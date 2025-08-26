@@ -16,7 +16,8 @@ servers:
     description: Kuala Staging
 
 tags:
-  - name: Auth (Supabase OAuth)
+  - name: Auth (Internal Supabase OAuth)
+  - name: Auth (Kuala)
   - name: Plans
   - name: Subscriptions
   - name: Invoices
@@ -25,7 +26,7 @@ tags:
 paths:
   /auth/v1/authorize:
     get:
-      tags: [Auth (Supabase OAuth)]
+      tags: [Auth (Internal Supabase OAuth)]
       summary: Login with OAuth Keycloak
       description: Redirects the user to Keycloak for OAuth authentication.
       parameters:
@@ -87,27 +88,29 @@ paths:
 
   /auth/v1/token:
     post:
-      tags: [Auth (Supabase OAuth)]
+      tags: [Auth (Internal Supabase OAuth)]
       summary: Exchange authorization code or refresh token for access token
       description: |
         After the OAuth provider redirects back to your app with a `code`,
         exchange it for an access token.
+
+        Refresh token will regenerate a new access token and give new refresh token also.
       requestBody:
         required: true
         content:
           application/json:
-              schema:
-                type: object
-                properties:
-                  auth_code:
-                    type: string
-                    description: Authorization code received from OAuth provider
-                  code_verifier:
-                    type: string
-                    description: PKCE code verifier (if using PKCE flow and grant_type is pkce)
-                  refresh_token:
-                    type: string
-                    description: Refresh token to obtain new access token (if grant_type is refresh_token)
+            schema:
+              type: object
+              properties:
+                auth_code:
+                  type: string
+                  description: Authorization code received from OAuth provider
+                code_verifier:
+                  type: string
+                  description: PKCE code verifier (if using PKCE flow and grant_type is pkce)
+                refresh_token:
+                  type: string
+                  description: Refresh token to obtain new access token (if grant_type is refresh_token)
       parameters:
         - in: header
           name: apikey
@@ -128,41 +131,215 @@ paths:
           content:
             application/json:
               schema:
-                oneOf:
-                  - $ref: '#/components/schemas/AuthResponse'  # For code exchange
-                  - $ref: '#/components/schemas/AuthSessionUrlResponse'  # For refresh token
+                $ref: "#/components/schemas/Session" # For code exchange
         "400":
           description: Invalid code or grant type.
 
   /auth/v1/logout:
     post:
-      tags: [Auth (Supabase OAuth)]
+      tags: [Auth (Internal Supabase OAuth)]
       summary: Logout user
       description: Logs out the authenticated user by revoking their refresh token.
       security:
         - bearerAuth: []
+      parameters:
+        - in: header
+          name: apikey
+          description: anon key for Supabase
+          schema:
+            type: string
       responses:
-        "200":
+        "204":
           description: Successfully logged out.
         "401":
           description: Unauthorized - Invalid or missing token.
 
   /auth/v1/user:
     get:
-      tags: [Auth (Supabase OAuth)]
+      tags: [Auth (Internal Supabase OAuth)]
       summary: Get current user
       description: Retrieves the currently authenticated user's information.
       security:
         - bearerAuth: []
+      parameters:
+        - in: header
+          name: apikey
+          description: anon key for Supabase
+          schema:
+            type: string
       responses:
         "200":
           description: User profile retrieved successfully.
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/User'
+                $ref: "#/components/schemas/User"
         "401":
           description: Unauthorized - Invalid or missing token.
+
+  /auth/authorize:
+    post:
+      tags: [Auth (Kuala)]
+      summary: Kuala authorize endpoint
+      description: |
+        Kuala wrapper for OAuth authorization. This endpoint handles the OAuth flow 
+        and redirects to the appropriate provider for authentication.
+      operationId: kualaAuthorize
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                redirect_to:
+                  type: string
+                  format: uri
+                  description: URL to redirect after successful authentication
+                code_challenge:
+                  type: string
+                  description: PKCE code challenge (S256)
+              required: [redirect_to, code_challenge]
+            example:
+              redirect_to: "https://yourapp.com/callback"
+              code_challenge: "your_code_challenge"
+      responses:
+        "200":
+          description: Authorization URL generated successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OAuthResponse"
+        "400":
+          description: Invalid provider or parameters
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /auth/exchange-token:
+    post:
+      tags: [Auth (Kuala)]
+      summary: Exchange authorization code for access token
+      description: |
+        Kuala wrapper for exchanging OAuth authorization code for access tokens.
+        This endpoint wraps the Supabase OAuth token exchange functionality.
+      operationId: kualaExchangeToken
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                auth_code:
+                  type: string
+                  description: Authorization code received from OAuth provider
+                code_verifier:
+                  type: string
+                  description: PKCE code verifier
+              required: [authCode, code_verifier]
+            example:
+              authCode: "authorization_code_from_provider"
+              codeVerifier: "your_code_verifier"
+      responses:
+        "200":
+          description: Successfully exchanged code for tokens
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Session"
+        "400":
+          description: Invalid code or grant type
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /auth/refresh-token:
+    post:
+      tags: [Auth (Kuala)]
+      summary: Refresh access token
+      description: |
+        Kuala wrapper for refreshing access tokens using refresh token.
+        This endpoint wraps the Supabase OAuth token refresh functionality.
+      operationId: kualaRefreshToken
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                refresh_token:
+                  type: string
+                  description: Refresh token to obtain new access token
+              required: [refresh_token]
+            example:
+              refresh_token: "your_refresh_token"
+      responses:
+        "200":
+          description: Successfully refreshed tokens
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Session"
+        "400":
+          description: Invalid refresh token
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Refresh token expired or invalid
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /auth/logout:
+    post:
+      tags: [Auth (Kuala)]
+      summary: Kuala logout endpoint
+      description: |
+        Kuala wrapper for user logout. This endpoint handles the logout process
+        and revokes the user's refresh token.
+      operationId: kualaLogout
+      security:
+        - bearerAuth: []
+      responses:
+        "204":
+          description: Successfully logged out
+        "401":
+          description: Unauthorized - Invalid or missing token
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /auth/me:
+    get:
+      tags: [Auth (Kuala)]
+      summary: Get current authenticated user
+      description: |
+        Kuala wrapper for retrieving the current authenticated user's information.
+        This endpoint wraps the Supabase user profile functionality.
+      operationId: kualaGetUser
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: User profile retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+        "401":
+          description: Unauthorized - Invalid or missing token
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
 
   /plans:
     get:
@@ -329,7 +506,6 @@ paths:
           description: Invoice created with empty response
         "404":
           description: If there is nothing to invoice for, returns a 404 status code.
-
 
   /invoices/{invoiceId}:
     get:
@@ -529,11 +705,11 @@ components:
         identities:
           type: [array, "null"]
           items:
-            $ref: '#/components/schemas/UserIdentity'
+            $ref: "#/components/schemas/UserIdentity"
         factors:
           type: [array, "null"]
           items:
-            $ref: '#/components/schemas/Factor'
+            $ref: "#/components/schemas/Factor"
         isAnonymous:
           type: boolean
       required:
@@ -542,7 +718,7 @@ components:
         - aud
         - createdAt
         - isAnonymous
-    
+
     UserIdentity:
       type: object
       properties:
@@ -601,7 +777,7 @@ components:
         - status
         - createdAt
         - updatedAt
-        
+
     Session:
       type: object
       properties:
@@ -670,7 +846,7 @@ components:
     OAuthProvider:
       type: object
       properties:
-        id: { type: string, examples: [google, github] }
+        id: { type: string, examples: [keycloak, google, github] }
         name: { type: string }
       required: [id, name]
 
