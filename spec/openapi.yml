@@ -178,38 +178,37 @@ paths:
           description: Unauthorized - Invalid or missing token.
 
   /auth/authorize:
-    post:
+    get:
       tags: [Auth (Kuala)]
       summary: Kuala authorize endpoint
       description: |
         Kuala wrapper for OAuth authorization. This endpoint handles the OAuth flow 
         and redirects to the appropriate provider for authentication.
       operationId: kualaAuthorize
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              properties:
-                redirect_to:
-                  type: string
-                  format: uri
-                  description: URL to redirect after successful authentication
-                code_challenge:
-                  type: string
-                  description: PKCE code challenge (S256)
-              required: [redirect_to, code_challenge]
-            example:
-              redirect_to: "https://yourapp.com/callback"
-              code_challenge: "your_code_challenge"
+      parameters:
+        - in: query
+          name: redirect_to
+          required: true
+          schema:
+            type: string
+            format: uri
+          example: https://yourapp.com/callback
+          description: URL to redirect after successful authentication.
+        - in: query
+          name: code_challenge
+          required: true
+          schema:
+            type: string
+          example: <your_code_challenge>
+          description: PKCE code challenge (S256).
       responses:
-        "200":
-          description: Authorization URL generated successfully
-          content:
-            application/json:
+        "302":
+          description: Redirect to Keycloak login page.
+          headers:
+            Location:
+              description: URL to the Keycloak login page.
               schema:
-                $ref: "#/components/schemas/OAuthResponse"
+                type: string
         "400":
           description: Invalid provider or parameters
           content:
@@ -238,10 +237,10 @@ paths:
                 code_verifier:
                   type: string
                   description: PKCE code verifier
-              required: [authCode, code_verifier]
+              required: [auth_code, code_verifier]
             example:
-              authCode: "authorization_code_from_provider"
-              codeVerifier: "your_code_verifier"
+              auth_code: "authorization_code_from_provider"
+              code_verifier: "your_code_verifier"
       responses:
         "200":
           description: Successfully exchanged code for tokens
