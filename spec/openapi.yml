@@ -1,4 +1,4 @@
-openapi: 3.1.0
+openapi: 3.0.3
 info:
   title: Kuala API
   version: "1.0.0"
@@ -209,6 +209,7 @@ paths:
               description: URL to the Keycloak login page.
               schema:
                 type: string
+                example: "https://auth.yourcompany.com/auth/realms/your-realm/protocol/openid-connect/auth?response_type=code&client_id=your-client&redirect_uri=https://yourapp.com/callback"
         "400":
           description: Invalid provider or parameters
           content:
@@ -365,7 +366,7 @@ paths:
                     type: array
                     items:
                       $ref: "#/components/schemas/Plan"
-              examples:
+              example:
                 monthly:
                   value:
                     plans:
@@ -442,7 +443,7 @@ paths:
           application/json:
             schema:
               $ref: "#/components/schemas/CreateSubscriptionRequest"
-            examples:
+            example:
               basic-monthly:
                 value:
                   planId: basic
@@ -655,58 +656,75 @@ components:
           type: object
           additionalProperties: true
         userMetadata:
-          type: [object, "null"]
+          type: object
+          nullable: true
           additionalProperties: true
         aud:
           type: string
         confirmationSentAt:
-          type: [string, "null"]
+          type: string
+          nullable: true
           format: date-time
         recoverySentAt:
-          type: [string, "null"]
+          type: string
+          nullable: true
           format: date-time
         emailChangeSentAt:
-          type: [string, "null"]
+          type: string
+          nullable: true
           format: date-time
         newEmail:
-          type: [string, "null"]
+          type: string
+          nullable: true
         invitedAt:
-          type: [string, "null"]
+          type: string
+          nullable: true
           format: date-time
         actionLink:
-          type: [string, "null"]
+          type: string
+          nullable: true
         email:
-          type: [string, "null"]
+          type: string
+          nullable: true
           format: email
         phone:
-          type: [string, "null"]
+          type: string
+          nullable: true
         createdAt:
           type: string
           format: date-time
         confirmedAt:
-          type: [string, "null"]
+          type: string
+          nullable: true
           format: date-time
           deprecated: true
         emailConfirmedAt:
-          type: [string, "null"]
+          type: string
+          nullable: true
           format: date-time
         phoneConfirmedAt:
-          type: [string, "null"]
+          type: string
+          nullable: true
           format: date-time
         lastSignInAt:
-          type: [string, "null"]
+          type: string
+          nullable: true
           format: date-time
         role:
-          type: [string, "null"]
+          type: string
+          nullable: true
         updatedAt:
-          type: [string, "null"]
+          type: string
+          nullable: true
           format: date-time
         identities:
-          type: [array, "null"]
+          type: array
+          nullable: true
           items:
             $ref: "#/components/schemas/UserIdentity"
         factors:
-          type: [array, "null"]
+          type: array
+          nullable: true
           items:
             $ref: "#/components/schemas/Factor"
         isAnonymous:
@@ -726,20 +744,24 @@ components:
         userId:
           type: string
         identityData:
-          type: [object, "null"]
+          type: object
+          nullable: true
           additionalProperties: true
         identityId:
           type: string
         provider:
           type: string
         createdAt:
-          type: [string, "null"]
+          type: string
+          nullable: true
           format: date-time
         lastSignInAt:
-          type: [string, "null"]
+          type: string
+          nullable: true
           format: date-time
         updatedAt:
-          type: [string, "null"]
+          type: string
+          nullable: true
           format: date-time
       required:
         - id
@@ -754,7 +776,8 @@ components:
           type: string
           description: "ID of the factor."
         friendlyName:
-          type: [string, "null"]
+          type: string
+          nullable: true
           description: "Friendly name of the factor, useful to disambiguate."
         factorType:
           type: string
@@ -781,20 +804,24 @@ components:
       type: object
       properties:
         providerToken:
-          type: [string, "null"]
+          type: string
+          nullable: true
           description: "OAuth provider access token."
         providerRefreshToken:
-          type: [string, "null"]
+          type: string
+          nullable: true
           description: "OAuth provider refresh token."
         accessToken:
           type: string
           description: "JWT access token issued by the auth server."
         expiresIn:
-          type: [integer, "null"]
+          type: integer
+          nullable: true
           description: "Number of seconds until the access token expires."
           example: 3600
         refreshToken:
-          type: [string, "null"]
+          type: string
+          nullable: true
           description: "Refresh token used to obtain a new access token."
         tokenType:
           type: string
@@ -813,7 +840,8 @@ components:
         session:
           $ref: "#/components/schemas/Session"
         redirectType:
-          type: [string, "null"]
+          type: string
+          nullable: true
           description: "Type of redirect after authentication (e.g., 'login', 'signup')."
           example: login
       required:
@@ -840,12 +868,11 @@ components:
           $ref: "#/components/schemas/Session"
         user:
           $ref: "#/components/schemas/User"
-      required: []
 
     OAuthProvider:
       type: object
       properties:
-        id: { type: string, examples: [keycloak, google, github] }
+        id: { type: string, example: keycloak }
         name: { type: string }
       required: [id, name]
 
@@ -882,8 +909,8 @@ components:
       type: object
       properties:
         accessToken: { type: string }
-        tokenType: { type: string, examples: [Bearer] }
-        expiresIn: { type: integer, examples: [3600] }
+        tokenType: { type: string, example: Bearer }
+        expiresIn: { type: integer, example: 3600 }
         refreshToken: { type: string }
       required: [accessToken, tokenType, expiresIn]
 
@@ -916,10 +943,11 @@ components:
       type: object
       properties:
         amount:
-          type: [number, "null"]
+          type: number
+          nullable: true
         currency:
           type: string
-          examples: [USD]
+          example: USD
         interval:
           type: string
           enum: [month, year]
@@ -936,9 +964,11 @@ components:
           enum: [month, year]
           default: month
         promoCode:
-          type: [string, "null"]
+          type: string
+          nullable: true
         paymentMethodToken:
-          type: [string, "null"]
+          type: string
+          nullable: true
           description: Optional token to set as default payment method before creating subscription.
       required: [planId]
 
@@ -1051,7 +1081,7 @@ components:
       properties:
         eventType:
           type: string
-          examples:
+          example:
             [
               INVOICE_CREATION,
               PAYMENT_SUCCESS,
