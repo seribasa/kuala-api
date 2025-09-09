@@ -18,6 +18,7 @@ servers:
 tags:
   - name: Auth (Internal Supabase OAuth)
   - name: Auth (Kuala)
+  - name: Identity
   - name: Plans
   - name: Subscriptions
   - name: Invoices
@@ -209,7 +210,7 @@ paths:
               description: URL to the Keycloak login page.
               schema:
                 type: string
-                example: "https://auth.yourcompany.com/auth/realms/your-realm/protocol/openid-connect/auth?response_type=code&client_id=your-client&redirect_uri=https://yourapp.com/callback"
+                example: "changethis/identity/realms/lebensraum/protocol/openid-connect/auth?client_id=eimunisasi&redirect_to=https%3A%2F%2Fyourapp.com%2Fcallback&redirect_uri=https%3A%2F%2Fkuala-base-staging.peltops.com%2Fauth%2Fv1%2Fcallback&response_type=code&scope=profile%20email%20openid&state=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...&flow_type=pkce"
         "400":
           description: Invalid provider or parameters
           content:
@@ -336,6 +337,129 @@ paths:
                 $ref: "#/components/schemas/User"
         "401":
           description: Unauthorized - Invalid or missing token
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /identity/realms/{realms}/protocol/openid-connect/auth:
+    get:
+      tags: [Identity]
+      summary: Identity authorization page
+      description: |
+        Displays an HTML page that continues the OAuth authorization flow.
+        This endpoint returns an HTML page with a single button that, when clicked,
+        redirects the user to the Keycloak OAuth authorization URL.
+      operationId: identityAuthorize
+      parameters:
+        - in: path
+          name: realms
+          required: true
+          schema:
+            type: string
+          example: lebensraum
+          description: OAuth client identifier
+        - in: query
+          name: client_id
+          required: true
+          schema:
+            type: string
+          example: eimunisasi
+          description: OAuth client identifier
+        - in: query
+          name: redirect_to
+          required: true
+          schema:
+            type: string
+            format: uri
+          example: https://yourapp.com/callback
+          description: URL to redirect after successful authentication
+        - in: query
+          name: redirect_uri
+          required: true
+          schema:
+            type: string
+            format: uri
+          example: https://kuala-base-staging.peltops.com/auth/v1/callback
+          description: OAuth callback URI
+        - in: query
+          name: response_type
+          required: false
+          schema:
+            type: string
+            default: code
+          example: code
+          description: OAuth response type
+        - in: query
+          name: scope
+          required: false
+          schema:
+            type: string
+            default: "profile email openid"
+          example: "profile email openid"
+          description: OAuth scopes
+        - in: query
+          name: state
+          required: false
+          schema:
+            type: string
+          example: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+          description: OAuth state parameter for CSRF protection
+        - in: query
+          name: flow_type
+          required: false
+          schema:
+            type: string
+            default: pkce
+          example: pkce
+          description: OAuth flow type
+      responses:
+        "200":
+          description: HTML page with authorization button
+          content:
+            text/html:
+              schema:
+                type: string
+                example: |
+                  <!DOCTYPE html>
+                  <html>
+                  <head>
+                    <title>Authorization Required</title>
+                    <meta charset="utf-8">
+                    <meta name="viewport" content="width=device-width, initial-scale=1">
+                    <style>
+                      body { font-family: Arial, sans-serif; text-align: center; padding: 50px; }
+                      .auth-container { max-width: 400px; margin: 0 auto; }
+                      .auth-button { 
+                        background-color: #007bff; 
+                        color: white; 
+                        padding: 12px 24px; 
+                        border: none; 
+                        border-radius: 4px; 
+                        font-size: 16px; 
+                        cursor: pointer; 
+                        text-decoration: none;
+                        display: inline-block;
+                      }
+                      .auth-button:hover { background-color: #0056b3; }
+                    </style>
+                  </head>
+                  <body>
+                    <div class="auth-container">
+                      <h2>Authorization Required</h2>
+                      <p>Click the button below to continue with authentication</p>
+                      <!-- 
+                        CHANGE THIS URL TO YOUR FRONT
+                        ENDPOINT THAT HANDLES THE CALLBACK 
+                      -->
+                      <a href="changethis/auth/v1/callback" class="auth-button">
+                        Login
+                      </a>
+                    </div>
+                  </body>
+                  </html>
+        "400":
+          description: Invalid parameters
           content:
             application/json:
               schema:
