@@ -474,10 +474,12 @@ paths:
         - in: query
           name: interval
           description: Billing interval filter
+          required: false
           schema:
             type: string
             enum: [month, year]
-            default: month
+            nullable: true
+            default:
       responses:
         "200":
           description: Available plans
@@ -492,63 +494,133 @@ paths:
                       $ref: "#/components/schemas/Plan"
               example:
                 monthly:
-                  value:
-                    plans:
-                      - id: free
-                        name: Free
-                        tier: free
-                        features:
-                          - Generic Apps
-                          - Patient Appointment
-                          - Clinic Virtual Assistant
-                        price:
-                          amount: 0
-                          currency: USD
-                          interval: month
-                        selectable: true
-                      - id: basic
-                        name: Basic
-                        tier: basic
-                        features:
-                          - Generic Apps
-                          - Patient Appointment
-                          - Clinic Virtual Assistant
-                          - Published Apps
-                          - Landing Page
-                          - Event Management
-                        price:
-                          amount: 49.99
-                          currency: USD
-                          interval: month
-                        selectable: true
-                      - id: premium
-                        name: Premium
-                        tier: premium
-                        features:
-                          - Generic Apps
-                          - Patient Appointment
-                          - Clinic Virtual Assistant
-                          - Published Apps
-                          - Landing Page
-                          - Event Management
-                          - Business Process
-                        price:
-                          amount: 99.99
-                          currency: USD
-                          interval: month
-                        selectable: true
-                      - id: enterprise
-                        name: Enterprise
-                        tier: enterprise
-                        features:
-                          - All Premium features
-                          - Enterprise Business Process
-                        price:
-                          amount: null
-                          currency: USD
-                          interval: month
-                        selectable: false
-                        contactUs: true
+                  plans:
+                  - id: free-monthly
+                    name: Free
+                    tier: free
+                    features:
+                      - Generic Apps
+                      - Patient Appointment
+                      - Clinic Virtual Assistant
+                    prices:
+                      - currency: USD
+                        amount: 0
+                      - currency: IDR
+                        amount: 0
+                    selectable: true
+                  - id: basic-monthly
+                    name: Basic
+                    tier: basic
+                    features:
+                      - Generic Apps
+                      - Patient Appointment
+                      - Clinic Virtual Assistant
+                      - Published Apps
+                      - Landing Page
+                      - Event Management
+                    prices:
+                      - amount: 9.99
+                        currency: USD
+                      - amount: 139000
+                        currency: IDR
+                    selectable: true
+                  - id: premium-monthly
+                    name: Premium
+                    tier: premium
+                    features:
+                      - Generic Apps
+                      - Patient Appointment
+                      - Clinic Virtual Assistant
+                      - Published Apps
+                      - Landing Page
+                      - Event Management
+                      - Business Process
+                    prices:
+                      - amount: 49.99
+                        currency: USD
+                      - amount: 699000
+                        currency: IDR
+                    selectable: true
+                  - id: enterprise-monthly
+                    name: Enterprise
+                    tier: enterprise
+                    features:
+                      - All Premium features
+                      - Enterprise Business Process
+                    prices:
+                      - amount: 499.99
+                        currency: USD
+                      - amount: 6990000
+                        currency: IDR
+                    selectable: false
+                    contactUs:
+                      email: test@test.com
+                      subject: "Inquiry about Enterprise Plan"
+                      body: "I would like to know more about the Enterprise plan."
+                annually:
+                  plans:
+                  - id: free-annual
+                    name: Free
+                    tier: free
+                    features:
+                      - Generic Apps
+                      - Patient Appointment
+                      - Clinic Virtual Assistant
+                    prices:
+                      - currency: USD
+                        amount: 0
+                      - currency: IDR
+                        amount: 0
+                    selectable: true
+                  - id: basic-annual
+                    name: Basic
+                    tier: basic
+                    features:
+                      - Generic Apps
+                      - Patient Appointment
+                      - Clinic Virtual Assistant
+                      - Published Apps
+                      - Landing Page
+                      - Event Management
+                    prices:
+                      - amount: 9.99
+                        currency: USD
+                      - amount: 139000
+                        currency: IDR
+                    selectable: true
+                  - id: premium-annual
+                    name: Premium
+                    tier: premium
+                    features:
+                      - Generic Apps
+                      - Patient Appointment
+                      - Clinic Virtual Assistant
+                      - Published Apps
+                      - Landing Page
+                      - Event Management
+                      - Business Process
+                    prices:
+                      - amount: 49.99
+                        currency: USD
+                      - amount: 699000
+                        currency: IDR
+                    selectable: true
+                  - id: enterprise-annual
+                    name: Enterprise
+                    tier: enterprise
+                    features:
+                      - All Premium features
+                      - Enterprise Business Process
+                    prices:
+                      - amount: 499.99
+                        currency: USD
+                      - amount: 6990000
+                        currency: IDR
+                    selectable: false
+                    contactUs:
+                      email: test@test.com
+                      subject: "Inquiry about Enterprise Plan"
+                      body: "I would like to know more about the Enterprise plan."
 
   /subscriptions:
     post:
@@ -1053,15 +1125,22 @@ components:
         features:
           type: array
           items: { type: string }
-        price:
-          $ref: "#/components/schemas/Price"
+        prices:
+          type: array
+          items:
+            $ref: "#/components/schemas/Price"
         selectable:
           type: boolean
           default: true
         contactUs:
-          type: boolean
-          default: false
-      required: [id, name, tier, features, price, selectable]
+          type: object
+          nullable: true
+          default: null
+          properties:
+            email: { type: string, format: email }
+            subject: { type: string }
+            body: { type: string }
+      required: [id, name, tier, features, prices, selectable]
 
     Price:
       type: object
@@ -1072,10 +1151,7 @@ components:
         currency:
           type: string
           example: USD
-        interval:
-          type: string
-          enum: [month, year]
-      required: [currency, interval]
+      required: [currency]
 
     CreateSubscriptionRequest:
       type: object

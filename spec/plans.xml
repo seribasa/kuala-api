@@ -1,0 +1,291 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<catalog
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:noNamespaceSchemaLocation="https://docs.killbill.io/latest/catalog.xsd">
+	<effectiveDate>2025-09-11T00:00:00+00:00</effectiveDate>
+	<catalogName>KualaCatalog</catalogName>
+	<recurringBillingMode>IN_ADVANCE</recurringBillingMode>
+	<currencies>
+		<currency>USD</currency>
+		<currency>IDR</currency>
+	</currencies>
+	<products>
+		<product name="Free">
+			<category>BASE</category>
+            <included>
+                <addonProduct>Generic-Apps</addonProduct>
+                <addonProduct>Patient-Appointment</addonProduct>
+                <addonProduct>Clinic-Virtual-Assistant</addonProduct>
+            </included>
+		</product>
+        <product name="Basic">
+            <category>BASE</category>
+            <included>
+                <addonProduct>Generic-Apps</addonProduct>
+                <addonProduct>Patient-Appointment</addonProduct>
+                <addonProduct>Clinic-Virtual-Assistant</addonProduct>
+                <addonProduct>Published-Apps</addonProduct>
+                <addonProduct>Landing-Page</addonProduct>
+                <addonProduct>Event-Management</addonProduct>
+            </included>
+        </product>
+        <product name="Premium">
+            <category>BASE</category>
+            <included>
+                <addonProduct>Generic-Apps</addonProduct>
+                <addonProduct>Patient-Appointment</addonProduct>
+                <addonProduct>Clinic-Virtual-Assistant</addonProduct>
+                <addonProduct>Published-Apps</addonProduct>
+                <addonProduct>Landing-Page</addonProduct>
+                <addonProduct>Event-Management</addonProduct>
+                <addonProduct>Business-Process</addonProduct>
+            </included>
+        </product>
+        <product name="Enterprise">
+            <category>BASE</category>
+            <included>
+                <addonProduct>Generic-Apps</addonProduct>
+                <addonProduct>Patient-Appointment</addonProduct>
+                <addonProduct>Clinic-Virtual-Assistant</addonProduct>
+                <addonProduct>Published-Apps</addonProduct>
+                <addonProduct>Landing-Page</addonProduct>
+                <addonProduct>Event-Management</addonProduct>
+                <addonProduct>Business-Process</addonProduct>
+                <addonProduct>Enterprise-Business-Process</addonProduct>
+            </included>
+        </product>
+		<product name="Generic-Apps">
+			<category>ADD_ON</category>
+		</product>
+        <product name="Patient-Appointment">
+            <category>ADD_ON</category>
+        </product>
+        <product name="Clinic-Virtual-Assistant">
+            <category>ADD_ON</category>
+        </product>
+        <product name="Published-Apps">
+            <category>ADD_ON</category>
+        </product>
+        <product name="Landing-Page">
+            <category>ADD_ON</category>
+        </product>
+        <product name="Event-Management">
+            <category>ADD_ON</category>
+        </product>
+        <product name="Business-Process">
+            <category>ADD_ON</category>
+        </product>
+        <product name="Enterprise-Business-Process">
+            <category>ADD_ON</category>
+        </product>
+	</products>
+	<rules>
+		<changePolicy>
+			<changePolicyCase>
+				<policy>END_OF_TERM</policy>
+			</changePolicyCase>
+		</changePolicy>
+		<cancelPolicy>
+			<cancelPolicyCase>
+				<policy>END_OF_TERM</policy>
+			</cancelPolicyCase>
+		</cancelPolicy>
+		<billingAlignment>
+			<billingAlignmentCase>
+				<alignment>ACCOUNT</alignment>
+			</billingAlignmentCase>
+		</billingAlignment>
+	</rules>
+	<plans>
+		<plan name="free-monthly">
+			<product>Free</product>
+			<initialPhases></initialPhases>
+			<finalPhase type="EVERGREEN">
+				<duration>
+					<unit>UNLIMITED</unit>
+				</duration>
+				<recurring>
+					<billingPeriod>MONTHLY</billingPeriod>
+					<recurringPrice>
+						<price>
+							<currency>USD</currency>
+							<value>0</value>
+						</price>
+						<price>
+							<currency>IDR</currency>
+							<value>0</value>
+						</price>
+					</recurringPrice>
+				</recurring>
+			</finalPhase>
+		</plan>
+		<plan name="free-annual">
+			<product>Free</product>
+			<initialPhases></initialPhases>
+			<finalPhase type="EVERGREEN">
+				<duration>
+					<unit>UNLIMITED</unit>
+				</duration>
+				<recurring>
+					<billingPeriod>ANNUAL</billingPeriod>
+					<recurringPrice>
+						<price>
+							<currency>USD</currency>
+							<value>0</value>
+						</price>
+						<price>
+							<currency>IDR</currency>
+							<value>0</value>
+						</price>
+					</recurringPrice>
+				</recurring>
+			</finalPhase>
+		</plan>
+		<plan name="basic-monthly">
+            <product>Basic</product>
+			<initialPhases></initialPhases>
+			<finalPhase type="EVERGREEN">
+				<duration>
+					<unit>UNLIMITED</unit>
+				</duration>
+				<recurring>
+					<billingPeriod>MONTHLY</billingPeriod>
+					<recurringPrice>
+						<price>
+							<currency>USD</currency>
+							<value>49.99</value>
+						</price>
+						<price>
+							<currency>IDR</currency>
+							<value>899000</value>
+						</price>
+					</recurringPrice>
+				</recurring>
+			</finalPhase>
+		</plan>
+		<plan name="basic-annual">
+            <product>Basic</product>
+            <initialPhases></initialPhases>
+            <finalPhase type="EVERGREEN">
+                <duration>
+                    <unit>UNLIMITED</unit>
+                </duration>
+                <recurring>
+                    <billingPeriod>ANNUAL</billingPeriod>
+                    <recurringPrice>
+                        <price>
+                            <currency>USD</currency>
+                            <value>499.99</value>
+                        </price>
+						<price>
+							<currency>IDR</currency>
+							<value>8999000</value>
+						</price>
+                    </recurringPrice>
+                </recurring>
+            </finalPhase>
+        </plan>
+        <plan name="premium-monthly">
+            <product>Premium</product>
+            <initialPhases></initialPhases>
+            <finalPhase type="EVERGREEN">
+                <duration>
+                    <unit>UNLIMITED</unit>
+                </duration>
+                <recurring>
+                    <billingPeriod>MONTHLY</billingPeriod>
+                    <recurringPrice>
+                        <price>
+                            <currency>USD</currency>
+                            <value>99.99</value>
+                        </price>
+                        <price>
+                            <currency>IDR</currency>
+                            <value>1799000</value>
+                        </price>
+                    </recurringPrice>
+                </recurring>
+            </finalPhase>
+        </plan>
+        <plan name="premium-annual">
+            <product>Premium</product>
+            <initialPhases></initialPhases>
+            <finalPhase type="EVERGREEN">
+                <duration>
+                    <unit>UNLIMITED</unit>
+                </duration>
+                <recurring>
+                    <billingPeriod>ANNUAL</billingPeriod>
+                    <recurringPrice>
+                        <price>
+                            <currency>USD</currency>
+                            <value>999.99</value>
+                        </price>
+                        <price>
+                            <currency>IDR</currency>
+                            <value>17999000</value>
+                        </price>
+                    </recurringPrice>
+                </recurring>
+            </finalPhase>
+        </plan>
+        <plan name="enterprise-monthly">
+            <product>Enterprise</product>
+            <initialPhases></initialPhases>
+            <finalPhase type="EVERGREEN">
+                <duration>
+                    <unit>UNLIMITED</unit>
+                </duration>
+                <recurring>
+                    <billingPeriod>MONTHLY</billingPeriod>
+                    <recurringPrice>
+                        <price>
+                            <currency>USD</currency>
+                            <value>199.99</value>
+                        </price>
+                        <price>
+                            <currency>IDR</currency>
+                            <value>3299000</value>
+                        </price>
+                    </recurringPrice>
+                </recurring>
+            </finalPhase>
+        </plan>
+        <plan name="enterprise-annual">
+            <product>Enterprise</product>
+            <initialPhases></initialPhases>
+            <finalPhase type="EVERGREEN">
+                <duration>
+                    <unit>UNLIMITED</unit>
+                </duration>
+                <recurring>
+                    <billingPeriod>ANNUAL</billingPeriod>
+                    <recurringPrice>
+                        <price>
+                            <currency>USD</currency>
+                            <value>1999.99</value>
+                        </price>
+                        <price>
+                            <currency>IDR</currency>
+                            <value>32999000</value>
+                        </price>
+                    </recurringPrice>
+                </recurring>
+            </finalPhase>
+        </plan>
+	</plans>
+	<priceLists>
+		<defaultPriceList name="DEFAULT">
+			<plans>
+                <plan>free-monthly</plan>
+                <plan>free-annual</plan>
+                <plan>basic-monthly</plan>
+                <plan>basic-annual</plan>
+                <plan>premium-monthly</plan>
+                <plan>premium-annual</plan>
+                <plan>enterprise-monthly</plan>
+                <plan>enterprise-annual</plan>
+			</plans>
+		</defaultPriceList>
+	</priceLists>
+</catalog>
