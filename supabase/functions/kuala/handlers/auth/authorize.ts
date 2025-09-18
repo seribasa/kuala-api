@@ -1,4 +1,5 @@
 import { Context } from "jsr:@hono/hono";
+import { ErrorResponse } from "../../../_shared/types/baseResponse.ts";
 
 /**
  * Kuala authorize endpoint handler
@@ -12,40 +13,35 @@ export const handleAuthorize = (c: Context) => {
 
     // Validate required parameters
     if (!redirectTo) {
-      return c.json(
-        {
-          code: "MISSING_REDIRECT_TO",
-          message: "redirect_to parameter is required",
-        },
-        400,
-      );
+      const errorResponse: ErrorResponse = {
+        code: "MISSING_REDIRECT_TO",
+        message: "redirect_to parameter is required",
+      };
+      return c.json(errorResponse, 400);
     }
 
     if (!codeChallenge) {
-      return c.json(
-        {
-          code: "MISSING_CODE_CHALLENGE",
-          message: "code_challenge parameter is required",
-        },
-        400,
-      );
+      const errorResponse: ErrorResponse = {
+        code: "MISSING_CODE_CHALLENGE",
+        message: "code_challenge parameter is required",
+      };
+      return c.json(errorResponse, 400);
     }
 
     // Validate redirect_to is a valid URL
     try {
       new URL(redirectTo);
     } catch {
-      return c.json(
-        {
-          code: "INVALID_REDIRECT_TO",
-          message: "redirect_to must be a valid URL",
-        },
-        400,
-      );
+      const errorResponse: ErrorResponse = {
+        code: "INVALID_REDIRECT_TO",
+        message: "redirect_to must be a valid URL",
+      };
+      return c.json(errorResponse, 400);
     }
 
     // Build the Supabase OAuth authorization URL
-    const supabaseAuthUrl = new URL("/auth/v1/authorize", c.req.url);
+    const supabaseBaseUrl = Deno.env.get("SUPABASE_URL") || c.req.url;
+    const supabaseAuthUrl = new URL("/auth/v1/authorize", supabaseBaseUrl);
     supabaseAuthUrl.searchParams.set("provider", "keycloak");
     supabaseAuthUrl.searchParams.set("scopes", "openid");
     supabaseAuthUrl.searchParams.set("redirect_to", redirectTo);
@@ -57,12 +53,10 @@ export const handleAuthorize = (c: Context) => {
     return c.redirect(supabaseAuthUrl.toString(), 302);
   } catch (error) {
     console.error("Error in handleAuthorize:", error);
-    return c.json(
-      {
-        code: "INTERNAL_ERROR",
-        message: "Internal server error",
-      },
-      500,
-    );
+    const errorResponse: ErrorResponse = {
+      code: "INTERNAL_ERROR",
+      message: "Internal server error",
+    };
+    return c.json(errorResponse, 500);
   }
 };

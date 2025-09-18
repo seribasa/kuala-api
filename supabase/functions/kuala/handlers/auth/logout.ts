@@ -1,4 +1,5 @@
 import { Context } from "jsr:@hono/hono";
+import { ErrorResponse } from "../../../_shared/types/baseResponse.ts";
 
 /**
  * Kuala logout endpoint handler
@@ -9,28 +10,25 @@ export const handleLogout = async (c: Context) => {
         // Get Authorization header
         const authorization = c.req.header("Authorization");
         if (!authorization) {
-            return c.json(
-                {
-                    code: "MISSING_AUTHORIZATION",
-                    message: "Authorization header is required",
-                },
-                401,
-            );
+            const errorResponse: ErrorResponse = {
+                code: "MISSING_AUTHORIZATION",
+                message: "Authorization header is required",
+            };
+            return c.json(errorResponse, 401);
         }
 
         // Build the Supabase logout URL
-        const supabaseLogoutUrl = new URL("/auth/v1/logout", c.req.url);
+        const supabaseBaseUrl = Deno.env.get("SUPABASE_URL") || c.req.url;
+        const supabaseLogoutUrl = new URL("/auth/v1/logout", supabaseBaseUrl);
 
         // Get apikey from environment
         const apikey = Deno.env.get("SUPABASE_ANON_KEY");
         if (!apikey) {
-            return c.json(
-                {
-                    code: "MISSING_API_KEY",
-                    message: "Supabase API key not configured",
-                },
-                500,
-            );
+            const errorResponse: ErrorResponse = {
+                code: "MISSING_API_KEY",
+                message: "Supabase API key not configured",
+            };
+            return c.json(errorResponse, 500);
         }
 
         // Forward request to Supabase
@@ -53,12 +51,10 @@ export const handleLogout = async (c: Context) => {
         return c.body(null, 204);
     } catch (error) {
         console.error("Error in handleLogout:", error);
-        return c.json(
-            {
-                code: "INTERNAL_ERROR",
-                message: "Internal server error",
-            },
-            500,
-        );
+        const errorResponse: ErrorResponse = {
+            code: "INTERNAL_ERROR",
+            message: "Internal server error",
+        };
+        return c.json(errorResponse, 500);
     }
 };

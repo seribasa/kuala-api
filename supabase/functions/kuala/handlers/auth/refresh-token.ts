@@ -1,4 +1,5 @@
 import { Context } from "jsr:@hono/hono";
+import { ErrorResponse } from "../../../_shared/types/baseResponse.ts";
 
 /**
  * Kuala refresh-token endpoint handler
@@ -12,17 +13,16 @@ export const handleRefreshToken = async (c: Context) => {
 
         // Validate required parameters
         if (!refresh_token) {
-            return c.json(
-                {
-                    code: "MISSING_REFRESH_TOKEN",
-                    message: "refresh_token is required",
-                },
-                400,
-            );
+            const errorResponse: ErrorResponse = {
+                code: "MISSING_REFRESH_TOKEN",
+                message: "refresh_token is required",
+            };
+            return c.json(errorResponse, 400);
         }
 
         // Build the Supabase token refresh URL
-        const supabaseTokenUrl = new URL("/auth/v1/token", c.req.url);
+        const supabaseBaseUrl = Deno.env.get("SUPABASE_URL") || c.req.url;
+        const supabaseTokenUrl = new URL("/auth/v1/token", supabaseBaseUrl);
         supabaseTokenUrl.searchParams.set("grant_type", "refresh_token");
 
         // Prepare request body for Supabase
@@ -33,13 +33,11 @@ export const handleRefreshToken = async (c: Context) => {
         // Get apikey from environment or request
         const apikey = Deno.env.get("SUPABASE_ANON_KEY");
         if (!apikey) {
-            return c.json(
-                {
-                    code: "MISSING_API_KEY",
-                    message: "Supabase API key not configured",
-                },
-                500,
-            );
+            const errorResponse: ErrorResponse = {
+                code: "MISSING_API_KEY",
+                message: "Supabase API key not configured",
+            };
+            return c.json(errorResponse, 500);
         }
 
         // Forward request to Supabase
@@ -67,12 +65,10 @@ export const handleRefreshToken = async (c: Context) => {
         return c.json(data, 200);
     } catch (error) {
         console.error("Error in handleRefreshToken:", error);
-        return c.json(
-            {
-                code: "INTERNAL_ERROR",
-                message: "Internal server error",
-            },
-            500,
-        );
+        const errorResponse: ErrorResponse = {
+            code: "INTERNAL_ERROR",
+            message: "Internal server error",
+        };
+        return c.json(errorResponse, 500);
     }
 };
