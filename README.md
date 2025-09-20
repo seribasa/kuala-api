@@ -19,7 +19,7 @@ Kuala API is a comprehensive backend service that provides:
 
 ### Architecture
 
-``` bash
+```bash
 ┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
 │   Client App    │───▶│   Kuala API     │───▶│   Supabase      │
 │                 │    │ (Edge Functions)│    │   (Auth & DB)   │
@@ -75,7 +75,7 @@ Copy `.env.example` to `.env` and configure the following variables:
 ```bash
 # Supabase Configuration
 AUTH_BASE_URL=https://your-project-id.supabase.co
-SUPABASE_ANON_KEY=your_supabase_anon_key_here
+AUTH_SUPABASE_ANON_KEY=your_supabase_anon_key_here
 
 # Optional: Kill Bill Configuration (for billing features)
 KILLBILL_URL=https://your-killbill-instance.com
@@ -173,7 +173,7 @@ curl -X GET "https://kuala-api-staging.seribasa.digital/auth/me" \
 
 ### Project Structure
 
-``` bash
+```bash
 kuala-api/
 ├── .env.example              # Environment variables template
 ├── LICENSE                   # MIT license
@@ -288,13 +288,13 @@ Plans are defined in Kill Bill and synchronized with the API. Each plan includes
 
 ### Environment Variables
 
-| Variable              | Description            | Required |
-| --------------------- | ---------------------- | -------- |
-| `AUTH_BASE_URL`       | Supabase project URL   | Yes      |
-| `SUPABASE_ANON_KEY`   | Supabase anonymous key | Yes      |
-| `KILLBILL_URL`        | Kill Bill instance URL | Optional |
-| `KILLBILL_API_KEY`    | Kill Bill API key      | Optional |
-| `KILLBILL_API_SECRET` | Kill Bill API secret   | Optional |
+| Variable                 | Description            | Required |
+| ------------------------ | ---------------------- | -------- |
+| `AUTH_BASE_URL`          | Supabase project URL   | Yes      |
+| `AUTH_SUPABASE_ANON_KEY` | Supabase anonymous key | Yes      |
+| `KILLBILL_URL`           | Kill Bill instance URL | Optional |
+| `KILLBILL_API_KEY`       | Kill Bill API key      | Optional |
+| `KILLBILL_API_SECRET`    | Kill Bill API secret   | Optional |
 
 ## 🚀 Deployment
 
@@ -313,7 +313,7 @@ supabase functions deploy kuala --project-ref your-prod-project-ref
 ```bash
 # Set production environment variables
 supabase secrets set AUTH_BASE_URL=https://prod.supabase.co
-supabase secrets set SUPABASE_ANON_KEY=prod_key_here
+supabase secrets set AUTH_SUPABASE_ANON_KEY=prod_key_here
 
 # Deploy with production config
 supabase functions deploy kuala

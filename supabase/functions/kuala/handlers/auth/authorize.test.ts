@@ -38,70 +38,82 @@ function createMockContext(
     } as unknown as Context;
 }
 
-Deno.test("handleAuthorize - should return 400 when redirect_to is missing", () => {
+Deno.test("handleAuthorize - should return 400 when redirect_to is missing", async () => {
     const mockContext = createMockContext({
         code_challenge: "test_challenge",
     });
 
-    const response = handleAuthorize(mockContext) as unknown as JsonResponse;
+    const response = await handleAuthorize(mockContext) as unknown as JsonResponse;
 
     assertEquals(response.status, 400);
     assertEquals(response.data.code, "MISSING_REDIRECT_TO");
     assertEquals(response.data.message, "redirect_to parameter is required");
 });
 
-Deno.test("handleAuthorize - should return 400 when code_challenge is missing", () => {
+Deno.test("handleAuthorize - should return 400 when code_challenge is missing", async () => {
     const mockContext = createMockContext({
         redirect_to: "https://example.com/callback",
     });
 
-    const response = handleAuthorize(mockContext) as unknown as JsonResponse;
+    const response = await handleAuthorize(mockContext) as unknown as JsonResponse;
 
     assertEquals(response.status, 400);
     assertEquals(response.data.code, "MISSING_CODE_CHALLENGE");
     assertEquals(response.data.message, "code_challenge parameter is required");
 });
 
-Deno.test("handleAuthorize - should return 400 when redirect_to is invalid URL", () => {
+Deno.test("handleAuthorize - should return 400 when redirect_to is invalid URL", async () => {
     const mockContext = createMockContext({
         redirect_to: "invalid-url",
         code_challenge: "test_challenge",
     });
 
-    const response = handleAuthorize(mockContext) as unknown as JsonResponse;
+    const response = await handleAuthorize(mockContext) as unknown as JsonResponse;
 
     assertEquals(response.status, 400);
     assertEquals(response.data.code, "INVALID_REDIRECT_TO");
     assertEquals(response.data.message, "redirect_to must be a valid URL");
 });
 
-Deno.test("handleAuthorize - should redirect with correct parameters when all inputs are valid", () => {
-    const redirectTo = "https://example.com/callback";
-    const codeChallenge = "test_challenge_123";
-
-    const mockContext = createMockContext({
-        redirect_to: redirectTo,
-        code_challenge: codeChallenge,
+Deno.test("handleAuthorize - should redirect with correct parameters when all inputs are valid", async () => {
+    // Mock environment variable
+    const envStub = stub(Deno.env, "get", (key: string) => {
+        if (key === "AUTH_BASE_URL") return "https://test.supabase.co";
+        return undefined;
     });
 
-    const response = handleAuthorize(
-        mockContext,
-    ) as unknown as RedirectResponse;
+    // Mock fetch to simulate Supabase redirect response
+    const fetchStub = stub(globalThis, "fetch", () => {
+        return Promise.resolve(new Response(null, {
+            status: 302,
+            headers: {
+                location: "https://keycloak.example.com/auth?redirect=test"
+            }
+        }));
+    });
 
-    assertEquals(response.status, 302);
+    try {
+        const redirectTo = "https://example.com/callback";
+        const codeChallenge = "test_challenge_123";
 
-    // Parse the redirect URL to verify parameters
-    const redirectUrl = new URL(response.redirectUrl);
-    assertEquals(redirectUrl.pathname, "/auth/v1/authorize");
-    assertEquals(redirectUrl.searchParams.get("provider"), "keycloak");
-    assertEquals(redirectUrl.searchParams.get("scopes"), "openid");
-    assertEquals(redirectUrl.searchParams.get("redirect_to"), redirectTo);
-    assertEquals(redirectUrl.searchParams.get("flow_type"), "pkce");
-    assertEquals(redirectUrl.searchParams.get("code_challenge"), codeChallenge);
-    assertEquals(redirectUrl.searchParams.get("code_challenge_method"), "s256");
+        const mockContext = createMockContext({
+            redirect_to: redirectTo,
+            code_challenge: codeChallenge,
+        });
+
+        const response = await handleAuthorize(
+            mockContext,
+        ) as unknown as RedirectResponse;
+
+        assertEquals(response.status, 302);
+        assertEquals(response.redirectUrl, "https://keycloak.example.com/auth?redirect=test");
+    } finally {
+        envStub.restore();
+        fetchStub.restore();
+    }
 });
 
-Deno.test("handleAuthorize - should handle URL constructor error gracefully", () => {
+Deno.test("handleAuthorize - should handle URL constructor error gracefully", async () => {
     // Create a stub that makes URL constructor throw
     const originalURL = globalThis.URL;
     let constructorCallCount = 0;
@@ -124,7 +136,7 @@ Deno.test("handleAuthorize - should handle URL constructor error gracefully", ()
             code_challenge: "test_challenge",
         });
 
-        const response = handleAuthorize(
+        const response = await handleAuthorize(
             mockContext,
         ) as unknown as JsonResponse;
 
@@ -136,7 +148,7 @@ Deno.test("handleAuthorize - should handle URL constructor error gracefully", ()
     }
 });
 
-Deno.test("handleAuthorize - should handle unexpected errors", () => {
+Deno.test("handleAuthorize - should handle unexpected errors", async () => {
     // Mock context that will cause an error when accessing req.query
     const mockContext = {
         req: {
@@ -155,7 +167,7 @@ Deno.test("handleAuthorize - should handle unexpected errors", () => {
     const consoleStub = stub(console, "error");
 
     try {
-        const response = handleAuthorize(
+        const response = await handleAuthorize(
             mockContext,
         ) as unknown as JsonResponse;
 
