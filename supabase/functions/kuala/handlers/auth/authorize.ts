@@ -5,7 +5,7 @@ import { ErrorResponse } from "../../../_shared/types/baseResponse.ts";
  * Kuala authorize endpoint handler
  * Wrapper for OAuth authorization that redirects to Supabase OAuth endpoint
  */
-export const handleAuthorize = (c: Context) => {
+export const handleAuthorize = async (c: Context) => {
 	try {
 		// Extract required query parameters
 		const redirectTo = c.req.query("redirect_to");
@@ -40,7 +40,7 @@ export const handleAuthorize = (c: Context) => {
 		}
 
 		// Build the Supabase OAuth authorization URL
-		const supabaseBaseUrl = Deno.env.get("SUPABASE_URL") || c.req.url;
+		const supabaseBaseUrl = Deno.env.get("AUTH_BASE_URL") || c.req.url;
 		const supabaseAuthUrl = new URL("/auth/v1/authorize", supabaseBaseUrl);
 		supabaseAuthUrl.searchParams.set("provider", "keycloak");
 		supabaseAuthUrl.searchParams.set("scopes", "openid");
@@ -49,8 +49,33 @@ export const handleAuthorize = (c: Context) => {
 		supabaseAuthUrl.searchParams.set("code_challenge", codeChallenge);
 		supabaseAuthUrl.searchParams.set("code_challenge_method", "s256");
 
-		// Redirect to Supabase OAuth endpoint
-		return c.redirect(supabaseAuthUrl.toString(), 302);
+		// Attempt to fetch Supabase OAuth endpoint to get redirect URL
+		const response = await fetch(supabaseAuthUrl.toString(), {
+			method: "GET",
+			redirect: "manual",
+		});
+		if (!response.ok && response.status !== 302) {
+			console.error("Supabase OAuth error:", response);
+			const errorResponse: ErrorResponse = {
+				code: "SUPABASE_OAUTH_ERROR",
+				message:
+					"Sorry, we encountered an error with the OAuth provider",
+			};
+			return c.json(
+				errorResponse,
+				response.status as 400 | 401 | 403 | 404 | 500,
+			);
+		}
+		const locationHeader = response.headers.get("location");
+		if (!locationHeader) {
+			const errorResponse: ErrorResponse = {
+				code: "NO_REDIRECT_LOCATION",
+				message: "No redirect location found",
+			};
+			return c.json(errorResponse, 500);
+		}
+
+		return c.redirect(locationHeader, 302);
 	} catch (error) {
 		console.error("Error in handleAuthorize:", error);
 		const errorResponse: ErrorResponse = {

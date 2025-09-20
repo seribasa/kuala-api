@@ -18,7 +18,7 @@ export const handleMe = async (c: Context) => {
 		}
 
 		// Build the Supabase user URL
-		const supabaseBaseUrl = Deno.env.get("SUPABASE_URL") || c.req.url;
+		const supabaseBaseUrl = Deno.env.get("AUTH_BASE_URL") || c.req.url;
 		const supabaseUserUrl = new URL("/auth/v1/user", supabaseBaseUrl);
 
 		// Get apikey from environment

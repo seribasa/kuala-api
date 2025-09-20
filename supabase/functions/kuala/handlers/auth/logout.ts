@@ -18,7 +18,7 @@ export const handleLogout = async (c: Context) => {
 		}
 
 		// Build the Supabase logout URL
-		const supabaseBaseUrl = Deno.env.get("SUPABASE_URL") || c.req.url;
+		const supabaseBaseUrl = Deno.env.get("AUTH_BASE_URL") || c.req.url;
 		const supabaseLogoutUrl = new URL("/auth/v1/logout", supabaseBaseUrl);
 
 		// Get apikey from environment

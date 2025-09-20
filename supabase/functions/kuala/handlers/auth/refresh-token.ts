@@ -21,7 +21,7 @@ export const handleRefreshToken = async (c: Context) => {
 		}
 
 		// Build the Supabase token refresh URL
-		const supabaseBaseUrl = Deno.env.get("SUPABASE_URL") || c.req.url;
+		const supabaseBaseUrl = Deno.env.get("AUTH_BASE_URL") || c.req.url;
 		const supabaseTokenUrl = new URL("/auth/v1/token", supabaseBaseUrl);
 		supabaseTokenUrl.searchParams.set("grant_type", "refresh_token");
 
