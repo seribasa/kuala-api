@@ -1,19 +1,19 @@
 {
-  "nodeModulesDir": "auto",
-  "npm": {
-    "specifiers": []
-  },
-  "imports": {
-    "@std/testing": "jsr:@std/testing@^1.0.12"
-  },
-  "tasks": {
-    "start": "deno run --allow-net --watch=static/,routes/,data/ dev.ts",
-    "test": "deno test --allow-net --allow-env --env-file=.env.test --coverage=coverage",
-    "lcov": "deno coverage --lcov coverage/ > coverage.lcov",
-    "lint": "deno lint"
-  },
-  "fmt": {
-    "useTabs": true,
-    "indentWidth": 4
-  }
+	"nodeModulesDir": "auto",
+	"npm": {
+		"specifiers": []
+	},
+	"imports": {
+		"@std/testing": "jsr:@std/testing@^1.0.12"
+	},
+	"tasks": {
+		"start": "deno run --allow-net --watch=static/,routes/,data/ dev.ts",
+		"test": "deno test --allow-net --allow-env --env-file=.env.test --coverage=coverage",
+		"lcov": "deno coverage --lcov coverage/ > coverage.lcov",
+		"lint": "deno lint"
+	},
+	"fmt": {
+		"useTabs": true,
+		"indentWidth": 4
+	}
 }

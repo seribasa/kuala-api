@@ -48,7 +48,7 @@ function createMockContext(
 }
 
 Deno.test("handleExchangeToken - should return 400 when auth_code is missing", async () => {
-	const mockContext = createMockContext({
+	const mockContext: Context = createMockContext({
 		code_verifier: "test_verifier",
 	});
 
