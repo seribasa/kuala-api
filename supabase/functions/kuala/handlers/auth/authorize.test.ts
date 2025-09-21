@@ -1,6 +1,6 @@
-import { assertEquals } from "jsr:@std/assert";
-import { stub } from "jsr:@std/testing/mock";
-import { Context } from "jsr:@hono/hono";
+import { assertEquals } from "@std/assert";
+import { stub } from "@std/testing/mock";
+import { Context } from "@hono/hono";
 import { handleAuthorize } from "./authorize.ts";
 
 // Type definitions for test responses

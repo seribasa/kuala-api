@@ -1,4 +1,4 @@
-import { Context } from "jsr:@hono/hono";
+import { Context } from "@hono/hono";
 import { ErrorResponse } from "../../../_shared/types/baseResponse.ts";
 import { authLogger } from "../../middleware/logger.ts";
 

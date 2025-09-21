@@ -1,5 +1,5 @@
-import { Hono } from "jsr:@hono/hono";
-import { logger } from "jsr:@hono/hono/logger";
+import { Hono } from "@hono/hono";
+import { logger } from "@hono/hono/logger";
 import { handleAuthorize } from "./handlers/auth/authorize.ts";
 import { handleExchangeToken } from "./handlers/auth/exchange-token.ts";
 import { handleRefreshToken } from "./handlers/auth/refresh-token.ts";

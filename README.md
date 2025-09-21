@@ -5,7 +5,8 @@
 [![Supabase](https://img.shields.io/badge/Supabase-3FCF8E?logo=supabase&logoColor=white)](https://supabase.com/)
 [![Deno](https://img.shields.io/badge/Deno-000000?logo=deno&logoColor=white)](https://deno.land/)
 
-> **Public API for OAuth authentication, subscription management, and payment processing powered by Supabase and Kill Bill.**
+> **Public API for OAuth authentication, subscription management, and payment
+> processing powered by Supabase and Kill Bill.**
 
 ## 🌟 Overview
 
@@ -220,7 +221,8 @@ deno test --allow-all --coverage=coverage
 This project follows TypeScript best practices:
 
 - **Type Safety**: All handlers use proper TypeScript types
-- **Error Handling**: Comprehensive error responses with proper HTTP status codes
+- **Error Handling**: Comprehensive error responses with proper HTTP status
+  codes
 - **Testing**: Unit tests for all handlers using Deno's testing framework
 - **Documentation**: Complete OpenAPI specification
 
@@ -263,7 +265,8 @@ The API supports multiple subscription tiers:
 
 ### Plan Management
 
-Plans are defined in Kill Bill and synchronized with the API. Each plan includes:
+Plans are defined in Kill Bill and synchronized with the API. Each plan
+includes:
 
 - ✅ Feature lists and capabilities
 - 💰 Pricing in multiple currencies (USD, IDR)
@@ -319,9 +322,408 @@ supabase secrets set AUTH_SUPABASE_ANON_KEY=prod_key_here
 supabase functions deploy kuala
 ```
 
+### Alternative Deployment Options
+
+#### 🖥️ Deploy to Your Own Server
+
+The API can run on any server that supports Deno. Here's how to deploy it as a
+standalone application:
+
+1. **Prepare the server environment**
+
+   ```bash
+   # Install Deno on your server
+   curl -fsSL https://deno.land/install.sh | sh
+
+   # Clone the repository
+   git clone https://github.com/seribasa/kuala-api.git
+   cd kuala-api
+   ```
+
+2. **Create a standalone server entry point**
+
+   Create `server.ts` in the project root:
+
+   ```typescript
+   import { serve } from "https://deno.land/std@0.208.0/http/server.ts";
+   import handler from "./supabase/functions/kuala/index.ts";
+
+   const port = parseInt(Deno.env.get("PORT") || "8080");
+
+   console.log(`🚀 Kuala API server running on port ${port}`);
+
+   await serve(handler, { port });
+   ```
+
+3. **Set up environment variables**
+
+   ```bash
+   # Create production environment file
+   cp .env.example .env.production
+
+   # Edit with your production values
+   export AUTH_BASE_URL=https://your-supabase-project.supabase.co
+   export AUTH_SUPABASE_ANON_KEY=your_production_anon_key
+   export KILLBILL_URL=https://your-killbill-instance.com
+   export KILLBILL_API_KEY=your_api_key
+   export KILLBILL_API_SECRET=your_api_secret
+   ```
+
+4. **Run the server**
+
+   ```bash
+   # Development
+   deno run --allow-all --env-file=.env.production server.ts
+
+   # Production with PM2
+   pm2 start "deno run --allow-all --env-file=.env.production server.ts" --name kuala-api
+
+   # Or with systemd service
+   sudo systemctl start kuala-api
+   ```
+
+5. **Nginx reverse proxy configuration**
+
+   ```nginx
+   server {
+       listen 80;
+       server_name api.yourdomain.com;
+
+       location / {
+           proxy_pass http://localhost:8080;
+           proxy_http_version 1.1;
+           proxy_set_header Upgrade $http_upgrade;
+           proxy_set_header Connection 'upgrade';
+           proxy_set_header Host $host;
+           proxy_set_header X-Real-IP $remote_addr;
+           proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+           proxy_set_header X-Forwarded-Proto $scheme;
+           proxy_cache_bypass $http_upgrade;
+       }
+   }
+   ```
+
+#### ☁️ Deploy to Serverless Platforms
+
+##### Deno Deploy
+
+```bash
+# Install Deno Deploy CLI
+deno install --allow-all --global https://deno.land/x/deploy/deployctl.ts
+
+# Deploy directly from GitHub
+deployctl deploy --project=kuala-api https://raw.githubusercontent.com/seribasa/kuala-api/main/supabase/functions/kuala/index.ts
+
+# Or deploy from local
+deployctl deploy --project=kuala-api ./supabase/functions/kuala/index.ts
+```
+
+##### Vercel
+
+1. **Create `vercel.json`**
+
+   ```json
+   {
+     "functions": {
+       "api/kuala.ts": {
+         "runtime": "vercel-deno@0.8.1"
+       }
+     },
+     "routes": [
+       { "src": "/api/(.*)", "dest": "/api/kuala.ts" },
+       { "src": "/(.*)", "dest": "/api/kuala.ts" }
+     ]
+   }
+   ```
+
+2. **Create `api/kuala.ts`**
+
+   ```typescript
+   import handler from "../supabase/functions/kuala/index.ts";
+
+   export default handler;
+   ```
+
+3. **Deploy**
+
+   ```bash
+   # Install Vercel CLI
+   npm i -g vercel
+
+   # Deploy
+   vercel --prod
+   ```
+
+##### Netlify
+
+1. **Create `netlify.toml`**
+
+   ```toml
+   [build]
+     command = "deno bundle supabase/functions/kuala/index.ts dist/bundle.js"
+     functions = "netlify/functions"
+
+   [[redirects]]
+     from = "/api/*"
+     to = "/.netlify/functions/kuala/:splat"
+     status = 200
+
+   [[redirects]]
+     from = "/*"
+     to = "/.netlify/functions/kuala/:splat"
+     status = 200
+   ```
+
+2. **Create `netlify/functions/kuala.ts`**
+
+   ```typescript
+   import { Handler } from "@netlify/functions";
+   import handler from "../../supabase/functions/kuala/index.ts";
+
+   export const handler: Handler = async (event, context) => {
+     const request = new Request(event.rawUrl, {
+       method: event.httpMethod,
+       headers: event.headers,
+       body: event.body,
+     });
+
+     const response = await handler(request);
+
+     return {
+       statusCode: response.status,
+       headers: Object.fromEntries(response.headers.entries()),
+       body: await response.text(),
+     };
+   };
+   ```
+
+##### Railway
+
+1. **Create `railway.toml`**
+
+   ```toml
+   [build]
+     builder = "deno"
+
+   [deploy]
+     startCommand = "deno run --allow-all server.ts"
+   ```
+
+2. **Deploy**
+
+   ```bash
+   # Install Railway CLI
+   npm install -g @railway/cli
+
+   # Login and deploy
+   railway login
+   railway link
+   railway up
+   ```
+
+##### Fly.io
+
+1. **Create `fly.toml`**
+
+   ```toml
+   app = "kuala-api"
+   primary_region = "sin"
+
+   [build]
+     image = "denoland/deno:alpine"
+
+   [env]
+     PORT = "8080"
+
+   [[services]]
+     internal_port = 8080
+     protocol = "tcp"
+
+     [[services.ports]]
+       handlers = ["http"]
+       port = 80
+
+     [[services.ports]]
+       handlers = ["tls", "http"]
+       port = 443
+
+     [services.concurrency]
+       hard_limit = 25
+       soft_limit = 20
+   ```
+
+2. **Create `Dockerfile`**
+
+   ```dockerfile
+   FROM denoland/deno:alpine
+
+   WORKDIR /app
+   COPY . .
+
+   RUN deno cache --reload server.ts
+
+   EXPOSE 8080
+
+   CMD ["deno", "run", "--allow-all", "server.ts"]
+   ```
+
+3. **Deploy**
+
+   ```bash
+   # Install Fly CLI
+   curl -L https://fly.io/install.sh | sh
+
+   # Deploy
+   fly deploy
+   ```
+
+#### 🐳 Docker Deployment
+
+1. **Create `Dockerfile`**
+
+   ```dockerfile
+   FROM denoland/deno:alpine
+
+   WORKDIR /app
+
+   # Copy dependency files
+   COPY supabase/functions/deno.json .
+   COPY supabase/functions/deno.lock .
+
+   # Cache dependencies
+   RUN deno cache --reload deno.json
+
+   # Copy source code
+   COPY . .
+
+   # Expose port
+   EXPOSE 8080
+
+   # Health check
+   HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
+     CMD deno eval "fetch('http://localhost:8080/health').then(() => Deno.exit(0)).catch(() => Deno.exit(1))"
+
+   # Start the application
+   CMD ["deno", "run", "--allow-all", "server.ts"]
+   ```
+
+2. **Create `docker-compose.yml`**
+
+   ```yaml
+   version: "3.8"
+
+   services:
+     kuala-api:
+       build: .
+       ports:
+         - "8080:8080"
+       environment:
+         - AUTH_BASE_URL=${AUTH_BASE_URL}
+         - AUTH_SUPABASE_ANON_KEY=${AUTH_SUPABASE_ANON_KEY}
+         - KILLBILL_URL=${KILLBILL_URL}
+         - KILLBILL_API_KEY=${KILLBILL_API_KEY}
+         - KILLBILL_API_SECRET=${KILLBILL_API_SECRET}
+       env_file:
+         - .env.production
+       restart: unless-stopped
+       healthcheck:
+         test: ["CMD", "deno", "eval", "fetch('http://localhost:8080/health')"]
+         interval: 30s
+         timeout: 10s
+         retries: 3
+
+     nginx:
+       image: nginx:alpine
+       ports:
+         - "80:80"
+         - "443:443"
+       volumes:
+         - ./nginx.conf:/etc/nginx/nginx.conf
+         - ./ssl:/etc/nginx/ssl
+       depends_on:
+         - kuala-api
+       restart: unless-stopped
+   ```
+
+3. **Build and run**
+
+   ```bash
+   # Build image
+   docker build -t kuala-api .
+
+   # Run with docker-compose
+   docker-compose up -d
+
+   # Or run directly
+   docker run -p 8080:8080 --env-file .env.production kuala-api
+   ```
+
+#### ⚙️ Configuration for Non-Supabase Deployments
+
+When deploying outside of Supabase, you'll need to handle some differences:
+
+1. **Environment Variables**
+
+   ```bash
+   # Required for all deployments
+   AUTH_BASE_URL=https://your-supabase-project.supabase.co
+   AUTH_SUPABASE_ANON_KEY=your_anon_key
+
+   # Optional: Custom port (default: 8080)
+   PORT=3000
+
+   # Optional: CORS origins (comma-separated)
+   CORS_ORIGINS=https://yourapp.com,https://staging.yourapp.com
+
+   # Optional: Kill Bill integration
+   KILLBILL_URL=https://your-killbill-instance.com
+   KILLBILL_API_KEY=your_api_key
+   KILLBILL_API_SECRET=your_api_secret
+   ```
+
+2. **Health Check Endpoint**
+
+   Add to your `server.ts`:
+
+   ```typescript
+   import { serve } from "https://deno.land/std@0.208.0/http/server.ts";
+   import handler from "./supabase/functions/kuala/index.ts";
+
+   const port = parseInt(Deno.env.get("PORT") || "8080");
+
+   const healthHandler = (req: Request): Response => {
+     if (new URL(req.url).pathname === "/health") {
+       return new Response("OK", { status: 200 });
+     }
+     return handler(req);
+   };
+
+   await serve(healthHandler, { port });
+   ```
+
+3. **CORS Configuration**
+
+   For production deployments, configure CORS appropriately:
+
+   ```typescript
+   const corsOrigins = Deno.env.get("CORS_ORIGINS")?.split(",") || ["*"];
+
+   const corsHandler = (req: Request): Response => {
+     const response = handler(req);
+     const origin = req.headers.get("origin");
+
+     if (origin && corsOrigins.includes(origin)) {
+       response.headers.set("Access-Control-Allow-Origin", origin);
+     }
+
+     return response;
+   };
+   ```
+
 ## 🤝 Contributing
 
-We welcome contributions! Please see our [Contributing Guide](CONTRIBUTING.md) for details.
+We welcome contributions! Please see our [Contributing Guide](CONTRIBUTING.md)
+for details.
 
 ### Development Workflow
 
@@ -343,13 +745,15 @@ We welcome contributions! Please see our [Contributing Guide](CONTRIBUTING.md) f
 
 ## 📄 License
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
+for details.
 
 ## 🆘 Support
 
 - **Documentation**: [API Docs](spec/openapi.yml)
 - **Issues**: [GitHub Issues](https://github.com/seribasa/kuala-api/issues)
-- **Discussions**: [GitHub Discussions](https://github.com/seribasa/kuala-api/discussions)
+- **Discussions**:
+  [GitHub Discussions](https://github.com/seribasa/kuala-api/discussions)
 
 ## 🔗 Related Projects
 
