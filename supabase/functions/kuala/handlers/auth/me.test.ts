@@ -348,3 +348,143 @@ Deno.test("handleMe - should handle malformed JSON response from Supabase", asyn
 		consoleStub.restore();
 	}
 });
+
+Deno.test("handleMe - should use fallback URL when AUTH_BASE_URL is not set", async () => {
+	// Mock user response
+	const mockUserResponse = {
+		id: "user123",
+		email: "test@example.com",
+	};
+
+	// Stub environment variables to return undefined for AUTH_BASE_URL but valid API key
+	const envStub = stub(Deno.env, "get", (key: string) => {
+		if (key === "AUTH_SUPABASE_ANON_KEY") return "test_api_key";
+		return undefined; // AUTH_BASE_URL not set
+	});
+
+	// Stub fetch to return successful response
+	const fetchStub = stub(
+		globalThis,
+		"fetch",
+		() =>
+			Promise.resolve(
+				new MockResponse(
+					mockUserResponse,
+					200,
+					true,
+				) as unknown as Response,
+			),
+	);
+
+	try {
+		const mockContext = createMockContext(
+			"Bearer test_token",
+			"https://kuala-api.example.com/auth/me",
+		);
+
+		const response = await handleMe(mockContext) as unknown as JsonResponse;
+
+		assertEquals(response.status, 200);
+		assertEquals(response.data, mockUserResponse);
+
+		// Verify fetch was called with fallback URL
+		assertEquals(fetchStub.calls.length, 1);
+		const [url] = fetchStub.calls[0].args;
+		const requestUrl = new URL(url as string);
+		assertEquals(requestUrl.origin, "https://kuala-api.example.com");
+	} finally {
+		envStub.restore();
+		fetchStub.restore();
+	}
+});
+
+Deno.test("handleMe - should handle Supabase error without error_description", async () => {
+	// Mock error response from Supabase without error_description
+	const mockErrorResponse = {
+		error: "invalid_token",
+		msg: "Token is invalid",
+	};
+
+	// Stub environment variables with proper values
+	const envStub = stub(Deno.env, "get", (key: string) => {
+		if (key === "AUTH_BASE_URL") return "https://test.supabase.co";
+		if (key === "AUTH_SUPABASE_ANON_KEY") return "test_api_key";
+		return undefined;
+	});
+
+	// Stub fetch to return error response
+	const fetchStub = stub(
+		globalThis,
+		"fetch",
+		() =>
+			Promise.resolve(
+				new MockResponse(
+					mockErrorResponse,
+					401,
+					false,
+				) as unknown as Response,
+			),
+	);
+
+	try {
+		const mockContext = createMockContext("Bearer invalid_token");
+
+		const response = await handleMe(mockContext) as unknown as JsonResponse;
+
+		const expectedResponse = {
+			code: "SUPABASE_ERROR",
+			message: "Token is invalid",
+		};
+
+		assertEquals(response.status, 401);
+		assertEquals(response.data, expectedResponse);
+	} finally {
+		envStub.restore();
+		fetchStub.restore();
+	}
+});
+
+Deno.test("handleMe - should handle Supabase error with no message fields", async () => {
+	// Mock error response from Supabase with no message
+	const mockErrorResponse = {
+		error: "unknown_error",
+	};
+
+	// Stub environment variables with proper values
+	const envStub = stub(Deno.env, "get", (key: string) => {
+		if (key === "AUTH_BASE_URL") return "https://test.supabase.co";
+		if (key === "AUTH_SUPABASE_ANON_KEY") return "test_api_key";
+		return undefined;
+	});
+
+	// Stub fetch to return error response
+	const fetchStub = stub(
+		globalThis,
+		"fetch",
+		() =>
+			Promise.resolve(
+				new MockResponse(
+					mockErrorResponse,
+					422,
+					false,
+				) as unknown as Response,
+			),
+	);
+
+	try {
+		const mockContext = createMockContext("Bearer test_token");
+
+		const response = await handleMe(mockContext) as unknown as JsonResponse;
+
+		const expectedResponse = {
+			code: "SUPABASE_ERROR",
+			message: "Error from Supabase",
+		};
+
+		assertEquals(response.status, 422);
+		assertEquals(response.data, expectedResponse);
+	} finally {
+		envStub.restore();
+		fetchStub.restore();
+	}
+});
