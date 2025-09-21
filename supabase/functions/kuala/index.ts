@@ -5,7 +5,7 @@ import { handleExchangeToken } from "./handlers/auth/exchange-token.ts";
 import { handleRefreshToken } from "./handlers/auth/refresh-token.ts";
 import { handleLogout } from "./handlers/auth/logout.ts";
 import { handleMe } from "./handlers/auth/me.ts";
-import { ErrorResponse } from "../_shared/types/baseResponse.ts";
+import { ErrorResponse } from "../_shared/types/response.ts";
 import { customLogger } from "./middleware/logger.ts";
 
 const auth = new Hono().basePath("/auth");

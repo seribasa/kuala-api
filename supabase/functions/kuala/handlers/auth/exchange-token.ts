@@ -1,5 +1,5 @@
 import { Context } from "@hono/hono";
-import { ErrorResponse } from "../../../_shared/types/baseResponse.ts";
+import { ErrorResponse } from "../../../_shared/types/response.ts";
 import { authLogger } from "../../middleware/logger.ts";
 
 /**
