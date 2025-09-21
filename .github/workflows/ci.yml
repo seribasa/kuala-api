@@ -180,6 +180,9 @@ jobs:
     name: Coverage Requirements
     runs-on: ubuntu-latest
     needs: test
+    env:
+      REQUIRED_BRANCH_COVERAGE: 90
+      REQUIRED_LINE_COVERAGE: 90
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -188,29 +191,37 @@ jobs:
         uses: denoland/setup-deno@v2
         with:
           deno-version: ${{ env.DENO_VERSION }}
-
       - name: Run tests and check coverage
         run: |
-          cd supabase/functions
-          deno test --allow-net --allow-env --coverage=coverage kuala/
+            cd supabase/functions
+            deno test --allow-net --allow-env --coverage=coverage kuala/
 
-          # Check coverage requirements
-          COVERAGE_OUTPUT=$(deno coverage coverage/ include="kuala/")
-          echo "$COVERAGE_OUTPUT"
+            # Generate coverage report
+            COVERAGE_OUTPUT=$(deno coverage coverage/ include="kuala/")
+            echo "$COVERAGE_OUTPUT"
 
-          # Extract branch coverage percentage
-          BRANCH_COVERAGE=$(echo "$COVERAGE_OUTPUT" | grep "All files" | awk '{print $3}' | sed 's/%//')
+            # Ambil langsung dari baris "All files"
+            BRANCH=$(echo "$COVERAGE_OUTPUT" | awk -F'|' '/All files/ {gsub(/ /, "", $3); gsub("%",""); print $3}')
+            LINE=$(echo "$COVERAGE_OUTPUT"   | awk -F'|' '/All files/ {gsub(/ /, "", $4); gsub("%",""); print $4}')
 
-          echo "Branch coverage: ${BRANCH_COVERAGE}%"
+            echo "📊 Branch Coverage: ${BRANCH}%"
+            echo "📊 Line Coverage:   ${LINE}%"
 
-          # Fail if coverage is below 90%
-          if (( $(echo "$BRANCH_COVERAGE < 90" | bc -l) )); then
-            echo "❌ Branch coverage (${BRANCH_COVERAGE}%) is below required 90%"
+            # Fail kalau branch coverage < $REQUIRED_BRANCH_COVERAGE
+            if (( $(echo "$BRANCH < $REQUIRED_BRANCH_COVERAGE" | bc -l) )); then
+            echo "❌ Branch coverage (${BRANCH}%) is below required ${REQUIRED_BRANCH_COVERAGE}%"
             exit 1
-          else
-            echo "✅ Branch coverage (${BRANCH_COVERAGE}%) meets requirement (≥90%)"
-          fi
+            else
+            echo "✅ Branch coverage (${BRANCH}%) meets requirement (>=${REQUIRED_BRANCH_COVERAGE}%)"
+            fi
 
+            # Fail kalau line coverage < $REQUIRED_LINE_COVERAGE
+            if (( $(echo "$LINE < $REQUIRED_LINE_COVERAGE" | bc -l) )); then
+            echo "❌ Line coverage (${LINE}%) is below required ${REQUIRED_LINE_COVERAGE}%"
+            exit 1
+            else
+            echo "✅ Line coverage (${LINE}%) meets requirement (>=${REQUIRED_LINE_COVERAGE}%)"
+            fi
   deployment-check:
     name: Deployment Readiness
     runs-on: ubuntu-latest
