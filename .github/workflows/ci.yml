@@ -196,8 +196,8 @@ jobs:
             cd supabase/functions
             deno test --allow-net --allow-env --coverage=coverage kuala/
 
-            # Generate coverage report
-            COVERAGE_OUTPUT=$(deno coverage coverage/ include="kuala/")
+            # Generate coverage report dan bersihkan ANSI escape sequences
+            COVERAGE_OUTPUT=$(deno coverage coverage/ include="kuala/" | sed 's/\x1b\[[0-9;]*m//g')
             echo "$COVERAGE_OUTPUT"
 
             # Ambil langsung dari baris "All files"
@@ -207,20 +207,24 @@ jobs:
             echo "📊 Branch Coverage: ${BRANCH}%"
             echo "📊 Line Coverage:   ${LINE}%"
 
+            # Sanitize variables dan set default values
+            BRANCH_NUM=${BRANCH:-0}
+            LINE_NUM=${LINE:-0}
+
             # Fail kalau branch coverage < $REQUIRED_BRANCH_COVERAGE
-            if (( $(echo "$BRANCH < $REQUIRED_BRANCH_COVERAGE" | bc -l) )); then
-            echo "❌ Branch coverage (${BRANCH}%) is below required ${REQUIRED_BRANCH_COVERAGE}%"
-            exit 1
+            if (( $(echo "$BRANCH_NUM < $REQUIRED_BRANCH_COVERAGE" | bc -l) )); then
+                echo "❌ Branch coverage (${BRANCH_NUM}%) is below required ${REQUIRED_BRANCH_COVERAGE}%"
+                exit 1
             else
-            echo "✅ Branch coverage (${BRANCH}%) meets requirement (>=${REQUIRED_BRANCH_COVERAGE}%)"
+                echo "✅ Branch coverage (${BRANCH_NUM}%) meets requirement (>=${REQUIRED_BRANCH_COVERAGE}%)"
             fi
 
             # Fail kalau line coverage < $REQUIRED_LINE_COVERAGE
-            if (( $(echo "$LINE < $REQUIRED_LINE_COVERAGE" | bc -l) )); then
-            echo "❌ Line coverage (${LINE}%) is below required ${REQUIRED_LINE_COVERAGE}%"
-            exit 1
+            if (( $(echo "$LINE_NUM < $REQUIRED_LINE_COVERAGE" | bc -l) )); then
+                echo "❌ Line coverage (${LINE_NUM}%) is below required ${REQUIRED_LINE_COVERAGE}%"
+                exit 1
             else
-            echo "✅ Line coverage (${LINE}%) meets requirement (>=${REQUIRED_LINE_COVERAGE}%)"
+                echo "✅ Line coverage (${LINE_NUM}%) meets requirement (>=${REQUIRED_LINE_COVERAGE}%)"
             fi
   deployment-check:
     name: Deployment Readiness
