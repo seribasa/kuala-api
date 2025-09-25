@@ -194,10 +194,10 @@ jobs:
       - name: Run tests and check coverage
         run: |
             cd supabase/functions
-            deno test --allow-net --allow-env --coverage=coverage kuala/
+            deno test --allow-net --allow-env --coverage=coverage
 
             # Generate coverage report dan bersihkan ANSI escape sequences
-            COVERAGE_OUTPUT=$(deno coverage coverage/ include="kuala/" | sed 's/\x1b\[[0-9;]*m//g')
+            COVERAGE_OUTPUT=$(deno coverage coverage/ | sed 's/\x1b\[[0-9;]*m//g')
             echo "$COVERAGE_OUTPUT"
 
             # Ambil langsung dari baris "All files"
