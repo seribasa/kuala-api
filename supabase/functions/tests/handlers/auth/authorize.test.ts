@@ -1,7 +1,7 @@
 import { assertEquals } from "@std/assert";
 import { stub } from "@std/testing/mock";
 import { Context } from "@hono/hono";
-import { handleAuthorize } from "./authorize.ts";
+import { handleAuthorize } from "../../../kuala/handlers/auth/authorize.ts";
 
 // Type definitions for test responses
 interface JsonResponse {

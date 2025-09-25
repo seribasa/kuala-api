@@ -63,7 +63,7 @@ jobs:
       - name: Run tests with coverage
         run: |
           cd supabase/functions
-          deno test --allow-net --allow-env --coverage=coverage kuala/  --junit-path=test_report.xml
+          deno test --allow-net --allow-env --coverage=coverage  --junit-path=test_report.xml
 
       - name: Generate coverage report
         run: |

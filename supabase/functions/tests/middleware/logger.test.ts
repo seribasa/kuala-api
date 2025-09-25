@@ -6,7 +6,7 @@ import {
 	type LogData,
 	logger,
 	type LogLevel,
-} from "./logger.ts";
+} from "../../kuala/middleware/logger.ts";
 
 // Helper function to capture console output
 function captureConsoleOutput(fn: () => void): string[] {

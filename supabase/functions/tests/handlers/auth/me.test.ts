@@ -1,7 +1,7 @@
 import { assertEquals } from "@std/assert";
 import { stub } from "@std/testing/mock";
 import { Context } from "@hono/hono";
-import { handleMe } from "./me.ts";
+import { handleMe } from "../../../kuala/handlers/auth/me.ts";
 
 // Type definitions for test responses
 interface JsonResponse {
