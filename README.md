@@ -14,7 +14,7 @@ Kuala API is a comprehensive backend service that provides:
 
 - **🔐 OAuth Authentication** - Seamless login with Keycloak via Supabase
 - **📋 Subscription Plans** - Flexible tier-based subscription management
-- **💳 Payment Processing** - Integrated billing and invoicing with Kill Bill
+- **💳 Payment Processing** - Integrated billing and invoicing with Kill Bill and Bayeu Payment Gateway
 - **🚀 Supabase Functions** - Serverless deployment with edge functions
 - **📝 OpenAPI Spec** - Complete API documentation and type safety
 
@@ -25,12 +25,12 @@ Kuala API is a comprehensive backend service that provides:
 │   Client App    │───▶│   Kuala API     │───▶│   Supabase      │
 │                 │    │ (Edge Functions)│    │   (Auth & DB)   │
 └─────────────────┘    └─────────────────┘    └─────────────────┘
-                                │
-                                ▼
-                       ┌─────────────────┐
-                       │   Kill Bill     │
-                       │   (Billing)     │
-                       └─────────────────┘
+                │
+                ▼
+             ┌─────────────────┐    ┌─────────────────┐
+             │   Kill Bill     │    │  Bayeu Payment  │
+             │   (Billing)     │───▶│    Gateway      │
+             └─────────────────┘    └─────────────────┘
 ```
 
 ## 🚀 Quick Start
@@ -144,12 +144,8 @@ sequenceDiagram
 #### 1. Start OAuth Flow
 
 ```bash
-curl -X GET "https://kuala-api-staging.seribasa.digital/auth/authorize" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "redirect_to": "https://yourapp.com/callback",
-    "code_challenge": "your_pkce_challenge"
-  }'
+curl 'https://kuala-api-staging.seribasa.digital/auth/authorize?redirect_to=https%3A%2F%2Fenakes-app.peltops.com&code_challenge=%3Cyour_code_challenge%3E' \
+  -H "Content-Type: application/json"
 ```
 
 #### 2. Exchange Authorization Code
@@ -163,7 +159,17 @@ curl -X POST "https://kuala-api-staging.seribasa.digital/auth/exchange-token" \
   }'
 ```
 
-#### 3. Get User Information
+#### 3. Refresh Access Token
+
+```bash
+curl -X POST "https://kuala-api-staging.seribasa.digital/auth/refresh-token" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "refresh_token": "your_refresh_token"
+  }'
+```
+
+#### 4. Get User Information
 
 ```bash
 curl -X GET "https://kuala-api-staging.seribasa.digital/auth/me" \
