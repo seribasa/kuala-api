@@ -1,0 +1,1321 @@
+openapi: 3.0.3
+info:
+  title: Kuala API
+  version: "1.0.0"
+  description: |
+    Public API for OAuth login (Supabase), viewing plans, creating subscriptions,
+    and handling invoices/payments backed by Kill Bill.
+
+    ### Notes
+    - Clients authenticate to this API with **Bearer JWT** (issued by Supabase) after OAuth.
+    - This API talks to **Kill Bill** server-side using X-Killbill-* headers. Clients do **not** call Kill Bill directly.
+    - Prices are shown monthly by default; toggle `interval=year` to show yearly pricing.
+
+servers:
+  - url: https://kuala-api-staging.seribasa.digital
+    description: Kuala Staging
+
+tags:
+  - name: Auth (Internal Supabase OAuth)
+  - name: Auth (Kuala)
+  - name: Identity
+  - name: Plans
+  - name: Subscriptions
+  - name: Invoices
+  - name: Webhooks
+
+paths:
+  /auth/v1/authorize:
+    get:
+      tags: [Auth (Internal Supabase OAuth)]
+      summary: Login with OAuth Keycloak
+      description: Redirects the user to Keycloak for OAuth authentication.
+      parameters:
+        - in: query
+          name: provider
+          required: true
+          schema:
+            type: string
+            enum: [keycloak]
+          example: keycloak
+          description: OAuth provider name.
+        - in: query
+          name: scopes
+          required: false
+          schema:
+            type: string
+            enum: [openid]
+          example: openid
+          description: scopes OAuth
+        - in: query
+          name: redirect_to
+          required: false
+          schema:
+            type: string
+            format: uri
+          example: https://yourapp.com/callback
+          description: URL to redirect after successful authentication.
+        - in: query
+          name: flow_type
+          required: false
+          schema:
+            type: string
+          example: pkce
+          description: flow type.
+        - in: query
+          name: code_challenge
+          required: false
+          schema:
+            type: string
+          example: <your_code_challenge>
+          description: code challenge generation.
+        - in: query
+          name: code_challenge_method
+          required: false
+          schema:
+            type: string
+          example: s256
+          description: flow type.
+      responses:
+        "302":
+          description: Redirect to Keycloak login page.
+          headers:
+            Location:
+              description: URL to the Keycloak login page.
+              schema:
+                type: string
+        "400":
+          description: Invalid provider or parameters.
+
+  /auth/v1/token:
+    post:
+      tags: [Auth (Internal Supabase OAuth)]
+      summary: Exchange authorization code or refresh token for access token
+      description: |
+        After the OAuth provider redirects back to your app with a `code`,
+        exchange it for an access token.
+
+        Refresh token will regenerate a new access token and give new refresh token also.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                auth_code:
+                  type: string
+                  description: Authorization code received from OAuth provider
+                code_verifier:
+                  type: string
+                  description: PKCE code verifier (if using PKCE flow and grant_type is pkce)
+                refresh_token:
+                  type: string
+                  description: Refresh token to obtain new access token (if grant_type is refresh_token)
+      parameters:
+        - in: header
+          name: apikey
+          description: anon key for Supabase
+          schema:
+            type: string
+        - in: query
+          name: grant_type
+          schema:
+            type: string
+            enum: [authorization_code, pkce, refresh_token]
+            description: authorization_code = standard OAuth code exchange; pkce = code exchange with PKCE; refresh_token = use refresh token to get new access token
+            default: pkce
+          required: true
+      responses:
+        "200":
+          description: Successfully exchanged code for tokens.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Session" # For code exchange
+        "400":
+          description: Invalid code or grant type.
+
+  /auth/v1/logout:
+    post:
+      tags: [Auth (Internal Supabase OAuth)]
+      summary: Logout user
+      description: Logs out the authenticated user by revoking their refresh token.
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: header
+          name: apikey
+          description: anon key for Supabase
+          schema:
+            type: string
+      responses:
+        "204":
+          description: Successfully logged out.
+        "401":
+          description: Unauthorized - Invalid or missing token.
+
+  /auth/v1/user:
+    get:
+      tags: [Auth (Internal Supabase OAuth)]
+      summary: Get current user
+      description: Retrieves the currently authenticated user's information.
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: header
+          name: apikey
+          description: anon key for Supabase
+          schema:
+            type: string
+      responses:
+        "200":
+          description: User profile retrieved successfully.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+        "401":
+          description: Unauthorized - Invalid or missing token.
+
+  /auth/authorize:
+    get:
+      tags: [Auth (Kuala)]
+      summary: Kuala authorize endpoint
+      description: |
+        Kuala wrapper for OAuth authorization. This endpoint handles the OAuth flow 
+        and redirects to the appropriate provider for authentication.
+      operationId: kualaAuthorize
+      parameters:
+        - in: query
+          name: redirect_to
+          required: true
+          schema:
+            type: string
+            format: uri
+          example: https://yourapp.com/callback
+          description: URL to redirect after successful authentication.
+        - in: query
+          name: code_challenge
+          required: true
+          schema:
+            type: string
+          example: <your_code_challenge>
+          description: PKCE code challenge (S256).
+      responses:
+        "302":
+          description: Redirect to Keycloak login page.
+          headers:
+            Location:
+              description: URL to the Keycloak login page.
+              schema:
+                type: string
+                example: "changethis/identity/realms/lebensraum/protocol/openid-connect/auth?client_id=eimunisasi&redirect_to=https%3A%2F%2Fyourapp.com%2Fcallback&redirect_uri=https%3A%2F%2Fkuala-base-staging.peltops.com%2Fauth%2Fv1%2Fcallback&response_type=code&scope=profile%20email%20openid&state=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...&flow_type=pkce"
+        "400":
+          description: Invalid provider or parameters
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /auth/exchange-token:
+    post:
+      tags: [Auth (Kuala)]
+      summary: Exchange authorization code for access token
+      description: |
+        Kuala wrapper for exchanging OAuth authorization code for access tokens.
+        This endpoint wraps the Supabase OAuth token exchange functionality.
+      operationId: kualaExchangeToken
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                auth_code:
+                  type: string
+                  description: Authorization code received from OAuth provider
+                code_verifier:
+                  type: string
+                  description: PKCE code verifier
+              required: [auth_code, code_verifier]
+            example:
+              auth_code: "authorization_code_from_provider"
+              code_verifier: "your_code_verifier"
+      responses:
+        "200":
+          description: Successfully exchanged code for tokens
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Session"
+        "400":
+          description: Invalid code or grant type
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /auth/refresh-token:
+    post:
+      tags: [Auth (Kuala)]
+      summary: Refresh access token
+      description: |
+        Kuala wrapper for refreshing access tokens using refresh token.
+        This endpoint wraps the Supabase OAuth token refresh functionality.
+      operationId: kualaRefreshToken
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                refresh_token:
+                  type: string
+                  description: Refresh token to obtain new access token
+              required: [refresh_token]
+            example:
+              refresh_token: "your_refresh_token"
+      responses:
+        "200":
+          description: Successfully refreshed tokens
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Session"
+        "400":
+          description: Invalid refresh token
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Refresh token expired or invalid
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /auth/logout:
+    post:
+      tags: [Auth (Kuala)]
+      summary: Kuala logout endpoint
+      description: |
+        Kuala wrapper for user logout. This endpoint handles the logout process
+        and revokes the user's refresh token.
+      operationId: kualaLogout
+      security:
+        - bearerAuth: []
+      responses:
+        "204":
+          description: Successfully logged out
+        "401":
+          description: Unauthorized - Invalid or missing token
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /auth/me:
+    get:
+      tags: [Auth (Kuala)]
+      summary: Get current authenticated user
+      description: |
+        Kuala wrapper for retrieving the current authenticated user's information.
+        This endpoint wraps the Supabase user profile functionality.
+      operationId: kualaGetUser
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: User profile retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+        "401":
+          description: Unauthorized - Invalid or missing token
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /identity/realms/{realms}/protocol/openid-connect/auth:
+    get:
+      tags: [Identity]
+      summary: Identity authorization page
+      description: |
+        Displays an HTML page that continues the OAuth authorization flow.
+        This endpoint returns an HTML page with a single button that, when clicked,
+        redirects the user to the Keycloak OAuth authorization URL.
+      operationId: identityAuthorize
+      parameters:
+        - in: path
+          name: realms
+          required: true
+          schema:
+            type: string
+          example: lebensraum
+          description: OAuth client identifier
+        - in: query
+          name: client_id
+          required: true
+          schema:
+            type: string
+          example: eimunisasi
+          description: OAuth client identifier
+        - in: query
+          name: redirect_to
+          required: true
+          schema:
+            type: string
+            format: uri
+          example: https://yourapp.com/callback
+          description: URL to redirect after successful authentication
+        - in: query
+          name: redirect_uri
+          required: true
+          schema:
+            type: string
+            format: uri
+          example: https://kuala-base-staging.peltops.com/auth/v1/callback
+          description: OAuth callback URI
+        - in: query
+          name: response_type
+          required: false
+          schema:
+            type: string
+            default: code
+          example: code
+          description: OAuth response type
+        - in: query
+          name: scope
+          required: false
+          schema:
+            type: string
+            default: "profile email openid"
+          example: "profile email openid"
+          description: OAuth scopes
+        - in: query
+          name: state
+          required: false
+          schema:
+            type: string
+          example: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+          description: OAuth state parameter for CSRF protection
+        - in: query
+          name: flow_type
+          required: false
+          schema:
+            type: string
+            default: pkce
+          example: pkce
+          description: OAuth flow type
+      responses:
+        "200":
+          description: HTML page with authorization button
+          content:
+            text/html:
+              schema:
+                type: string
+                example: |
+                  <!DOCTYPE html>
+                  <html>
+                  <head>
+                    <title>Authorization Required</title>
+                    <meta charset="utf-8">
+                    <meta name="viewport" content="width=device-width, initial-scale=1">
+                    <style>
+                      body { font-family: Arial, sans-serif; text-align: center; padding: 50px; }
+                      .auth-container { max-width: 400px; margin: 0 auto; }
+                      .auth-button { 
+                        background-color: #007bff; 
+                        color: white; 
+                        padding: 12px 24px; 
+                        border: none; 
+                        border-radius: 4px; 
+                        font-size: 16px; 
+                        cursor: pointer; 
+                        text-decoration: none;
+                        display: inline-block;
+                      }
+                      .auth-button:hover { background-color: #0056b3; }
+                    </style>
+                  </head>
+                  <body>
+                    <div class="auth-container">
+                      <h2>Authorization Required</h2>
+                      <p>Click the button below to continue with authentication</p>
+                      <!-- 
+                        CHANGE THIS URL TO YOUR FRONT
+                        ENDPOINT THAT HANDLES THE CALLBACK 
+                      -->
+                      <a href="changethis/auth/v1/callback" class="auth-button">
+                        Login
+                      </a>
+                    </div>
+                  </body>
+                  </html>
+        "400":
+          description: Invalid parameters
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /plans:
+    get:
+      tags: [Plans]
+      summary: List subscription plans
+      operationId: listPlans
+      parameters:
+        - in: query
+          name: interval
+          description: Billing interval filter
+          required: false
+          schema:
+            type: string
+            enum: [month, year]
+            nullable: true
+            default:
+      responses:
+        "200":
+          description: Available plans
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  plans:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Plan"
+              example:
+                monthly:
+                  plans:
+                  - id: free-monthly
+                    name: Free
+                    tier: free
+                    features:
+                      - Generic Apps
+                      - Patient Appointment
+                      - Clinic Virtual Assistant
+                    prices:
+                      - currency: USD
+                        amount: 0
+                      - currency: IDR
+                        amount: 0
+                    selectable: true
+                  - id: basic-monthly
+                    name: Basic
+                    tier: basic
+                    features:
+                      - Generic Apps
+                      - Patient Appointment
+                      - Clinic Virtual Assistant
+                      - Published Apps
+                      - Landing Page
+                      - Event Management
+                    prices:
+                      - amount: 9.99
+                        currency: USD
+                      - amount: 139000
+                        currency: IDR
+                    selectable: true
+                  - id: premium-monthly
+                    name: Premium
+                    tier: premium
+                    features:
+                      - Generic Apps
+                      - Patient Appointment
+                      - Clinic Virtual Assistant
+                      - Published Apps
+                      - Landing Page
+                      - Event Management
+                      - Business Process
+                    prices:
+                      - amount: 49.99
+                        currency: USD
+                      - amount: 699000
+                        currency: IDR
+                    selectable: true
+                  - id: enterprise-monthly
+                    name: Enterprise
+                    tier: enterprise
+                    features:
+                      - All Premium features
+                      - Enterprise Business Process
+                    prices:
+                      - amount: 499.99
+                        currency: USD
+                      - amount: 6990000
+                        currency: IDR
+                    selectable: false
+                    contactUs:
+                      email: test@test.com
+                      subject: "Inquiry about Enterprise Plan"
+                      body: "I would like to know more about the Enterprise plan."
+                annually:
+                  plans:
+                  - id: free-annual
+                    name: Free
+                    tier: free
+                    features:
+                      - Generic Apps
+                      - Patient Appointment
+                      - Clinic Virtual Assistant
+                    prices:
+                      - currency: USD
+                        amount: 0
+                      - currency: IDR
+                        amount: 0
+                    selectable: true
+                  - id: basic-annual
+                    name: Basic
+                    tier: basic
+                    features:
+                      - Generic Apps
+                      - Patient Appointment
+                      - Clinic Virtual Assistant
+                      - Published Apps
+                      - Landing Page
+                      - Event Management
+                    prices:
+                      - amount: 9.99
+                        currency: USD
+                      - amount: 139000
+                        currency: IDR
+                    selectable: true
+                  - id: premium-annual
+                    name: Premium
+                    tier: premium
+                    features:
+                      - Generic Apps
+                      - Patient Appointment
+                      - Clinic Virtual Assistant
+                      - Published Apps
+                      - Landing Page
+                      - Event Management
+                      - Business Process
+                    prices:
+                      - amount: 49.99
+                        currency: USD
+                      - amount: 699000
+                        currency: IDR
+                    selectable: true
+                  - id: enterprise-annual
+                    name: Enterprise
+                    tier: enterprise
+                    features:
+                      - All Premium features
+                      - Enterprise Business Process
+                    prices:
+                      - amount: 499.99
+                        currency: USD
+                      - amount: 6990000
+                        currency: IDR
+                    selectable: false
+                    contactUs:
+                      email: test@test.com
+                      subject: "Inquiry about Enterprise Plan"
+                      body: "I would like to know more about the Enterprise plan."
+
+  /subscriptions:
+    post:
+      tags: [Subscriptions]
+      summary: Create subscription for current user (chooses plan)
+      description: |
+        - Creates/links a Kill Bill **Account** for the authenticated user.
+        - Creates a Kill Bill **Subscription** on the selected plan.
+        - Returns the consolidated subscription resource.
+      operationId: createSubscription
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateSubscriptionRequest"
+            example:
+              basic-monthly:
+                value:
+                  planId: basic
+                  interval: month
+      responses:
+        "201":
+          description: Subscription created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Subscription"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "409":
+          description: Already subscribed to a non-cancellable plan
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+
+  /subscriptions/{subscriptionId}:
+    get:
+      tags: [Subscriptions]
+      summary: Get subscription
+      operationId: getSubscription
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: subscriptionId
+          schema: { type: string }
+          required: true
+      responses:
+        "200":
+          description: Subscription
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Subscription"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /invoices:
+    post:
+      tags: [Invoices]
+      summary: Generate invoice for a subscription (if not auto-generated)
+      description: |
+        Typically Kill Bill generates an invoice automatically when a subscription starts.
+        Use this endpoint to force-generate an out-of-cycle invoice (e.g., proration or manual charge).
+      operationId: createInvoice
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateInvoiceRequest"
+      responses:
+        "201":
+          description: Invoice created with empty response
+        "404":
+          description: If there is nothing to invoice for, returns a 404 status code.
+
+  /invoices/{invoiceId}:
+    get:
+      tags: [Invoices]
+      summary: Get invoice
+      operationId: getInvoice
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: invoiceId
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: Invoice
+          content:
+            application/json:
+              schema:
+                # forward all response from killbill
+                $ref: "#/components/schemas/Invoice"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /invoices/{invoiceId}/pdf:
+    get:
+      tags: [Invoices]
+      summary: Download invoice as PDF
+      description: |
+        Fetch an invoice and render it as PDF.
+        Internally calls the Kill Bill API:
+        `GET /1.0/kb/invoices/{invoiceId}/html`
+        then converts the result into a PDF file.
+      operationId: downloadInvoicePdf
+      parameters:
+        - name: invoiceId
+          in: path
+          required: true
+          schema:
+            type: string
+          description: The ID of the invoice.
+      responses:
+        "200":
+          description: PDF file of the invoice
+          content:
+            application/pdf:
+              schema:
+                type: string
+                format: binary
+        "404":
+          description: Invoice not found
+        "500":
+          description: Failed to generate PDF
+  /invoices/{invoiceId}/pay:
+    post:
+      tags: [Invoices]
+      summary: Pay an invoice
+      description: |
+        1. Trigger bayeu api for started transaction (NEW endpoint). 
+        notes: need to update bayeu flow. add new transaction_status `started`, payment_status `unpaid`, order_status `none`
+
+        2. Creates a payment for the invoice in Kill Bill using the user's default payment method
+        (or a one-off payment method if provided).
+      operationId: payInvoice
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: invoiceId
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PayInvoiceRequest"
+      responses:
+        "201":
+          description: Payment created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Payment"
+        "402":
+          description: Payment required / failed
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+
+  /webhooks/supabase:
+    post:
+      tags: [Webhooks]
+      summary: Supabase auth webhook (optional)
+      description: Receives user created/updated events if configured.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: true
+      responses:
+        "200":
+          description: Acknowledged
+
+  /webhooks/killbill:
+    post:
+      tags: [Webhooks]
+      summary: Kill Bill webhook receiver
+      description: Handles events like INVOICE_CREATION, PAYMENT_SUCCESS, PAYMENT_FAILED, SUBSCRIPTION_*.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/KillBillEvent"
+      responses:
+        "200":
+          description: Acknowledged
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  responses:
+    BadRequest:
+      description: Bad request
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+    NotFound:
+      description: Resource not found
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+
+  schemas:
+    User:
+      type: object
+      properties:
+        id:
+          type: string
+        appMetadata:
+          type: object
+          additionalProperties: true
+        userMetadata:
+          type: object
+          nullable: true
+          additionalProperties: true
+        aud:
+          type: string
+        confirmationSentAt:
+          type: string
+          nullable: true
+          format: date-time
+        recoverySentAt:
+          type: string
+          nullable: true
+          format: date-time
+        emailChangeSentAt:
+          type: string
+          nullable: true
+          format: date-time
+        newEmail:
+          type: string
+          nullable: true
+        invitedAt:
+          type: string
+          nullable: true
+          format: date-time
+        actionLink:
+          type: string
+          nullable: true
+        email:
+          type: string
+          nullable: true
+          format: email
+        phone:
+          type: string
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+        confirmedAt:
+          type: string
+          nullable: true
+          format: date-time
+          deprecated: true
+        emailConfirmedAt:
+          type: string
+          nullable: true
+          format: date-time
+        phoneConfirmedAt:
+          type: string
+          nullable: true
+          format: date-time
+        lastSignInAt:
+          type: string
+          nullable: true
+          format: date-time
+        role:
+          type: string
+          nullable: true
+        updatedAt:
+          type: string
+          nullable: true
+          format: date-time
+        identities:
+          type: array
+          nullable: true
+          items:
+            $ref: "#/components/schemas/UserIdentity"
+        factors:
+          type: array
+          nullable: true
+          items:
+            $ref: "#/components/schemas/Factor"
+        isAnonymous:
+          type: boolean
+      required:
+        - id
+        - appMetadata
+        - aud
+        - createdAt
+        - isAnonymous
+
+    UserIdentity:
+      type: object
+      properties:
+        id:
+          type: string
+        userId:
+          type: string
+        identityData:
+          type: object
+          nullable: true
+          additionalProperties: true
+        identityId:
+          type: string
+        provider:
+          type: string
+        createdAt:
+          type: string
+          nullable: true
+          format: date-time
+        lastSignInAt:
+          type: string
+          nullable: true
+          format: date-time
+        updatedAt:
+          type: string
+          nullable: true
+          format: date-time
+      required:
+        - id
+        - userId
+        - identityId
+        - provider
+
+    Factor:
+      type: object
+      properties:
+        id:
+          type: string
+          description: "ID of the factor."
+        friendlyName:
+          type: string
+          nullable: true
+          description: "Friendly name of the factor, useful to disambiguate."
+        factorType:
+          type: string
+          enum: [totp, phone]
+          description: "Type of factor. Supports both `totp` and `phone`."
+        status:
+          type: string
+          enum: [unverified, verified, pending, disabled] # asumsi, bisa disesuaikan
+          description: "Status of the factor."
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - factorType
+        - status
+        - createdAt
+        - updatedAt
+
+    Session:
+      type: object
+      properties:
+        providerToken:
+          type: string
+          nullable: true
+          description: "OAuth provider access token."
+        providerRefreshToken:
+          type: string
+          nullable: true
+          description: "OAuth provider refresh token."
+        accessToken:
+          type: string
+          description: "JWT access token issued by the auth server."
+        expiresIn:
+          type: integer
+          nullable: true
+          description: "Number of seconds until the access token expires."
+          example: 3600
+        refreshToken:
+          type: string
+          nullable: true
+          description: "Refresh token used to obtain a new access token."
+        tokenType:
+          type: string
+          description: "Type of token (usually `bearer`)."
+          example: bearer
+        user:
+          $ref: "#/components/schemas/User"
+      required:
+        - accessToken
+        - tokenType
+        - user
+
+    AuthSessionUrlResponse:
+      type: object
+      properties:
+        session:
+          $ref: "#/components/schemas/Session"
+        redirectType:
+          type: string
+          nullable: true
+          description: "Type of redirect after authentication (e.g., 'login', 'signup')."
+          example: login
+      required:
+        - session
+
+    OAuthResponse:
+      type: object
+      properties:
+        provider:
+          $ref: "#/components/schemas/OAuthProvider"
+        url:
+          type: string
+          format: uri
+          description: "The URL to redirect the user for OAuth authentication."
+          example: "https://eimunisasi-base-staging.peltops.com/auth/v1/authorize?provider=keycloak"
+      required:
+        - provider
+        - url
+
+    AuthResponse:
+      type: object
+      properties:
+        session:
+          $ref: "#/components/schemas/Session"
+        user:
+          $ref: "#/components/schemas/User"
+
+    OAuthProvider:
+      type: object
+      properties:
+        id: { type: string, example: keycloak }
+        name: { type: string }
+      required: [id, name]
+
+    OAuthStartRequest:
+      type: object
+      properties:
+        provider:
+          type: string
+          description: Provider ID (e.g., google, github)
+        redirectUri:
+          type: string
+          format: uri
+        codeChallenge:
+          type: string
+          description: PKCE code challenge (S256)
+        state:
+          type: string
+          description: CSRF token/state
+      required: [provider, redirectUri]
+
+    OAuthCallbackResponse:
+      type: object
+      properties:
+        user:
+          type: object
+          properties:
+            id: { type: string }
+            email: { type: string, format: email }
+        session:
+          $ref: "#/components/schemas/TokenResponse"
+      required: [user, session]
+
+    TokenResponse:
+      type: object
+      properties:
+        accessToken: { type: string }
+        tokenType: { type: string, example: Bearer }
+        expiresIn: { type: integer, example: 3600 }
+        refreshToken: { type: string }
+      required: [accessToken, tokenType, expiresIn]
+
+    Plan:
+      type: object
+      properties:
+        id:
+          {
+            type: string,
+            description: Plan identifier in our system (maps to Kill Bill product/plan),
+          }
+        name: { type: string }
+        tier:
+          type: string
+          enum: [free, basic, premium, enterprise]
+        features:
+          type: array
+          items: { type: string }
+        prices:
+          type: array
+          items:
+            $ref: "#/components/schemas/Price"
+        selectable:
+          type: boolean
+          default: true
+        contactUs:
+          type: object
+          nullable: true
+          default: null
+          properties:
+            email: { type: string, format: email }
+            subject: { type: string }
+            body: { type: string }
+      required: [id, name, tier, features, prices, selectable]
+
+    Price:
+      type: object
+      properties:
+        amount:
+          type: number
+          nullable: true
+        currency:
+          type: string
+          example: USD
+      required: [currency]
+
+    CreateSubscriptionRequest:
+      type: object
+      properties:
+        planId:
+          type: string
+          description: One of the plan IDs from `/plans` (free/basic/premium/enterprise).
+        interval:
+          type: string
+          enum: [month, year]
+          default: month
+        promoCode:
+          type: string
+          nullable: true
+        paymentMethodToken:
+          type: string
+          nullable: true
+          description: Optional token to set as default payment method before creating subscription.
+      required: [planId]
+
+    Subscription:
+      type: object
+      properties:
+        id: { type: string }
+        userId: { type: string }
+        planId: { type: string }
+        interval:
+          type: string
+          enum: [month, year]
+        status:
+          type: string
+          enum: [trialing, active, paused, canceled, past_due]
+        startDate: { type: string, format: date-time }
+        currentPeriodStart: { type: string, format: date-time }
+        currentPeriodEnd: { type: string, format: date-time }
+        billing:
+          type: object
+          description: Reference metadata for debugging
+          properties:
+            accountId: { type: string }
+            subscriptionId: { type: string }
+            bundleId: { type: string }
+      required:
+        [
+          id,
+          userId,
+          planId,
+          interval,
+          status,
+          startDate,
+          currentPeriodStart,
+          currentPeriodEnd,
+        ]
+
+    CreateInvoiceRequest:
+      type: object
+      properties:
+        accountId: { type: string }
+        targetDate: { type: string }
+      required: [accountId]
+
+    Invoice:
+      type: object
+      properties:
+        id: { type: string }
+        number: { type: string }
+        userId: { type: string }
+        subscriptionId: { type: string }
+        status:
+          type: string
+          enum: [draft, open, paid, void, uncollectible]
+        currency: { type: string }
+        amount: { type: number }
+        balance: { type: number }
+        items:
+          type: array
+          items: { $ref: "#/components/schemas/InvoiceItem" }
+        createdAt: { type: string, format: date-time }
+        dueDate: { type: string, format: date-time }
+      required:
+        [id, userId, status, currency, amount, balance, items, createdAt]
+
+    InvoiceItem:
+      type: object
+      properties:
+        description: { type: string }
+        quantity: { type: number, default: 1 }
+        unitAmount: { type: number }
+        amount: { type: number }
+      required: [description, amount]
+
+    PayInvoiceRequest:
+      type: object
+      properties:
+        paymentMethodToken:
+          type: string
+          description: Use a specific PM; if omitted, use default on Kill Bill account.
+        capture:
+          type: boolean
+          default: true
+        externalPayment:
+          type: boolean
+          default: false
+          description: Mark as externally paid in Kill Bill (administrative).
+      additionalProperties: false
+
+    Payment:
+      type: object
+      properties:
+        id: { type: string }
+        invoiceId: { type: string }
+        status:
+          type: string
+          enum: [authorized, captured, succeeded, failed]
+        amount: { type: number }
+        currency: { type: string }
+        attemptedAt: { type: string, format: date-time }
+        killbill:
+          type: object
+          properties:
+            paymentId: { type: string }
+            transactionId: { type: string }
+      required: [id, invoiceId, status, amount, currency, attemptedAt]
+
+    KillBillEvent:
+      type: object
+      properties:
+        eventType:
+          type: string
+          example:
+            [
+              INVOICE_CREATION,
+              PAYMENT_SUCCESS,
+              PAYMENT_FAILED,
+              SUBSCRIPTION_PHASE,
+              SUBSCRIPTION_CANCEL,
+            ]
+        accountId: { type: string }
+        objectType: { type: string }
+        objectId: { type: string }
+        payload:
+          type: object
+          additionalProperties: true
+      required: [eventType]
+
+    Error:
+      type: object
+      properties:
+        code: { type: string }
+        message: { type: string }
+        details:
+          type: object
+          additionalProperties: true
+      required: [code, message]
+
+x-internal:
+  killbill:
+    headers:
+      apiKeyHeader: X-Killbill-ApiKey
+      apiSecretHeader: X-Killbill-ApiSecret
+      createdByHeader: X-Killbill-CreatedBy
+    typicalCalls:
+      createAccount: POST /1.0/kb/accounts
+      createSubscription: POST /1.0/kb/subscriptions
+      triggerInvoice: POST /1.0/kb/invoices?targetDate=...
+      getInvoice: GET /1.0/kb/invoices/{invoiceId}
+      payInvoice: POST /1.0/kb/invoices/{invoiceId}/payments
