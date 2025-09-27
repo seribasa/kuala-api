@@ -25,12 +25,13 @@ Kuala API is a comprehensive backend service that provides:
 │   Client App    │───▶│   Kuala API     │───▶│   Supabase      │
 │                 │    │ (Edge Functions)│    │   (Auth & DB)   │
 └─────────────────┘    └─────────────────┘    └─────────────────┘
-                │
-                ▼
-             ┌─────────────────┐    ┌─────────────────┐
-             │   Kill Bill     │    │  Bayeu Payment  │
-             │   (Billing)     │───▶│    Gateway      │
-             └─────────────────┘    └─────────────────┘
+                        │               │
+                        │               │
+                        ▼               ▼
+          ┌─────────────────┐    ┌─────────────────┐
+          │   Kill Bill     │    │  Bayeu Payment  │
+          │   (Billing)     │    │    Gateway      │
+          └─────────────────┘    └─────────────────┘
 ```
 
 ## 🚀 Quick Start
@@ -39,6 +40,7 @@ Kuala API is a comprehensive backend service that provides:
 
 - [Deno](https://deno.land/) (v1.37+)
 - [Supabase CLI](https://supabase.com/docs/guides/cli) (v1.0+)
+- [Docker](https://www.docker.com/get-started) (for local Supabase and Kill Bill)
 - [Git](https://git-scm.com/)
 
 ### Installation
@@ -75,7 +77,7 @@ Copy `.env.example` to `.env` and configure the following variables:
 
 ```bash
 # Supabase Configuration
-AUTH_BASE_URL=https://your-project-id.supabase.co
+AUTH_BASE_URL=https://your-project-id.supabase.co # Your Supabase project URL (Local or Production)
 AUTH_SUPABASE_ANON_KEY=your_supabase_anon_key_here
 
 # Optional: Kill Bill Configuration (for billing features)
@@ -96,18 +98,20 @@ KILLBILL_API_SECRET=your_killbill_api_secret
 ```mermaid
 sequenceDiagram
     participant Client
-    participant Kuala
+    participant Kuala API
     participant Supabase
     participant Keycloak
 
-    Client->>Kuala: GET /auth/authorize?redirect_to=...&code_challenge=...
-    Kuala->>Supabase: Redirect to OAuth
+    Client->>Kuala API: GET /auth/authorize?redirect_to=...&code_challenge=...
+    Kuala API->>Supabase: Call OAuth
     Supabase->>Keycloak: OAuth flow
-    Keycloak->>Client: Redirect with auth code
-    Client->>Kuala: POST /auth/exchange-token
-    Kuala->>Supabase: Exchange code for tokens
-    Supabase->>Kuala: Return access & refresh tokens
-    Kuala->>Client: Return session data
+    Keycloak->>Supabase: Redirect with auth code
+    Supabase->>Kuala API: Redirect with auth code
+    Kuala API->>Client: Redirect with auth code
+    Client->>Kuala API: POST /auth/exchange-token
+    Kuala API->>Supabase: Exchange code for tokens
+    Supabase->>Kuala API: Return access & refresh tokens
+    Kuala API->>Client: Return session data
 ```
 
 ### Core Endpoints
@@ -142,6 +146,8 @@ sequenceDiagram
 ### Example Usage
 
 #### 1. Start OAuth Flow
+
+How to generate `code_challenge` and `code_verifier` see this [helpers.ts](https://github.com/supabase/auth-js/blob/1cbd43ec638a26ac59ae3908219927885be55ecb/src/lib/helpers.ts).
 
 ```bash
 curl 'https://kuala-api-staging.seribasa.digital/auth/authorize?redirect_to=https%3A%2F%2Fenakes-app.peltops.com&code_challenge=%3Cyour_code_challenge%3E' \
@@ -187,11 +193,11 @@ kuala-api/
 ├── README.md                 # This file
 ├── docs/                     # Additional documentation
 ├── spec/                     # API specifications
-│   ├── openapi.yml          # OpenAPI 3.0 specification
-│   └── plans.xml            # Kill Bill plan definitions
+│   └── openapi.yml          # OpenAPI 3.0 specification
 ├── supabase/
 │   ├── config.toml          # Supabase configuration
 │   └── functions/
+│       ├── tests/           # Unit tests
 │       ├── _shared/         # Shared types and utilities
 │       │   └── types/
 │       │       └── BaseResponse.ts
@@ -207,6 +213,7 @@ kuala-api/
 └── infra/                   # Infrastructure configs
     └── killbill/
         └── docker-compose.yaml
+        └── plans.xml            # Kill Bill plan definitions
 ```
 
 ### Running Tests
@@ -751,7 +758,7 @@ for details.
 
 ## 📄 License
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
+This project is licensed under the Apache License - see the [LICENSE](LICENSE) file
 for details.
 
 ## 🆘 Support
