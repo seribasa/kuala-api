@@ -3,6 +3,7 @@ volumes:
   db:
 services:
   killbill:
+    container_name: killbill-kuala
     image: killbill/killbill:0.24.10
     ports:
       - "8080:8080"
@@ -12,6 +13,7 @@ services:
       - KILLBILL_DAO_PASSWORD=killbill
       - KILLBILL_CATALOG_URI=plans.xml
   kaui:
+    container_name: kaui-kuala
     image: killbill/kaui:3.0.9
     ports:
       - "9090:8080"
@@ -21,6 +23,7 @@ services:
       - KAUI_CONFIG_DAO_PASSWORD=killbill
       - KAUI_KILLBILL_URL=http://killbill:8080
   db:
+    container_name: mariadb-kuala
     image: killbill/mariadb:0.24
     volumes:
       - type: volume
