@@ -265,6 +265,51 @@ This project follows TypeScript best practices:
    supabase db reset
    ```
 
+### Bootstrap Kill Bill Tenant Locally
+
+Spin up the Kill Bill stack defined in `infra/killbill/docker-compose.yaml` and
+create a tenant in a single step:
+
+```bash
+./infra/killbill/init-tenant.sh --start-stack --api-key demo --api-secret demosecret --use-global-default
+```
+
+The script will:
+
+- Start `killbill`, `kaui`, and the backing MariaDB container (if requested)
+- Wait for Kill Bill to report healthy
+- Submit a `POST /1.0/kb/tenants` request with the credentials you provide
+
+> **Heads-up:** Tenants created via the API are not immediately visible in KAUI
+> because the UI cannot fetch the `apiSecret` automatically. After running the
+> script, log into KAUI and “create” the same tenant again—KAUI will simply sync
+> with the existing tenant instead of creating a duplicate.
+
+Additional flags let you override the Kill Bill URL, set a custom `externalKey`,
+or skip starting Docker if the stack is already running. Run
+`./infra/killbill/init-tenant.sh --help` for the full option list.
+
+### Upload Kill Bill Catalog
+
+After creating a tenant, upload your subscription catalog defined in
+`infra/killbill/plans.xml`:
+
+```bash
+./infra/killbill/upload-catalog.sh --api-key demo --api-secret demosecret
+```
+
+This publishes your complete subscription plans, pricing, and billing rules to
+Kill Bill. The catalog includes:
+
+- Product definitions (Free, Basic, Premium, Enterprise)
+- Plan pricing in multiple currencies (USD, IDR)
+- Monthly and annual billing periods
+- Add-on features and included products
+
+You can customize the catalog file location with `--catalog-file` or override
+Kill Bill connection settings. Run `./infra/killbill/upload-catalog.sh --help`
+for all options.
+
 ## 📋 Subscription Plans
 
 The API supports multiple subscription tiers:
