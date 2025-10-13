@@ -5,10 +5,6 @@ export async function corsMiddleware(c: Context, next: Next) {
 	for (const [key, value] of Object.entries(corsHeaders)) {
 		c.header(key, value);
 	}
-	c.header(
-		"Access-Control-Allow-Methods",
-		"GET,POST,PUT,DELETE",
-	);
 
 	if (c.req.method === "OPTIONS") {
 		return c.body(null, 204);
@@ -19,8 +15,4 @@ export async function corsMiddleware(c: Context, next: Next) {
 	for (const [key, value] of Object.entries(corsHeaders)) {
 		c.res.headers.set(key, value);
 	}
-	c.res.headers.set(
-		"Access-Control-Allow-Methods",
-		"GET,POST,PUT,DELETE",
-	);
 }
