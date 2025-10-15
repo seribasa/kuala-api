@@ -2,10 +2,6 @@ import type { Context, Next } from "@hono/hono";
 import { corsHeaders } from "../../_shared/cors-headers.ts";
 
 export async function corsMiddleware(c: Context, next: Next) {
-	for (const [key, value] of Object.entries(corsHeaders)) {
-		c.header(key, value);
-	}
-
 	if (c.req.method === "OPTIONS") {
 		return c.body(null, 204);
 	}
