@@ -295,7 +295,7 @@ After creating a tenant, upload your subscription catalog defined in
 `infra/killbill/plans.xml`:
 
 ```bash
-./infra/killbill/upload-catalog.sh --api-key demo --api-secret demosecret
+./infra/killbill/init-plans-catalog.sh --api-key demo --api-secret demosecret
 ```
 
 This publishes your complete subscription plans, pricing, and billing rules to
@@ -307,7 +307,7 @@ Kill Bill. The catalog includes:
 - Add-on features and included products
 
 You can customize the catalog file location with `--catalog-file` or override
-Kill Bill connection settings. Run `./infra/killbill/upload-catalog.sh --help`
+Kill Bill connection settings. Run `./infra/killbill/init-plans-catalog.sh --help`
 for all options.
 
 ## 📋 Subscription Plans

@@ -12,14 +12,11 @@ Required arguments:
   -s, --api-secret <secret> Tenant API secret to register.
 
 Optional arguments:
-      --external-key <key>  External key to associate with the tenant.
       --killbill-url <url>  Base URL for Kill Bill (default: http://127.0.0.1:8080).
       --created-by <name>   Value for X-Killbill-CreatedBy header (default: kuala-bootstrap).
       --admin-user <user>   Kill Bill admin username for authentication (default: admin).
       --admin-password <pw> Kill Bill admin password for authentication (default: password).
       --use-global-default  Configure tenant with the default catalog.
-      --start-stack         Start the local Kill Bill stack with docker compose before creating the tenant.
-      --wait-timeout <sec>  Seconds to wait for Kill Bill to become ready (default: 120).
   -h, --help                Show this help message and exit.
 
 Environment variables:
@@ -30,7 +27,7 @@ Environment variables:
 
 Examples:
   ./init-tenant.sh --api-key demo --api-secret demosecret
-  ./init-tenant.sh -k demo -s demosecret --external-key demo --use-global-default
+  ./init-tenant.sh -k demo -s demosecret
 EOF
 }
 
@@ -57,8 +54,6 @@ API_KEY=""
 API_SECRET=""
 EXTERNAL_KEY=""
 USE_GLOBAL_DEFAULT="false"
-START_STACK="false"
-WAIT_TIMEOUT=120
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -70,11 +65,6 @@ while [[ $# -gt 0 ]]; do
     -s|--api-secret)
       [[ $# -ge 2 ]] || error "--api-secret requires a value"
       API_SECRET="$2"
-      shift 2
-      ;;
-    --external-key)
-      [[ $# -ge 2 ]] || error "--external-key requires a value"
-      EXTERNAL_KEY="$2"
       shift 2
       ;;
     --killbill-url)
@@ -101,15 +91,6 @@ while [[ $# -gt 0 ]]; do
       USE_GLOBAL_DEFAULT="true"
       shift 1
       ;;
-    --start-stack)
-      START_STACK="true"
-      shift 1
-      ;;
-    --wait-timeout)
-      [[ $# -ge 2 ]] || error "--wait-timeout requires a value"
-      WAIT_TIMEOUT="$2"
-      shift 2
-      ;;
     -h|--help)
       usage
       exit 0
@@ -124,38 +105,6 @@ done
 [[ -n "$API_SECRET" ]] || { usage; error "--api-secret is required"; }
 
 require_command curl
-
-if [[ "$START_STACK" == "true" ]]; then
-  require_command docker
-  if docker compose version >/dev/null 2>&1; then
-    compose_cmd=(docker compose)
-  elif command -v docker-compose >/dev/null 2>&1; then
-    compose_cmd=(docker-compose)
-  else
-    error "Docker Compose is required when using --start-stack"
-  fi
-  echo "[INFO] Starting Kill Bill stack with docker compose"
-  "${compose_cmd[@]}" -f "$COMPOSE_FILE" up -d
-fi
-
-if [[ "$START_STACK" == "true" ]]; then
-  echo "[INFO] Waiting for Kill Bill to become ready at ${KILLBILL_URL}"
-  deadline=$((SECONDS + WAIT_TIMEOUT))
-  health_endpoint="${KILLBILL_URL%/}/1.0/healthcheck"
-  while true; do
-    health_code=$(curl -s -o /dev/null -w "%{http_code}" "$health_endpoint" || echo "")
-    if [[ "$health_code" == "200" ]]; then
-      echo "[INFO] Kill Bill healthcheck reports ready"
-      break
-    fi
-
-    if (( SECONDS >= deadline )); then
-      error "Timed out waiting for Kill Bill after ${WAIT_TIMEOUT} seconds"
-    fi
-
-    sleep 5
-  done
-fi
 
 query_suffix=""
 if [[ "$USE_GLOBAL_DEFAULT" == "true" ]]; then

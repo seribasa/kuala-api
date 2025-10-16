@@ -3,7 +3,7 @@ set -euo pipefail
 
 usage() {
   cat <<'EOF'
-Usage: upload-catalog.sh [options]
+Usage: init-plans-catalog.sh [options]
 
 Upload a catalog XML file to Kill Bill for the specified tenant.
 
@@ -28,8 +28,8 @@ Environment variables:
   CREATED_BY        Alternative way to set --created-by.
 
 Examples:
-  ./upload-catalog.sh --api-key demo --api-secret demosecret
-  ./upload-catalog.sh --catalog-file custom-plans.xml --api-key demo --api-secret demosecret
+  ./init-plans-catalog.sh --api-key demo --api-secret demosecret
+  ./init-plans-catalog.sh --catalog-file custom-plans.xml --api-key demo --api-secret demosecret
 EOF
 }
 
@@ -127,6 +127,9 @@ response_body=$(mktemp)
 response_headers=$(mktemp)
 trap 'rm -f "$response_body" "$response_headers"' EXIT
 
+# Read catalog file content into a variable
+catalog_content=$(cat "${CATALOG_FILE}")
+
 curl_exit=0
 http_status=$(curl -sS -w "%{http_code}" -o "$response_body" -D "$response_headers" \
   -X POST "${KILLBILL_URL}/1.0/kb/catalog/xml" \
@@ -138,7 +141,7 @@ http_status=$(curl -sS -w "%{http_code}" -o "$response_body" -D "$response_heade
   -H "X-Killbill-CreatedBy: ${CREATED_BY}" \
   -H "X-Killbill-Reason: ${REASON}" \
   -H "X-Killbill-Comment: ${COMMENT}" \
-  --data-binary "@${CATALOG_FILE}") || curl_exit=$?
+  -d "${catalog_content}") || curl_exit=$?
 
 if (( curl_exit != 0 )); then
   echo "[ERROR] Unable to reach Kill Bill at ${KILLBILL_URL}." >&2
