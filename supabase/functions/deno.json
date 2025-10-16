@@ -1,25 +1,25 @@
 {
-  "nodeModulesDir": "auto",
-  "lock": false,
-  "npm": {
-    "specifiers": []
-  },
-  "imports": {
-    "@std/testing": "jsr:@std/testing@^1.0.12",
-    "@std/assert": "jsr:@std/assert@^1.0.12",
-    "@std/testing/mock": "jsr:@std/testing@^1.0.12/mock",
-    "@hono/hono": "jsr:@hono/hono@^4.6.3",
-    "@hono/hono/logger": "jsr:@hono/hono@^4.6.3/logger"
-  },
-  "tasks": {
-    "dev": "deno run --allow-net --allow-env --watch=supabase/functions,infra/self-hosted --config=deno.json --env-file=../../.env ../../infra/self-hosted/server.ts",
-    "start": "deno run --allow-net --allow-env --config=deno.json --env-file=../../.env ../../infra/self-hosted/server.ts",
-    "test": "deno test --allow-net --allow-env --env-file=.env.test --coverage=coverage",
-    "lcov": "deno coverage --lcov coverage/ > coverage.lcov",
-    "lint": "deno lint"
-  },
-  "fmt": {
-    "useTabs": true,
-    "indentWidth": 4
-  }
+	"nodeModulesDir": "auto",
+	"lock": false,
+	"npm": {
+		"specifiers": []
+	},
+	"imports": {
+		"@std/testing": "jsr:@std/testing@^1.0.12",
+		"@std/assert": "jsr:@std/assert@^1.0.12",
+		"@std/testing/mock": "jsr:@std/testing@^1.0.12/mock",
+		"@hono/hono": "jsr:@hono/hono@^4.6.3",
+		"@hono/hono/logger": "jsr:@hono/hono@^4.6.3/logger"
+	},
+	"tasks": {
+		"dev": "deno run --allow-net --allow-env --watch=supabase/functions,infra/self-hosted --config=deno.json --env-file=../../.env ../../infra/self-hosted/server.ts",
+		"start": "deno run --allow-net --allow-env --config=deno.json --env-file=../../.env ../../infra/self-hosted/server.ts",
+		"test": "deno test --allow-net --allow-env --env-file=.env.test --coverage=coverage",
+		"lcov": "deno coverage --lcov coverage/ > coverage.lcov",
+		"lint": "deno lint"
+	},
+	"fmt": {
+		"useTabs": true,
+		"indentWidth": 4
+	}
 }
