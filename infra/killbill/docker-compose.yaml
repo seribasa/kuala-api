@@ -1,35 +1,115 @@
-version: "3.2"
 volumes:
   db:
 services:
   killbill:
+    container_name: killbill_service
     image: killbill/killbill:0.24.10
     ports:
-      - "8080:8080"
+      - "${KILLBILL_PORT}:8080"
     volumes:
-      - ./shiro.ini:/var/lib/killbill/shiro.ini
+      - ./shiro.ini.template:/tmp/shiro.ini.template:ro
+      - ./generate-shiro.sh:/generate-shiro.sh:ro
+    entrypoint: ["/bin/sh", "/generate-shiro.sh"]
     environment:
-      - KILLBILL_DAO_URL=jdbc:mysql://db:3306/killbill
-      - KILLBILL_DAO_USER=root
-      - KILLBILL_DAO_PASSWORD=killbill
-      - KILLBILL_CATALOG_URI=plans.xml
-      - KILLBILL_SECURITY_SHIRO_RESOURCE_PATH=file:/var/lib/killbill/shiro.ini
+      - KILLBILL_DAO_URL=${KILLBILL_DAO_URL}
+      - KILLBILL_DAO_USER=${KILLBILL_DAO_USER}
+      - KILLBILL_DAO_PASSWORD=${KILLBILL_DAO_PASSWORD}
+      - KILLBILL_CATALOG_URI=${KILLBILL_CATALOG_URI}
+      - KILLBILL_SECURITY_SHIRO_RESOURCE_PATH=${KILLBILL_SECURITY_SHIRO_RESOURCE_PATH}
+      - ADMIN_USER=${ADMIN_USER}
+      - ADMIN_PASSWORD=${ADMIN_PASSWORD}
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/1.0/healthcheck"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+      start_period: 60s
+    depends_on:
+      db:
+        condition: service_healthy
   kaui:
+    container_name: kaui
     image: killbill/kaui:3.0.9
     ports:
-      - "9090:8080"
+      - "${KAUI_PORT}:8080"
     environment:
-      - KAUI_CONFIG_DAO_URL=jdbc:mysql://db:3306/kaui
-      - KAUI_CONFIG_DAO_USER=root
-      - KAUI_CONFIG_DAO_PASSWORD=killbill
-      - KAUI_KILLBILL_URL=http://killbill:8080
+      - KAUI_CONFIG_DAO_URL=${KAUI_CONFIG_DAO_URL}
+      - KAUI_CONFIG_DAO_USER=${KAUI_CONFIG_DAO_USER}
+      - KAUI_CONFIG_DAO_PASSWORD=${KAUI_CONFIG_DAO_PASSWORD}
+      - KAUI_KILLBILL_URL=${KAUI_KILLBILL_URL}
+    depends_on:
+      killbill:
+        condition: service_healthy
   db:
+    container_name: mariadb
     image: killbill/mariadb:0.24
     volumes:
       - type: volume
         source: db
         target: /var/lib/mysql
     expose:
-      - "3306"
+      - "${MYSQL_PORT}"
     environment:
-      - MYSQL_ROOT_PASSWORD=killbill
+      - MYSQL_ROOT_PASSWORD=${MYSQL_ROOT_PASSWORD}
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "mysqladmin",
+          "ping",
+          "-h",
+          "localhost",
+          "-p${MYSQL_ROOT_PASSWORD}",
+        ]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+  init-tenant:
+    container_name: init_tenant
+    image: curlimages/curl:8.5.0
+    volumes:
+      - ./init-tenant.sh:/scripts/init-tenant.sh:ro
+    environment:
+      - KILLBILL_URL=${KILLBILL_URL}
+      - ADMIN_USER=${ADMIN_USER}
+      - ADMIN_PASSWORD=${ADMIN_PASSWORD}
+    command:
+      - sh
+      - /scripts/init-tenant.sh
+      - --api-key
+      - ${KILLBILL_API_KEY}
+      - --api-secret
+      - ${KILLBILL_API_SECRET}
+      - --killbill-url
+      - ${KILLBILL_URL}
+    depends_on:
+      killbill:
+        condition: service_healthy
+    restart: "no"
+  init-catalog:
+    container_name: init_catalog
+    image: curlimages/curl:8.5.0
+    volumes:
+      - ./init-plans-catalog.sh:/scripts/init-plans-catalog.sh:ro
+      - ./plans.xml:/scripts/plans.xml:ro
+    environment:
+      - KILLBILL_URL=${KILLBILL_URL}
+      - ADMIN_USER=${ADMIN_USER}
+      - ADMIN_PASSWORD=${ADMIN_PASSWORD}
+      - KILLBILL_API_KEY=${KILLBILL_API_KEY}
+      - KILLBILL_API_SECRET=${KILLBILL_API_SECRET}
+    command:
+      - sh
+      - /scripts/init-plans-catalog.sh
+      - --catalog-file
+      - /scripts/plans.xml
+      - --api-key
+      - ${KILLBILL_API_KEY}
+      - --api-secret
+      - ${KILLBILL_API_SECRET}
+      - --killbill-url
+      - ${KILLBILL_URL}
+    depends_on:
+      init-tenant:
+        condition: service_completed_successfully
+    restart: "no"

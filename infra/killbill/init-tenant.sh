@@ -1,5 +1,5 @@
-#!/usr/bin/env bash
-set -euo pipefail
+#!/bin/sh
+set -eu
 
 usage() {
   cat <<'EOF'
@@ -42,7 +42,7 @@ require_command() {
   fi
 }
 
-SCRIPT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
+SCRIPT_DIR=$(cd "$(dirname "$0")" && pwd)
 COMPOSE_FILE="${SCRIPT_DIR}/docker-compose.yaml"
 
 KILLBILL_URL=${KILLBILL_URL:-"http://127.0.0.1:8080"}
@@ -55,15 +55,15 @@ API_SECRET=""
 EXTERNAL_KEY=""
 USE_GLOBAL_DEFAULT="false"
 
-while [[ $# -gt 0 ]]; do
+while [ $# -gt 0 ]; do
   case "$1" in
     -k|--api-key)
-      [[ $# -ge 2 ]] || error "--api-key requires a value"
+      [ $# -ge 2 ] || error "--api-key requires a value"
       API_KEY="$2"
       shift 2
       ;;
     -s|--api-secret)
-      [[ $# -ge 2 ]] || error "--api-secret requires a value"
+      [ $# -ge 2 ] || error "--api-secret requires a value"
       API_SECRET="$2"
       shift 2
       ;;
@@ -101,13 +101,13 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
-[[ -n "$API_KEY" ]] || { usage; error "--api-key is required"; }
-[[ -n "$API_SECRET" ]] || { usage; error "--api-secret is required"; }
+[ -n "$API_KEY" ] || { usage; error "--api-key is required"; }
+[ -n "$API_SECRET" ] || { usage; error "--api-secret is required"; }
 
 require_command curl
 
 query_suffix=""
-if [[ "$USE_GLOBAL_DEFAULT" == "true" ]]; then
+if [ "${USE_GLOBAL_DEFAULT}" = "true" ]; then
   query_suffix="?useGlobalDefault=true"
 fi
 
@@ -116,7 +116,7 @@ response_body=$(mktemp)
 response_headers=$(mktemp)
 trap 'rm -f "$payload" "$response_body" "$response_headers"' EXIT
 
-if [[ -n "$EXTERNAL_KEY" ]]; then
+if [ -n "$EXTERNAL_KEY" ]; then
   cat >"$payload" <<EOF
 {
   "apiKey": "${API_KEY}",
@@ -140,18 +140,26 @@ http_status=$(curl -sS -w "%{http_code}" -o "$response_body" -D "$response_heade
   -u "${ADMIN_USER}:${ADMIN_PASSWORD}" \
   -d @"$payload")
 
-if [[ "$http_status" == "201" ]]; then
+if [ "$http_status" = "201" ]; then
   location_header=$(awk -F': ' 'BEGIN{IGNORECASE=1} /^Location:/ {print $2}' "$response_headers" | tail -n1 | tr -d '\r\n')
   echo "[SUCCESS] Tenant created successfully."
-  if [[ -n "$location_header" ]]; then
+  if [ -n "$location_header" ]; then
     echo "[INFO] Tenant URL: ${location_header}"
   else
     echo "[INFO] Location header not returned; check Kill Bill logs if needed."
   fi
   exit 0
+elif [ "$http_status" = "409" ]; then
+  # Tenant already exists - treat as success for idempotency
+  echo "[INFO] Tenant already exists (HTTP 409). Continuing..."
+  if [ -s "$response_body" ]; then
+    echo "[INFO] Response:" 
+    cat "$response_body"
+  fi
+  exit 0
 else
   echo "[ERROR] Failed to create tenant (HTTP ${http_status})." >&2
-  if [[ -s "$response_body" ]]; then
+  if [ -s "$response_body" ]; then
     echo "[ERROR] Response:" >&2
     cat "$response_body" >&2
   fi
