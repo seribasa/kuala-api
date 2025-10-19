@@ -1,5 +1,5 @@
-#!/usr/bin/env bash
-set -euo pipefail
+#!/bin/sh
+set -eu
 
 usage() {
   cat <<'EOF'
@@ -44,7 +44,7 @@ require_command() {
   fi
 }
 
-SCRIPT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
+SCRIPT_DIR=$(cd "$(dirname "$0")" && pwd)
 DEFAULT_CATALOG="${SCRIPT_DIR}/plans.xml"
 
 CATALOG_FILE="${DEFAULT_CATALOG}"
@@ -57,50 +57,50 @@ CREATED_BY=${CREATED_BY:-"kuala-bootstrap"}
 REASON="catalog-upload"
 COMMENT="Initial catalog upload"
 
-while [[ $# -gt 0 ]]; do
+while [ $# -gt 0 ]; do
   case "$1" in
     --catalog-file)
-      [[ $# -ge 2 ]] || error "--catalog-file requires a value"
+      [ $# -ge 2 ] || error "--catalog-file requires a value"
       CATALOG_FILE="$2"
       shift 2
       ;;
     --killbill-url)
-      [[ $# -ge 2 ]] || error "--killbill-url requires a value"
+      [ $# -ge 2 ] || error "--killbill-url requires a value"
       KILLBILL_URL="$2"
       shift 2
       ;;
     --admin-user)
-      [[ $# -ge 2 ]] || error "--admin-user requires a value"
+      [ $# -ge 2 ] || error "--admin-user requires a value"
       ADMIN_USER="$2"
       shift 2
       ;;
     --admin-password)
-      [[ $# -ge 2 ]] || error "--admin-password requires a value"
+      [ $# -ge 2 ] || error "--admin-password requires a value"
       ADMIN_PASSWORD="$2"
       shift 2
       ;;
     --api-key)
-      [[ $# -ge 2 ]] || error "--api-key requires a value"
+      [ $# -ge 2 ] || error "--api-key requires a value"
       API_KEY="$2"
       shift 2
       ;;
     --api-secret)
-      [[ $# -ge 2 ]] || error "--api-secret requires a value"
+      [ $# -ge 2 ] || error "--api-secret requires a value"
       API_SECRET="$2"
       shift 2
       ;;
     --created-by)
-      [[ $# -ge 2 ]] || error "--created-by requires a value"
+      [ $# -ge 2 ] || error "--created-by requires a value"
       CREATED_BY="$2"
       shift 2
       ;;
     --reason)
-      [[ $# -ge 2 ]] || error "--reason requires a value"
+      [ $# -ge 2 ] || error "--reason requires a value"
       REASON="$2"
       shift 2
       ;;
     --comment)
-      [[ $# -ge 2 ]] || error "--comment requires a value"
+      [ $# -ge 2 ] || error "--comment requires a value"
       COMMENT="$2"
       shift 2
       ;;
@@ -114,12 +114,12 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
-[[ -n "$API_KEY" ]] || { usage; error "--api-key is required"; }
-[[ -n "$API_SECRET" ]] || { usage; error "--api-secret is required"; }
+[ -n "$API_KEY" ] || { usage; error "--api-key is required"; }
+[ -n "$API_SECRET" ] || { usage; error "--api-secret is required"; }
 
 require_command curl
 
-[[ -f "$CATALOG_FILE" ]] || error "Catalog file not found: ${CATALOG_FILE}"
+[ -f "$CATALOG_FILE" ] || error "Catalog file not found: ${CATALOG_FILE}"
 
 echo "[INFO] Uploading catalog from ${CATALOG_FILE} to Kill Bill at ${KILLBILL_URL}"
 
@@ -143,19 +143,45 @@ http_status=$(curl -sS -w "%{http_code}" -o "$response_body" -D "$response_heade
   -H "X-Killbill-Comment: ${COMMENT}" \
   -d "${catalog_content}") || curl_exit=$?
 
-if (( curl_exit != 0 )); then
+if [ "$curl_exit" -ne 0 ]; then
   echo "[ERROR] Unable to reach Kill Bill at ${KILLBILL_URL}." >&2
   echo "[ERROR] curl exit code: ${curl_exit}" >&2
   echo "[ERROR] Ensure the Kill Bill service is running and reachable." >&2
   exit "$curl_exit"
 fi
 
-if [[ "$http_status" == "201" ]]; then
+if [ "$http_status" = "201" ]; then
   echo "[SUCCESS] Catalog uploaded successfully."
+  exit 0
+elif [ "$http_status" = "400" ]; then
+  # Check if error code 2080 (catalog already loaded for tenant)
+  if grep -q '"code":2080' "$response_body" 2>/dev/null; then
+    echo "[INFO] Catalog already loaded for this tenant (error code 2080). Skipping upload..."
+    if [ -s "$response_body" ]; then
+      echo "[INFO] Response:" 
+      cat "$response_body"
+    fi
+    exit 0
+  else
+    # Actual validation error (not duplicate catalog)
+    echo "[ERROR] Failed to upload catalog - validation error (HTTP ${http_status})." >&2
+    if [ -s "$response_body" ]; then
+      echo "[ERROR] Response:" >&2
+      cat "$response_body" >&2
+    fi
+    exit 1
+  fi
+elif [ "$http_status" = "409" ]; then
+  # Catalog conflict - treat as success for idempotency
+  echo "[INFO] Catalog conflict (HTTP 409). Continuing..."
+  if [ -s "$response_body" ]; then
+    echo "[INFO] Response:" 
+    cat "$response_body"
+  fi
   exit 0
 else
   echo "[ERROR] Failed to upload catalog (HTTP ${http_status})." >&2
-  if [[ -s "$response_body" ]]; then
+  if [ -s "$response_body" ]; then
     echo "[ERROR] Response:" >&2
     cat "$response_body" >&2
   fi

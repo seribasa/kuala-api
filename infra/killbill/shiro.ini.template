@@ -1,7 +1,7 @@
 [users]
 # Format: username = password, role1, role2, ...
 # Default admin user with root permissions
-admin = password, root
+${ADMIN_USER} = ${ADMIN_PASSWORD}, root
 
 # Additional users can be added here
 # Example: admin = admin123, root
