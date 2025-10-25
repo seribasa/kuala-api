@@ -79,7 +79,7 @@ Copy `.env.example` to `.env` and configure. * see `.env.example` for required v
 
 ### Base URL
 
-- **Staging**: `https://kuala-api-staging.seribasa.digital`
+- **Staging**: `https://kuala-api-staging.seribasa.digital/v1`
 - **Local Development**: `http://localhost:54321/functions/v1/kuala`
 
 ### Authentication Flow
@@ -139,14 +139,14 @@ sequenceDiagram
 How to generate `code_challenge` and `code_verifier` see this [helpers.ts](https://github.com/supabase/auth-js/blob/1cbd43ec638a26ac59ae3908219927885be55ecb/src/lib/helpers.ts).
 
 ```bash
-curl 'https://kuala-api-staging.seribasa.digital/auth/authorize?redirect_to=https%3A%2F%2Fenakes-app.peltops.com&code_challenge=%3Cyour_code_challenge%3E' \
+curl 'https://kuala-api-staging.seribasa.digital/v1/auth/authorize?redirect_to=https%3A%2F%2Fenakes-app.peltops.com&code_challenge=%3Cyour_code_challenge%3E' \
   -H "Content-Type: application/json"
 ```
 
 #### 2. Exchange Authorization Code
 
 ```bash
-curl -X POST "https://kuala-api-staging.seribasa.digital/auth/exchange-token" \
+curl -X POST "https://kuala-api-staging.seribasa.digital/v1/auth/exchange-token" \
   -H "Content-Type: application/json" \
   -d '{
     "auth_code": "authorization_code_from_oauth",
@@ -157,7 +157,7 @@ curl -X POST "https://kuala-api-staging.seribasa.digital/auth/exchange-token" \
 #### 3. Refresh Access Token
 
 ```bash
-curl -X POST "https://kuala-api-staging.seribasa.digital/auth/refresh-token" \
+curl -X POST "https://kuala-api-staging.seribasa.digital/v1/auth/refresh-token" \
   -H "Content-Type: application/json" \
   -d '{
     "refresh_token": "your_refresh_token"
@@ -167,7 +167,7 @@ curl -X POST "https://kuala-api-staging.seribasa.digital/auth/refresh-token" \
 #### 4. Get User Information
 
 ```bash
-curl -X GET "https://kuala-api-staging.seribasa.digital/auth/me" \
+curl -X GET "https://kuala-api-staging.seribasa.digital/v1/auth/me" \
   -H "Authorization: Bearer your_access_token"
 ```
 
