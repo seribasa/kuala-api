@@ -40,7 +40,7 @@ Kuala API is a comprehensive backend service that provides:
 
 - [Deno](https://deno.land/) (v1.37+)
 - [Supabase CLI](https://supabase.com/docs/guides/cli) (v1.0+)
-- [Docker](https://www.docker.com/get-started) (for local Supabase and Kill Bill)
+- [Docker](https://www.docker.com/get-started) (for local Supabase, Kill Bill, Keycloak)
 - [Git](https://git-scm.com/)
 
 ### Installation
@@ -73,24 +73,13 @@ Kuala API is a comprehensive backend service that provides:
 
 ### Environment Configuration
 
-Copy `.env.example` to `.env` and configure the following variables:
-
-```bash
-# Supabase Configuration
-AUTH_BASE_URL=https://your-project-id.supabase.co # Your Supabase project URL (Local or Production)
-AUTH_SUPABASE_ANON_KEY=your_supabase_anon_key_here
-
-# Optional: Kill Bill Configuration (for billing features)
-KILLBILL_URL=https://your-killbill-instance.com
-KILLBILL_API_KEY=your_killbill_api_key
-KILLBILL_API_SECRET=your_killbill_api_secret
-```
+Copy `.env.example` to `.env` and configure. * see `.env.example` for required variables.
 
 ## 📚 API Documentation
 
 ### Base URL
 
-- **Staging**: `https://kuala-api-staging.seribasa.digital`
+- **Staging**: `https://kuala-api-staging.seribasa.digital/v1`
 - **Local Development**: `http://localhost:54321/functions/v1/kuala`
 
 ### Authentication Flow
@@ -150,14 +139,14 @@ sequenceDiagram
 How to generate `code_challenge` and `code_verifier` see this [helpers.ts](https://github.com/supabase/auth-js/blob/1cbd43ec638a26ac59ae3908219927885be55ecb/src/lib/helpers.ts).
 
 ```bash
-curl 'https://kuala-api-staging.seribasa.digital/auth/authorize?redirect_to=https%3A%2F%2Fenakes-app.peltops.com&code_challenge=%3Cyour_code_challenge%3E' \
+curl 'https://kuala-api-staging.seribasa.digital/v1/auth/authorize?redirect_to=https%3A%2F%2Fenakes-app.peltops.com&code_challenge=%3Cyour_code_challenge%3E' \
   -H "Content-Type: application/json"
 ```
 
 #### 2. Exchange Authorization Code
 
 ```bash
-curl -X POST "https://kuala-api-staging.seribasa.digital/auth/exchange-token" \
+curl -X POST "https://kuala-api-staging.seribasa.digital/v1/auth/exchange-token" \
   -H "Content-Type: application/json" \
   -d '{
     "auth_code": "authorization_code_from_oauth",
@@ -168,7 +157,7 @@ curl -X POST "https://kuala-api-staging.seribasa.digital/auth/exchange-token" \
 #### 3. Refresh Access Token
 
 ```bash
-curl -X POST "https://kuala-api-staging.seribasa.digital/auth/refresh-token" \
+curl -X POST "https://kuala-api-staging.seribasa.digital/v1/auth/refresh-token" \
   -H "Content-Type: application/json" \
   -d '{
     "refresh_token": "your_refresh_token"
@@ -178,7 +167,7 @@ curl -X POST "https://kuala-api-staging.seribasa.digital/auth/refresh-token" \
 #### 4. Get User Information
 
 ```bash
-curl -X GET "https://kuala-api-staging.seribasa.digital/auth/me" \
+curl -X GET "https://kuala-api-staging.seribasa.digital/v1/auth/me" \
   -H "Authorization: Bearer your_access_token"
 ```
 
@@ -353,47 +342,37 @@ standalone application:
    cd kuala-api
    ```
 
-2. **Create a standalone server entry point**
+2. **Use the provided standalone server entry point**
 
-   Create `server.ts` in the project root:
+    The repository ships with `infra/self-hosted/server.ts`:
 
-   ```typescript
-   import { serve } from "https://deno.land/std@0.208.0/http/server.ts";
-   import handler from "./supabase/functions/kuala/index.ts";
-
-   const port = parseInt(Deno.env.get("PORT") || "8080");
-
-   console.log(`🚀 Kuala API server running on port ${port}`);
-
-   await serve(handler, { port });
-   ```
+    Copy it to your preferred location if you want to deploy from a different directory.
 
 3. **Set up environment variables**
 
    ```bash
    # Create production environment file
-   cp .env.example .env.production
-
-   # Edit with your production values
-   export AUTH_BASE_URL=https://your-supabase-project.supabase.co
-   export AUTH_SUPABASE_ANON_KEY=your_production_anon_key
-   export KILLBILL_URL=https://your-killbill-instance.com
-   export KILLBILL_API_KEY=your_api_key
-   export KILLBILL_API_SECRET=your_api_secret
+   cp .env.example .env
    ```
 
 4. **Run the server**
 
-   ```bash
-   # Development
-   deno run --allow-all --env-file=.env.production server.ts
+    ```bash
+    # Development with auto-reload (watches supabase/functions and infra/self-hosted)
+    cd supabase/functions && deno task dev
 
-   # Production with PM2
-   pm2 start "deno run --allow-all --env-file=.env.production server.ts" --name kuala-api
+    # Production / one-off run
+    cd supabase/functions && deno task start
 
-   # Or with systemd service
-   sudo systemctl start kuala-api
-   ```
+    # Or run manually
+    deno run --allow-net --allow-env --config=deno.json --env-file=../../.env ../../infra/self-hosted/server.ts
+
+    # Production with PM2
+    pm2 start "deno run --allow-net --allow-env --config=deno.json --env-file=../../.env ../../infra/self-hosted/server.ts" --name kuala-api
+
+    # Or with systemd service
+    sudo systemctl start kuala-api
+    ```
 
 5. **Nginx reverse proxy configuration**
 
@@ -592,73 +571,7 @@ deployctl deploy --project=kuala-api ./supabase/functions/kuala/index.ts
 
 #### 🐳 Docker Deployment
 
-1. **Create `Dockerfile`**
-
-   ```dockerfile
-   FROM denoland/deno:alpine
-
-   WORKDIR /app
-
-   # Copy dependency files
-   COPY supabase/functions/deno.json .
-   COPY supabase/functions/deno.lock .
-
-   # Cache dependencies
-   RUN deno cache --reload deno.json
-
-   # Copy source code
-   COPY . .
-
-   # Expose port
-   EXPOSE 8080
-
-   # Health check
-   HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
-     CMD deno eval "fetch('http://localhost:8080/health').then(() => Deno.exit(0)).catch(() => Deno.exit(1))"
-
-   # Start the application
-   CMD ["deno", "run", "--allow-all", "server.ts"]
-   ```
-
-2. **Create `docker-compose.yml`**
-
-   ```yaml
-   version: "3.8"
-
-   services:
-     kuala-api:
-       build: .
-       ports:
-         - "8080:8080"
-       environment:
-         - AUTH_BASE_URL=${AUTH_BASE_URL}
-         - AUTH_SUPABASE_ANON_KEY=${AUTH_SUPABASE_ANON_KEY}
-         - KILLBILL_URL=${KILLBILL_URL}
-         - KILLBILL_API_KEY=${KILLBILL_API_KEY}
-         - KILLBILL_API_SECRET=${KILLBILL_API_SECRET}
-       env_file:
-         - .env.production
-       restart: unless-stopped
-       healthcheck:
-         test: ["CMD", "deno", "eval", "fetch('http://localhost:8080/health')"]
-         interval: 30s
-         timeout: 10s
-         retries: 3
-
-     nginx:
-       image: nginx:alpine
-       ports:
-         - "80:80"
-         - "443:443"
-       volumes:
-         - ./nginx.conf:/etc/nginx/nginx.conf
-         - ./ssl:/etc/nginx/ssl
-       depends_on:
-         - kuala-api
-       restart: unless-stopped
-   ```
-
-3. **Build and run**
+1. **Build and run**
 
    ```bash
    # Build image
@@ -669,68 +582,6 @@ deployctl deploy --project=kuala-api ./supabase/functions/kuala/index.ts
 
    # Or run directly
    docker run -p 8080:8080 --env-file .env.production kuala-api
-   ```
-
-#### ⚙️ Configuration for Non-Supabase Deployments
-
-When deploying outside of Supabase, you'll need to handle some differences:
-
-1. **Environment Variables**
-
-   ```bash
-   # Required for all deployments
-   AUTH_BASE_URL=https://your-supabase-project.supabase.co
-   AUTH_SUPABASE_ANON_KEY=your_anon_key
-
-   # Optional: Custom port (default: 8080)
-   PORT=3000
-
-   # Optional: CORS origins (comma-separated)
-   CORS_ORIGINS=https://yourapp.com,https://staging.yourapp.com
-
-   # Optional: Kill Bill integration
-   KILLBILL_URL=https://your-killbill-instance.com
-   KILLBILL_API_KEY=your_api_key
-   KILLBILL_API_SECRET=your_api_secret
-   ```
-
-2. **Health Check Endpoint**
-
-   Add to your `server.ts`:
-
-   ```typescript
-   import { serve } from "https://deno.land/std@0.208.0/http/server.ts";
-   import handler from "./supabase/functions/kuala/index.ts";
-
-   const port = parseInt(Deno.env.get("PORT") || "8080");
-
-   const healthHandler = (req: Request): Response => {
-     if (new URL(req.url).pathname === "/health") {
-       return new Response("OK", { status: 200 });
-     }
-     return handler(req);
-   };
-
-   await serve(healthHandler, { port });
-   ```
-
-3. **CORS Configuration**
-
-   For production deployments, configure CORS appropriately:
-
-   ```typescript
-   const corsOrigins = Deno.env.get("CORS_ORIGINS")?.split(",") || ["*"];
-
-   const corsHandler = (req: Request): Response => {
-     const response = handler(req);
-     const origin = req.headers.get("origin");
-
-     if (origin && corsOrigins.includes(origin)) {
-       response.headers.set("Access-Control-Allow-Origin", origin);
-     }
-
-     return response;
-   };
    ```
 
 ## 🤝 Contributing
@@ -771,6 +622,7 @@ for details.
 ## 🔗 Related Projects
 
 - [Supabase](https://supabase.com/) - Backend-as-a-Service platform
+- [Keycloak](https://www.keycloak.org/) - Open-source identity and access management
 - [Kill Bill](https://killbill.io/) - Open-source billing platform
 - [Deno](https://deno.land/) - Modern JavaScript/TypeScript runtime
 - [Hono](https://hono.dev/) - Lightweight web framework
