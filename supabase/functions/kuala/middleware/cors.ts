@@ -1,7 +1,6 @@
 import type { Context, Next } from "@hono/hono";
 import { getAllowedOrigin, getCorsConfig } from "../../_shared/cors-headers.ts";
 
-
 /**
  * CORS Middleware
  *
