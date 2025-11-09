@@ -58,4 +58,4 @@ function getAllowedOrigin(
 	return null;
 }
 
-export { corsHeaders, getCorsConfig, getAllowedOrigin };
+export { corsHeaders, getAllowedOrigin, getCorsConfig };
