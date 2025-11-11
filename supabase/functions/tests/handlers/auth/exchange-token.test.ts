@@ -536,3 +536,102 @@ Deno.test("handleExchangeToken - should handle response with missing status fall
 		fetchStub.restore();
 	}
 });
+
+Deno.test("handleExchangeToken - should handle response with code field in error", async () => {
+	// Mock error response with code field
+	const mockErrorResponse = {
+		code: 422,
+		error_code: "invalid_request",
+		error_description: "Invalid request format",
+	};
+
+	// Stub environment variables with proper values
+	const envStub = stub(Deno.env, "get", (key: string) => {
+		if (key === "AUTH_BASE_URL") return "https://test.supabase.co";
+		if (key === "AUTH_SUPABASE_ANON_KEY") return "test_api_key";
+		return undefined;
+	});
+
+	// Stub fetch to return error with code field
+	const fetchStub = stub(
+		globalThis,
+		"fetch",
+		() =>
+			Promise.resolve(
+				new MockResponse(
+					mockErrorResponse,
+					400,
+					false,
+				) as unknown as Response,
+			),
+	);
+
+	try {
+		const mockContext = createMockContext({
+			auth_code: "invalid_auth_code",
+			code_verifier: "test_verifier",
+		});
+
+		const response = await handleExchangeToken(
+			mockContext,
+		) as unknown as JsonResponse;
+
+		const expectedResponse = {
+			code: "invalid_request",
+			message: "Invalid request format",
+		};
+
+		// Should use the code field as status
+		assertEquals(response.status, 422);
+		assertEquals(response.data, expectedResponse);
+	} finally {
+		envStub.restore();
+		fetchStub.restore();
+	}
+});
+
+Deno.test("handleExchangeToken - should handle successful response missing some fields", async () => {
+	// Mock successful Supabase response without some fields
+	const mockSupabaseResponse = {
+		access_token: "test_access_token",
+		// Missing refresh_token, token_type, expires_in
+	};
+
+	// Stub environment variables with proper values
+	const envStub = stub(Deno.env, "get", (key: string) => {
+		if (key === "AUTH_BASE_URL") return "https://test.supabase.co";
+		if (key === "AUTH_SUPABASE_ANON_KEY") return "test_api_key";
+		return undefined;
+	});
+
+	// Stub fetch to return successful response with missing fields
+	const fetchStub = stub(
+		globalThis,
+		"fetch",
+		() =>
+			Promise.resolve(
+				new MockResponse(
+					mockSupabaseResponse,
+					200,
+					true,
+				) as unknown as Response,
+			),
+	);
+
+	try {
+		const mockContext = createMockContext({
+			auth_code: "test_auth_code",
+			code_verifier: "test_verifier",
+		});
+
+		const response = await handleExchangeToken(
+			mockContext,
+		) as unknown as JsonResponse;
+
+		assertEquals(response.status, 200);
+		assertEquals(response.data, mockSupabaseResponse);
+	} finally {
+		envStub.restore();
+		fetchStub.restore();
+	}
+});

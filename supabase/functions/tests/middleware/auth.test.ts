@@ -308,3 +308,83 @@ Deno.test("getUser - should return user from context", () => {
 	assertEquals(user.id, "user123");
 	assertEquals(user.email, "test@example.com");
 });
+
+Deno.test("authMiddleware - should handle empty user response", async () => {
+	const envStub = stub(Deno.env, "get", (key: string) => {
+		if (key === "AUTH_BASE_URL") return "https://test.supabase.co";
+		if (key === "AUTH_SUPABASE_ANON_KEY") return "test_key";
+		return undefined;
+	});
+
+	const fetchStub = stub(
+		globalThis,
+		"fetch",
+		() =>
+			Promise.resolve(
+				new MockResponse(null, 200) as unknown as Response,
+			),
+	);
+
+	const mockContext = createMockContext("Bearer valid_token");
+	let nextCalled = false;
+	const next: Next = async () => {
+		nextCalled = true;
+	};
+
+	try {
+		const response = await authMiddleware(mockContext, next);
+
+		assertEquals(nextCalled, false);
+		assertEquals((response as any).status, 401);
+		assertEquals((response as any).data.code, "UNAUTHORIZED");
+	} finally {
+		envStub.restore();
+		fetchStub.restore();
+	}
+});
+
+Deno.test("authMiddleware - should use request URL when AUTH_BASE_URL is missing", async () => {
+	const mockUser = {
+		id: "user123",
+		email: "test@example.com",
+		aud: "authenticated",
+		role: "authenticated",
+	};
+
+	const envStub = stub(Deno.env, "get", (key: string) => {
+		// Missing AUTH_BASE_URL, should use request URL
+		if (key === "AUTH_SUPABASE_ANON_KEY") return "test_key";
+		return undefined;
+	});
+
+	const fetchStub = stub(
+		globalThis,
+		"fetch",
+		(url) => {
+			// Verify that the URL is constructed from request URL
+			const requestUrl = url as string;
+			assertEquals(requestUrl.includes("api.example.com"), true);
+			return Promise.resolve(
+				new MockResponse(mockUser, 200) as unknown as Response,
+			);
+		},
+	);
+
+	const mockContext = createMockContext("Bearer valid_token");
+	let nextCalled = false;
+	const next: Next = async () => {
+		nextCalled = true;
+	};
+
+	try {
+		await authMiddleware(mockContext, next);
+
+		assertEquals(nextCalled, true);
+		const user = mockContext.get("user");
+		assertEquals(user.id, "user123");
+		assertEquals(user.email, "test@example.com");
+	} finally {
+		envStub.restore();
+		fetchStub.restore();
+	}
+});
