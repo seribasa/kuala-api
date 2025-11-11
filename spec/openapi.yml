@@ -640,17 +640,17 @@ paths:
             schema:
               $ref: "#/components/schemas/CreateSubscriptionRequest"
             example:
-              basic-monthly:
-                value:
-                  planId: basic
-                  interval: month
+              planId: basic-monthly
       responses:
         "201":
           description: Subscription created
-          content:
-            application/json:
+          headers:
+            Location:
+              description: URL of the created subscription
               schema:
-                $ref: "#/components/schemas/Subscription"
+                type: string
+                format: uri
+                example: "/subscriptions/123"
         "400":
           $ref: "#/components/responses/BadRequest"
         "409":
@@ -658,19 +658,12 @@ paths:
           content:
             application/json:
               schema: { $ref: "#/components/schemas/Error" }
-
-  /subscriptions/{subscriptionId}:
     get:
       tags: [Subscriptions]
-      summary: Get subscription
-      operationId: getSubscription
+      summary: Get subscription for current user
+      operationId: getSubscriptionUser
       security:
         - bearerAuth: []
-      parameters:
-        - in: path
-          name: subscriptionId
-          schema: { type: string }
-          required: true
       responses:
         "200":
           description: Subscription
@@ -1159,17 +1152,9 @@ components:
         planId:
           type: string
           description: One of the plan IDs from `/plans` (free/basic/premium/enterprise).
-        interval:
-          type: string
-          enum: [month, year]
-          default: month
         promoCode:
           type: string
           nullable: true
-        paymentMethodToken:
-          type: string
-          nullable: true
-          description: Optional token to set as default payment method before creating subscription.
       required: [planId]
 
     Subscription:
