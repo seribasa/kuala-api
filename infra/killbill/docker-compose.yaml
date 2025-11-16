@@ -2,7 +2,7 @@ volumes:
   db:
 services:
   killbill:
-    container_name: killbill_service
+    container_name: killbill-kuala
     image: killbill/killbill:0.24.10
     ports:
       - "${KILLBILL_PORT}:8080"
@@ -28,7 +28,7 @@ services:
       db:
         condition: service_healthy
   kaui:
-    container_name: kaui
+    container_name: kaui-kuala
     image: killbill/kaui:3.0.9
     ports:
       - "${KAUI_PORT}:8080"
@@ -41,7 +41,7 @@ services:
       killbill:
         condition: service_healthy
   db:
-    container_name: mariadb
+    container_name: mariadb-kuala
     image: killbill/mariadb:0.24
     volumes:
       - type: volume
