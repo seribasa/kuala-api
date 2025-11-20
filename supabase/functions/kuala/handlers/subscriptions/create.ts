@@ -7,26 +7,7 @@ import {
 } from "../../../_shared/types/index.ts";
 import { logger } from "../../middleware/logger.ts";
 import { getUser } from "../../middleware/auth.ts";
-
-type KillBillConfig = {
-	baseUrl: string;
-	apiKey: string;
-	apiSecret: string;
-	username: string;
-	password: string;
-	defaultCurrency: string;
-};
-
-function getKillBillConfig(): KillBillConfig {
-	return {
-		baseUrl: Deno.env.get("KILLBILL_BASE_URL") || "",
-		apiKey: Deno.env.get("KILLBILL_API_KEY") || "",
-		apiSecret: Deno.env.get("KILLBILL_API_SECRET") || "",
-		username: Deno.env.get("KILLBILL_USERNAME") || "",
-		password: Deno.env.get("KILLBILL_PASSWORD") || "",
-		defaultCurrency: Deno.env.get("KILLBILL_DEFAULT_CURRENCY") || "",
-	};
-}
+import { killBillConfig as getKillBillConfig } from "../../../_shared/config/killbill-config.ts"
 
 /**
  * Create or get Kill Bill account for the user

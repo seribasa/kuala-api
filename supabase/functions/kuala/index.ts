@@ -6,7 +6,11 @@ import { handleRefreshToken } from "./handlers/auth/refresh-token.ts";
 import { handleLogout } from "./handlers/auth/logout.ts";
 import { handleMe } from "./handlers/auth/me.ts";
 import { handlePlans } from "./handlers/plans/index.ts";
-import { handleCreateSubscription } from "./handlers/subscriptions/create.ts";
+import {
+	handleCreateSubscription,
+	handleGetSubscription,
+	handleGetSubscriptionById,
+} from "./handlers/subscriptions/index.ts";
 import { ErrorResponse } from "../_shared/types/response.ts";
 import { customLogger } from "./middleware/logger.ts";
 import { corsMiddleware } from "./middleware/cors.ts";
@@ -26,6 +30,8 @@ app.use("*", corsMiddleware);
 app.route("/", auth);
 app.get("/plans", handlePlans);
 app.post("/subscriptions", authMiddleware, handleCreateSubscription);
+app.get("/subscriptions", authMiddleware, handleGetSubscription);
+app.get("/subscriptions/:subscriptionId", authMiddleware, handleGetSubscriptionById);
 
 // HANDLE 404
 const errorResponse: ErrorResponse = {
