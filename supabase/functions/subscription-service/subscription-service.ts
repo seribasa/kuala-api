@@ -6,7 +6,7 @@ import {
 } from "../_shared/types/events.ts";
 import { killBillService } from "../_shared/services/killbill.ts";
 import { logger } from "../_shared/middleware/logger.ts";
-import { subscriptionStateManager } from "../_shared/services/state-management.ts";
+import { subscriptionStateManager } from "../_shared/services/subscription-state-management.ts";
 
 interface ServiceStatus {
 	status: "healthy" | "unhealthy" | "starting";
@@ -75,9 +75,11 @@ export class SubscriptionService {
 					triggeredBy: "subscription-service",
 					reason: "Starting subscription creation process",
 					metadata: {
-						accountId: event.accountId,
 						userId: event.userId,
+						accountId: event.accountId,
 						planId: event.planId,
+						email: event.email,
+						name: event.name,
 					},
 				},
 			);
@@ -150,10 +152,13 @@ export class SubscriptionService {
 						? "Uncancelled existing subscription"
 						: "Created new subscription in Kill Bill",
 					metadata: {
+						userId: event.userId,
 						subscriptionId,
 						accountId: event.accountId,
 						planId: event.planId,
 						wasExisting: !!existingSubscription,
+						email: event.email,
+						name: event.name,
 					},
 				},
 			);

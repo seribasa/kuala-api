@@ -9,6 +9,7 @@ import type {
 	ErrorResponse,
 } from "../../../_shared/types/response.ts";
 import { killBillService } from "../../../_shared/services/killbill.ts";
+import { subscriptionStateManager } from "../../../_shared/services/subscription-state-management.ts";
 
 interface CreateEventDrivenSubscriptionRequest {
 	planId: string;
@@ -46,6 +47,29 @@ export async function handleCreateEventDrivenSubscription(c: Context) {
 			return c.json(errorResponse, 400);
 		}
 
+		// Check for existing pending subscription request in state management system
+		const hasPendingRequest = await subscriptionStateManager
+			.hasPendingSubscriptionRequest(user.id);
+
+		if (hasPendingRequest) {
+			const latestRequest = await subscriptionStateManager
+				.getLatestSubscriptionRequest(user.id);
+
+			logger.warn(handlerName, "User has pending subscription request", {
+				userId: user.id,
+				currentState: latestRequest?.current_state,
+				correlationId: latestRequest?.entity_id,
+				lastUpdated: latestRequest?.state_updated_at,
+			});
+
+			const errorResponse: ErrorResponse = {
+				code: "PENDING_SUBSCRIPTION_REQUEST",
+				message:
+					`You have a pending subscription request in state: ${latestRequest?.current_state}. Please wait for it to complete or contact support.`,
+			};
+			return c.json(errorResponse, 409);
+		}
+
 		// Check for existing active subscription
 		const activeSubscription = await killBillService.getActiveSubscription(
 			user.id,
@@ -67,6 +91,25 @@ export async function handleCreateEventDrivenSubscription(c: Context) {
 
 		// Create correlation ID for tracking
 		const correlationId = crypto.randomUUID();
+
+		// Create initial state transition
+		await subscriptionStateManager.transitionState(
+			"subscription_request",
+			correlationId,
+			"requested",
+			{
+				triggeredBy: "api-handler",
+				eventType: "SubscriptionRequested",
+				reason: "User initiated subscription request via API",
+				metadata: {
+					userId: user.id,
+					email: user.email || "",
+					name: user.user_metadata?.full_name ||
+						user.user_metadata?.name || "",
+					planId: body.planId,
+				},
+			},
+		);
 
 		// Create and publish SubscriptionRequested event
 		const event = createSubscriptionRequestedEvent(

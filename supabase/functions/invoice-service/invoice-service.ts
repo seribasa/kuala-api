@@ -5,7 +5,7 @@ import {
 	SubscriptionCreatedEvent,
 } from "../_shared/types/events.ts";
 import { killBillService } from "../_shared/services/killbill.ts";
-import { subscriptionStateManager } from "../_shared/services/state-management.ts";
+import { subscriptionStateManager } from "../_shared/services/subscription-state-management.ts";
 
 interface ServiceStatus {
 	status: "healthy" | "unhealthy" | "starting";

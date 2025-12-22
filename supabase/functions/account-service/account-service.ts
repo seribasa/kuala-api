@@ -5,7 +5,7 @@ import {
 	SubscriptionRequestedEvent,
 } from "../_shared/types/events.ts";
 import { killBillService } from "../_shared/services/killbill.ts";
-import { subscriptionStateManager } from "../_shared/services/state-management.ts";
+import { subscriptionStateManager } from "../_shared/services/subscription-state-management.ts";
 
 interface ServiceStatus {
 	status: "healthy" | "unhealthy" | "starting";
@@ -82,9 +82,13 @@ export class AccountService {
 					triggeredBy: "account-service",
 					reason: "Account created/verified in Kill Bill",
 					metadata: {
+						userId: event.userId,
 						accountId: killBillAccountResponse.account.accountId,
 						isNewAccount: killBillAccountResponse.isNewAccount,
 						currency: killBillAccountResponse.account.currency,
+						email: event.email,
+						name: event.name,
+						planId: event.planId,
 					},
 				},
 			);
@@ -121,6 +125,8 @@ export class AccountService {
 					metadata: {
 						userId: event.userId,
 						email: event.email,
+						name: event.name,
+						planId: event.planId,
 					},
 				},
 			);

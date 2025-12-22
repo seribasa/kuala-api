@@ -12,7 +12,9 @@ export interface StateTransition {
 	triggered_by: string;
 	event_type?: string;
 	transition_reason?: string;
+	// deno-lint-ignore no-explicit-any
 	metadata?: Record<string, any>;
+	// deno-lint-ignore no-explicit-any
 	error_details?: Record<string, any>;
 	created_at: string;
 }
@@ -24,6 +26,7 @@ export interface CurrentEntityState {
 	state_updated_at: string;
 	last_updated_by: string;
 	last_event_type?: string;
+	// deno-lint-ignore no-explicit-any
 	last_metadata?: Record<string, any>;
 }
 
@@ -31,7 +34,9 @@ export interface TransitionOptions {
 	triggeredBy?: string;
 	eventType?: string;
 	reason?: string;
+	// deno-lint-ignore no-explicit-any
 	metadata?: Record<string, any>;
+	// deno-lint-ignore no-explicit-any
 	errorDetails?: Record<string, any>;
 }
 
@@ -266,6 +271,30 @@ export class StateManagementService {
 		}
 
 		return statistics;
+	}
+
+	/**
+	 * Get entities by metadata field (useful for finding entities by user ID)
+	 */
+	async getEntitiesByMetadata(
+		entityType: string,
+		metadataPath: string,
+		// deno-lint-ignore no-explicit-any
+		value: any,
+	): Promise<CurrentEntityState[]> {
+		const { data, error } = await this.supabase
+			.from("current_entity_states")
+			.select("*")
+			.eq("entity_type", entityType)
+			.contains("last_metadata", { [metadataPath]: value });
+
+		if (error) {
+			throw new Error(
+				`Failed to get entities by metadata: ${error.message}`,
+			);
+		}
+
+		return data as CurrentEntityState[];
 	}
 
 	/**
