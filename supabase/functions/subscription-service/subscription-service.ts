@@ -1,4 +1,3 @@
-import { createClient, SupabaseClient } from "@supabase/supabase-js";
 import { RabbitMQClient } from "../_shared/rabbitmq.ts";
 import {
 	AccountReadyEvent,
@@ -7,9 +6,7 @@ import {
 } from "../_shared/types/events.ts";
 import { killBillService } from "../_shared/services/killbill.ts";
 import { logger } from "../_shared/middleware/logger.ts";
-
-const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
-const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+import { subscriptionStateManager } from "../_shared/services/state-management.ts";
 
 interface ServiceStatus {
 	status: "healthy" | "unhealthy" | "starting";
@@ -19,7 +16,6 @@ interface ServiceStatus {
 }
 
 export class SubscriptionService {
-	private supabase: SupabaseClient;
 	private rabbitMQClient: RabbitMQClient;
 	private consumerActive = false;
 	private eventsProcessed = 0;
@@ -27,7 +23,6 @@ export class SubscriptionService {
 	private status: ServiceStatus["status"] = "starting";
 
 	constructor() {
-		this.supabase = createClient(supabaseUrl, supabaseServiceKey);
 		this.rabbitMQClient = new RabbitMQClient();
 	}
 
@@ -74,20 +69,18 @@ export class SubscriptionService {
 
 		try {
 			// Update subscription status to creating_subscription
-			const { error: statusError } = await this.supabase
-				.from("subscription_requests")
-				.update({
-					status: "creating_subscription",
-					account_id: event.accountId,
-					updated_at: new Date().toISOString(),
-				})
-				.eq("correlation_id", event.correlationId);
-
-			if (statusError) {
-				throw new Error(
-					`Failed to update subscription status: ${statusError.message}`,
-				);
-			}
+			await subscriptionStateManager.transitionToCreatingSubscription(
+				event.correlationId,
+				{
+					triggeredBy: "subscription-service",
+					reason: "Starting subscription creation process",
+					metadata: {
+						accountId: event.accountId,
+						userId: event.userId,
+						planId: event.planId,
+					},
+				},
+			);
 			let subscriptionId: string | null = null;
 			// Check for existing active subscription
 			const existingSubscription = await killBillService
@@ -149,20 +142,21 @@ export class SubscriptionService {
 			}
 
 			// Update subscription request status
-			const { error: updateError } = await this.supabase
-				.from("subscription_requests")
-				.update({
-					status: "subscription_created",
-					subscription_id: subscriptionId,
-					updated_at: new Date().toISOString(),
-				})
-				.eq("correlation_id", event.correlationId);
-
-			if (updateError) {
-				throw new Error(
-					`Failed to update subscription status: ${updateError.message}`,
-				);
-			}
+			await subscriptionStateManager.transitionToSubscriptionCreated(
+				event.correlationId,
+				{
+					triggeredBy: "subscription-service",
+					reason: existingSubscription
+						? "Uncancelled existing subscription"
+						: "Created new subscription in Kill Bill",
+					metadata: {
+						subscriptionId,
+						accountId: event.accountId,
+						planId: event.planId,
+						wasExisting: !!existingSubscription,
+					},
+				},
+			);
 
 			// Publish SubscriptionCreated event
 			const subscriptionCreatedEvent = createSubscriptionCreatedEvent(
@@ -184,16 +178,19 @@ export class SubscriptionService {
 			console.error(`❌ Failed to process account ready event:`, error);
 
 			// Update subscription status to failed
-			await this.supabase
-				.from("subscription_requests")
-				.update({
-					status: "failed",
-					error_message: error instanceof Error
-						? error.message
-						: "Unknown error",
-					updated_at: new Date().toISOString(),
-				})
-				.eq("correlation_id", event.correlationId);
+			await subscriptionStateManager.transitionToFailed(
+				event.correlationId,
+				error instanceof Error ? error.message : "Unknown error",
+				{
+					triggeredBy: "subscription-service",
+					reason: "Failed to process account ready event",
+					metadata: {
+						userId: event.userId,
+						accountId: event.accountId,
+						planId: event.planId,
+					},
+				},
+			);
 
 			throw error;
 		}
