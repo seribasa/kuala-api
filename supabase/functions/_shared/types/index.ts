@@ -186,6 +186,89 @@ interface KillBillSubscription {
 	priceOverrides: unknown[];
 }
 
+// Kill Bill Invoice Item types
+// productName	string	system	Name of the Product for this subscription if any
+// planName	string	system	Name of the Plan for this subscription if any
+// phaseName	string	system	Name of the PlanPhase for this subscription if any
+// usageName	string	system	Name of the Usage section for this subscription if any
+// prettyProductName	string	system	Pretty name of the Product for this subscription if any
+// prettyPlanName	string	system	Pretty name of the Plan for this subscription if any
+// prettyPhaseName	string	system	Pretty name of the PlanPhase for this subscription if any
+// prettyUsageName	string	system	Pretty name of the Usage section for this subscription if any
+// itemType	string	system	Item type (see below)
+// description	string	user or system	Optional description of the item
+// startDate	date	user or system	Start date of the period invoiced
+// endDate	date	user or system	End date of the period invoiced
+// amount	number	user or system	Amount being invoiced
+// rate	number	user or system	Rate associated with the Plan
+// currency	string	user or system	Currency associated with the account
+// quantity	number	system	Quantity of usage blocks (number of units/block size). Applicable only for itemType=USAGE and when org.killbill.invoice.item.result.behavior.mode=DETAIL is specified
+// itemDetails	string	system	JSON list correpsonding to usage items being invoiced. It contains one entry per tier
+// catalogEffectiveDate	DateTime	system	The effective date of the underlying catalog. Applicable only for itemType=RECURRING
+// childItems	list	user or system	In the hierarchical model, the items for the children.
+// auditLogs	array	system	Array of audit log records for 
+interface KillBillInvoiceItem {
+	invoiceItemId: string;
+	invoiceId: string;
+	linkedInvoiceItemId?: string | null;
+	accountId: string;
+	childAccountId?: string | null;
+	bundleId?: string | null;
+	subscriptionId?: string | null;
+	productName?: string | null;
+	planName?: string | null;
+	phaseName?: string | null;
+	usageName?: string | null;
+	prettyProductName?: string | null;
+	prettyPlanName?: string | null;
+	prettyPhaseName?: string | null;
+	prettyUsageName?: string | null;
+	itemType:
+		| "EXTERNAL_CHARGE"
+		| "FIXED"
+		| "RECURRING"
+		| "REPAIR_ADJ"
+		| "CBA_ADJ"
+		| "CREDIT_ADJ"
+		| "ITEM_ADJ"
+		| "TAX"
+		| "USAGE";
+	description?: string | null;
+	startDate: string;
+	endDate?: string | null;
+	amount: number;
+	rate?: number | null;
+	currency: string;
+	quantity?: number | null;
+	itemDetails?: string | null;
+	catalogEffectiveDate?: string | null;
+	childItems?: KillBillInvoiceItem[] | null;
+	auditLogs?: unknown[];
+}
+
+// Kill Bill Invoice response
+interface KillBillInvoice {
+	invoiceId: string;
+	accountId: string;
+	amount: number;
+	currency: string;
+	status: "DRAFT" | "COMMITTED" | "VOID";
+	creditAdj: number;
+	refundAdj: number;
+	invoiceDate: string;
+	targetDate: string;
+	invoiceNumber?: number | null;
+	balance: number;
+	bundleKeys?: string[] | null;
+	credits?: unknown[] | null;
+	items: KillBillInvoiceItem[];
+	trackingIds?: string[];
+	isParentInvoice?: boolean;
+	parentInvoiceId?: string | null;
+	parentAccountId?: string | null;
+	auditLogs?: unknown[];
+}
+
 export type {
 	AppMetadata,
 	AuthenticatedUser,
@@ -195,6 +278,8 @@ export type {
 	IdentityData,
 	KillBillAccount,
 	KillBillCatalog,
+	KillBillInvoice,
+	KillBillInvoiceItem,
 	KillBillPrice,
 	KillBillSubscription,
 	Plan,

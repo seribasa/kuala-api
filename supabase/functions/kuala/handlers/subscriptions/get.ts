@@ -2,8 +2,8 @@ import { Context } from "@hono/hono";
 import { ErrorResponse } from "../../../_shared/types/response.ts";
 import { authLogger } from "../../middleware/logger.ts";
 import { getUser } from "../../middleware/auth.ts";
-import { killBillService } from "../../services/killbill.ts";
 import { mapKillBillSubscriptionToSubscription } from "../../utils/subscription-mapper.ts";
+import { killBillService } from "../../../_shared/services/killbill.ts";
 
 /**
  * Get subscription for current authenticated user
@@ -40,10 +40,11 @@ export const handleGetSubscription = async (c: Context) => {
 		});
 
 		// Get active subscription for this account
-		const activeSubscription = await killBillService.getActiveSubscription(
-			account.accountId,
-		);
-		if (!activeSubscription) {
+		const kbSubscription = await killBillService
+			.getSubscriptionByExternalId(
+				userId,
+			);
+		if (!kbSubscription) {
 			authLogger.success(handlerName, "No active subscription found", {
 				accountId: account.accountId.substring(0, 8) + "...",
 			});
@@ -55,15 +56,15 @@ export const handleGetSubscription = async (c: Context) => {
 		}
 
 		authLogger.validation(handlerName, "Active subscription found", {
-			subscriptionId: activeSubscription.subscriptionId?.substring(0, 8) +
+			subscriptionId: kbSubscription.subscriptionId?.substring(0, 8) +
 				"...",
-			planName: activeSubscription.planName,
-			state: activeSubscription.state,
+			planName: kbSubscription.planName,
+			state: kbSubscription.state,
 		});
 
 		// Map Kill Bill subscription to our format
 		const subscription = mapKillBillSubscriptionToSubscription(
-			activeSubscription,
+			kbSubscription,
 			userId,
 			account.accountId,
 		);

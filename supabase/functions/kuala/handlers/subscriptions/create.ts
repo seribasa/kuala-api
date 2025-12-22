@@ -3,8 +3,7 @@ import { ErrorResponse } from "../../../_shared/types/response.ts";
 import { CreateSubscriptionRequest } from "../../../_shared/types/index.ts";
 import { logger } from "../../middleware/logger.ts";
 import { getUser } from "../../middleware/auth.ts";
-import { killBillService } from "../../services/killbill.ts";
-
+import { killBillService } from "../../../_shared/services/killbill.ts";
 /**
  * Handler for POST /subscriptions
  * Creates a subscription for the authenticated user
@@ -37,7 +36,7 @@ export async function handleCreateSubscription(c: Context) {
 		}
 
 		// 3. Get or create Kill Bill account
-		const account = await killBillService.getOrCreateAccount(
+		const accountResponse = await killBillService.getOrCreateAccount(
 			user.id,
 			user.email || "",
 		);
@@ -45,7 +44,7 @@ export async function handleCreateSubscription(c: Context) {
 		// 4. Check for existing active subscription
 		const { hasActive, subscription: existingSubscription } =
 			await killBillService.hasActiveSubscription(
-				account.accountId,
+				accountResponse.account.accountId,
 			);
 
 		if (hasActive && existingSubscription) {
@@ -65,10 +64,25 @@ export async function handleCreateSubscription(c: Context) {
 		let subscriptionId: string;
 		try {
 			subscriptionId = await killBillService.createSubscription(
-				account.accountId,
+				user.id,
+				accountResponse.account.accountId,
 				planId,
 			);
-		} catch (_) {
+		} catch (error) {
+			if (
+				error instanceof Error &&
+				error.message.includes("DUPLICATE_SUBSCRIPTION")
+			) {
+				logger.error(
+					handlerName,
+					"Duplicate subscription detected",
+				);
+				const errorResponse: ErrorResponse = {
+					code: "DUPLICATE_SUBSCRIPTION",
+					message: "Subscription already exists",
+				};
+				return c.json(errorResponse, 409);
+			}
 			const errorResponse: ErrorResponse = {
 				code: "SUBSCRIPTION_CREATION_FAILED",
 				message: "Failed to create subscription",
