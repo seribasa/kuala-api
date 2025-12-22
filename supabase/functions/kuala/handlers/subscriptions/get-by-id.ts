@@ -2,8 +2,8 @@ import { Context } from "@hono/hono";
 import { ErrorResponse } from "../../../_shared/types/response.ts";
 import { authLogger } from "../../middleware/logger.ts";
 import { getUser } from "../../middleware/auth.ts";
-import { killBillService } from "../../services/killbill.ts";
 import { mapKillBillSubscriptionToSubscription } from "../../utils/subscription-mapper.ts";
+import { killBillService } from "../../../_shared/services/killbill.ts";
 
 /**
  * Get subscription by ID

@@ -6,12 +6,15 @@ import { logger } from "./logger.ts";
 /**
  * Get user from Authorization header by calling Supabase /auth/v1/user
  */
-async function getAuthenticatedUser(
+export async function getAuthenticatedUser(
 	authorization: string,
-	c: Context,
 ): Promise<AuthenticatedUser | null> {
 	const handlerName = "authMiddleware";
-	const supabaseBaseUrl = Deno.env.get("AUTH_BASE_URL") || c.req.url;
+	const supabaseBaseUrl = Deno.env.get("AUTH_BASE_URL");
+	if (!supabaseBaseUrl) {
+		logger.error(handlerName, "Missing SUPABASE_URL environment variable");
+		return null;
+	}
 	const supabaseUserUrl = new URL("/auth/v1/user", supabaseBaseUrl);
 	const apikey = Deno.env.get("AUTH_SUPABASE_ANON_KEY");
 
@@ -74,7 +77,7 @@ export async function authMiddleware(c: Context, next: Next) {
 	}
 
 	// 2. Get authenticated user
-	const user = await getAuthenticatedUser(authorization, c);
+	const user = await getAuthenticatedUser(authorization);
 	if (!user || !user.id || !user.email) {
 		logger.error(handlerName, "Failed to get authenticated user");
 		const errorResponse: ErrorResponse = {
