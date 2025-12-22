@@ -1,16 +1,11 @@
-import { createClient, SupabaseClient } from "@supabase/supabase-js";
-import {
-	RabbitMQClient,
-} from "../_shared/rabbitmq.ts";
+import { RabbitMQClient } from "../_shared/rabbitmq.ts";
 import {
 	createAccountReadyEvent,
 	DomainEvent,
 	SubscriptionRequestedEvent,
 } from "../_shared/types/events.ts";
 import { killBillService } from "../_shared/services/killbill.ts";
-
-const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
-const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+import { subscriptionStateManager } from "../_shared/services/state-management.ts";
 
 interface ServiceStatus {
 	status: "healthy" | "unhealthy" | "starting";
@@ -20,7 +15,6 @@ interface ServiceStatus {
 }
 
 export class AccountService {
-	private supabase: SupabaseClient;
 	private rabbitMQClient: RabbitMQClient;
 	private consumerActive = false;
 	private eventsProcessed = 0;
@@ -28,7 +22,6 @@ export class AccountService {
 	private status: ServiceStatus["status"] = "starting";
 
 	constructor() {
-		this.supabase = createClient(supabaseUrl, supabaseServiceKey);
 		this.rabbitMQClient = new RabbitMQClient();
 	}
 
@@ -83,19 +76,18 @@ export class AccountService {
 				);
 
 			// 3. Update SAGA subscription status to account_ready
-			const { error: statusError } = await this.supabase
-				.from("subscription_requests")
-				.update({
-					status: "account_ready",
-					updated_at: new Date().toISOString(),
-				})
-				.eq("correlation_id", event.correlationId);
-
-			if (statusError) {
-				throw new Error(
-					`Failed to update subscription status: ${statusError.message}`,
-				);
-			}
+			await subscriptionStateManager.transitionToAccountReady(
+				event.correlationId,
+				{
+					triggeredBy: "account-service",
+					reason: "Account created/verified in Kill Bill",
+					metadata: {
+						accountId: killBillAccountResponse.account.accountId,
+						isNewAccount: killBillAccountResponse.isNewAccount,
+						currency: killBillAccountResponse.account.currency,
+					},
+				},
+			);
 
 			// 4. Publish AccountReady event
 			const accountReadyEvent = createAccountReadyEvent(
@@ -120,16 +112,18 @@ export class AccountService {
 			console.error(`❌ Failed to process subscription request:`, error);
 
 			// Update subscription status to failed
-			await this.supabase
-				.from("subscription_requests")
-				.update({
-					status: "failed",
-					error_message: error instanceof Error
-						? error.message
-						: "Unknown error",
-					updated_at: new Date().toISOString(),
-				})
-				.eq("correlation_id", event.correlationId);
+			await subscriptionStateManager.transitionToFailed(
+				event.correlationId,
+				error instanceof Error ? error.message : "Unknown error",
+				{
+					triggeredBy: "account-service",
+					reason: "Failed to process subscription request",
+					metadata: {
+						userId: event.userId,
+						email: event.email,
+					},
+				},
+			);
 
 			throw error;
 		}

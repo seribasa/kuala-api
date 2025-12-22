@@ -1,4 +1,3 @@
-import { createClient, SupabaseClient } from "@supabase/supabase-js";
 import { RabbitMQClient } from "../_shared/rabbitmq.ts";
 import {
 	createInvoiceGeneratedEvent,
@@ -6,9 +5,7 @@ import {
 	SubscriptionCreatedEvent,
 } from "../_shared/types/events.ts";
 import { killBillService } from "../_shared/services/killbill.ts";
-
-const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
-const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+import { subscriptionStateManager } from "../_shared/services/state-management.ts";
 
 interface ServiceStatus {
 	status: "healthy" | "unhealthy" | "starting";
@@ -18,7 +15,6 @@ interface ServiceStatus {
 }
 
 export class InvoiceService {
-	private supabase: SupabaseClient;
 	private rabbitMQClient: RabbitMQClient;
 	private consumerActive = false;
 	private eventsProcessed = 0;
@@ -26,7 +22,6 @@ export class InvoiceService {
 	private status: ServiceStatus["status"] = "starting";
 
 	constructor() {
-		this.supabase = createClient(supabaseUrl, supabaseServiceKey);
 		this.rabbitMQClient = new RabbitMQClient();
 	}
 
@@ -72,19 +67,18 @@ export class InvoiceService {
 
 		try {
 			// 1. Update subscription status to generating_invoice
-			const { error: statusError } = await this.supabase
-				.from("subscription_requests")
-				.update({
-					status: "generating_invoice",
-					updated_at: new Date().toISOString(),
-				})
-				.eq("correlation_id", event.correlationId);
-
-			if (statusError) {
-				throw new Error(
-					`Failed to update subscription status: ${statusError.message}`,
-				);
-			}
+			await subscriptionStateManager.transitionToGeneratingInvoice(
+				event.correlationId,
+				{
+					triggeredBy: "invoice-service",
+					reason: "Starting invoice generation process",
+					metadata: {
+						userId: event.userId,
+						accountId: event.accountId,
+						subscriptionId: event.subscriptionId,
+					},
+				},
+			);
 
 			// 2. Get account from Kill Bill
 			const account = await killBillService.getAccountByExternalKey(
@@ -101,7 +95,7 @@ export class InvoiceService {
 			);
 			const invoice = invoices.find((invoice) => {
 				if (invoice.status === "VOID") return false;
-				return invoice
+				return invoice;
 			});
 			const hasInvoiceForCurrentPeriod = !!invoice;
 
@@ -127,20 +121,20 @@ export class InvoiceService {
 					console.log("✅ Account is up to date, no invoice needed");
 
 					// Update subscription request status to completed without invoice
-					const { error: updateError } = await this.supabase
-						.from("subscription_requests")
-						.update({
-							status: "completed",
-							updated_at: new Date().toISOString(),
-							completed_at: new Date().toISOString(),
-						})
-						.eq("correlation_id", event.correlationId);
-
-					if (updateError) {
-						throw new Error(
-							`Failed to update subscription status: ${updateError.message}`,
-						);
-					}
+					await subscriptionStateManager.transitionToCompleted(
+						event.correlationId,
+						{
+							triggeredBy: "invoice-service",
+							reason:
+								"Account is up to date, no new invoice needed",
+							metadata: {
+								userId: event.userId,
+								accountId: event.accountId,
+								subscriptionId: event.subscriptionId,
+								invoiceGenerated: false,
+							},
+						},
+					);
 
 					console.log(
 						`✅ Subscription flow completed without new invoice!`,
@@ -153,21 +147,23 @@ export class InvoiceService {
 			}
 
 			// 5. Update subscription request status to completed
-			const { error: updateError } = await this.supabase
-				.from("subscription_requests")
-				.update({
-					status: "completed",
-					invoice_id: invoiceId,
-					updated_at: new Date().toISOString(),
-					completed_at: new Date().toISOString(),
-				})
-				.eq("correlation_id", event.correlationId);
-
-			if (updateError) {
-				throw new Error(
-					`Failed to update subscription status: ${updateError.message}`,
-				);
-			}
+			await subscriptionStateManager.transitionToCompleted(
+				event.correlationId,
+				{
+					triggeredBy: "invoice-service",
+					reason: hasInvoiceForCurrentPeriod
+						? "Used existing invoice for current period"
+						: "Generated new invoice",
+					metadata: {
+						userId: event.userId,
+						accountId: event.accountId,
+						subscriptionId: event.subscriptionId,
+						invoiceId,
+						invoiceGenerated: true,
+						wasExistingInvoice: hasInvoiceForCurrentPeriod,
+					},
+				},
+			);
 
 			// 6. Publish InvoiceGenerated event
 			const invoiceGeneratedEvent = createInvoiceGeneratedEvent(
@@ -194,16 +190,19 @@ export class InvoiceService {
 			);
 
 			// Update subscription status to failed
-			await this.supabase
-				.from("subscription_requests")
-				.update({
-					status: "failed",
-					error_message: error instanceof Error
-						? error.message
-						: "Unknown error",
-					updated_at: new Date().toISOString(),
-				})
-				.eq("correlation_id", event.correlationId);
+			await subscriptionStateManager.transitionToFailed(
+				event.correlationId,
+				error instanceof Error ? error.message : "Unknown error",
+				{
+					triggeredBy: "invoice-service",
+					reason: "Failed to process subscription created event",
+					metadata: {
+						userId: event.userId,
+						accountId: event.accountId,
+						subscriptionId: event.subscriptionId,
+					},
+				},
+			);
 
 			throw error;
 		}
