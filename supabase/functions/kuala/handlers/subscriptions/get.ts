@@ -1,9 +1,10 @@
 import { Context } from "@hono/hono";
 import { ErrorResponse } from "../../../_shared/types/response.ts";
-import { authLogger } from "../../middleware/logger.ts";
+import { authLogger, logger } from "../../middleware/logger.ts";
 import { getUser } from "../../middleware/auth.ts";
 import { mapKillBillSubscriptionToSubscription } from "../../utils/subscription-mapper.ts";
 import { killBillService } from "../../../_shared/services/killbill.ts";
+import { subscriptionStateManager } from "../../../_shared/services/subscription-state-management.ts";
 
 /**
  * Get subscription for current authenticated user
@@ -21,6 +22,29 @@ export const handleGetSubscription = async (c: Context) => {
 		authLogger.validation(handlerName, "Authenticated user", {
 			userId: userId.substring(0, 8) + "...",
 		});
+
+		// Check for existing pending subscription request in state management system
+		const hasPendingRequest = await subscriptionStateManager
+			.hasPendingSubscriptionRequest(user.id);
+
+		if (hasPendingRequest) {
+			const latestRequest = await subscriptionStateManager
+				.getLatestSubscriptionRequest(user.id);
+
+			logger.warn(handlerName, "User has pending subscription request", {
+				userId: user.id,
+				currentState: latestRequest?.current_state,
+				correlationId: latestRequest?.entity_id,
+				lastUpdated: latestRequest?.state_updated_at,
+			});
+
+			const errorResponse: ErrorResponse = {
+				code: "PENDING_SUBSCRIPTION_REQUEST",
+				message:
+					`You have a pending subscription request in state: ${latestRequest?.current_state}. Please wait for it to complete or contact support.`,
+			};
+			return c.json(errorResponse, 409);
+		}
 
 		// Get user's Kill Bill account
 		const account = await killBillService.getAccountByExternalKey(userId);

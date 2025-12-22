@@ -89,6 +89,20 @@ export const subscriptionStateManager = {
 		);
 	},
 
+	transitionState(
+		entityType: string,
+		entityId: string,
+		toState: string,
+		options: TransitionOptions = {},
+	): Promise<string> {
+		return stateManager.transitionState(
+			entityType,
+			entityId,
+			toState,
+			options,
+		);
+	},
+
 	getCurrentState(
 		correlationId: string,
 	): Promise<CurrentEntityState | null> {
@@ -103,5 +117,41 @@ export const subscriptionStateManager = {
 			"subscription_request",
 			correlationId,
 		);
+	},
+
+	/**
+	 * Check if user has any pending subscription requests
+	 */
+	async hasPendingSubscriptionRequest(userId: string): Promise<boolean> {
+		const request = await stateManager.getEntitiesByMetadata(
+			"subscription_request",
+			"userId",
+			userId,
+		);
+		
+		const pending = request.filter((r) =>
+			r.current_state !== "completed" && r.current_state !== "failed"
+		);
+		return pending.length > 0;
+	},
+
+	/**
+	 * Get user's latest subscription request regardless of state
+	 */
+	async getLatestSubscriptionRequest(
+		userId: string,
+	): Promise<CurrentEntityState | null> {
+		const requests = await stateManager.getEntitiesByMetadata(
+			"subscription_request",
+			"userId",
+			userId,
+		);
+		if (requests.length === 0) return null;
+
+		// Sort by state_updated_at to get the most recent
+		return requests.sort((a, b) =>
+			new Date(b.state_updated_at).getTime() -
+			new Date(a.state_updated_at).getTime()
+		)[0];
 	},
 };
