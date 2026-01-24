@@ -51,6 +51,7 @@ export async function getAuthenticatedUser(
 
 		return user as AuthenticatedUser;
 	} catch (error) {
+		logger.error(handlerName, `${supabaseBaseUrl}`);
 		logger.error(handlerName, "Error fetching authenticated user", {
 			error: error instanceof Error ? error.message : String(error),
 		});

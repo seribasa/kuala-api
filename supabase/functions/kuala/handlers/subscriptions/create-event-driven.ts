@@ -1,4 +1,4 @@
-// Event-driven subscription creation handler
+// Event-driven subscription creation handler with comprehensive error handling
 import type { Context } from "@hono/hono";
 import { getUser } from "../../middleware/auth.ts";
 import { createSubscriptionRequestedEvent } from "../../../_shared/types/events.ts";
@@ -8,8 +8,14 @@ import type {
 	BaseResponse,
 	ErrorResponse,
 } from "../../../_shared/types/response.ts";
-import { killBillService } from "../../../_shared/services/killbill.ts";
+import { killBillService } from "@shared/services/killbill.ts";
 import { subscriptionStateManager } from "../../../_shared/services/subscription-state-management.ts";
+import {
+	classifyError,
+	ErrorCodes,
+	getErrorCode,
+	withRetry,
+} from "../../../_shared/errors/index.ts";
 
 interface CreateEventDrivenSubscriptionRequest {
 	planId: string;
@@ -17,12 +23,17 @@ interface CreateEventDrivenSubscriptionRequest {
 
 interface CreateEventDrivenSubscriptionResponse {
 	correlation_id: string;
-	status: "processing";
+	status: "processing" | "failed";
 	message: string;
+}
+
+interface CreateEventDrivenSubscriptionErrorResponse extends ErrorResponse {
+	correlation_id?: string;
 }
 
 export async function handleCreateEventDrivenSubscription(c: Context) {
 	const handlerName = "handleCreateEventDrivenSubscription";
+	let correlationId: string | undefined;
 
 	try {
 		// Get authenticated user from context (auth middleware already applied)
@@ -35,14 +46,36 @@ export async function handleCreateEventDrivenSubscription(c: Context) {
 			},
 		);
 
-		// Parse request body
-		const body: CreateEventDrivenSubscriptionRequest = await c.req.json();
+		// Parse request body with validation
+		let body: CreateEventDrivenSubscriptionRequest;
+		try {
+			body = await c.req.json();
+		} catch (_parseError) {
+			logger.error(handlerName, "Invalid JSON in request body");
+			const errorResponse: CreateEventDrivenSubscriptionErrorResponse = {
+				code: ErrorCodes.INVALID_EVENT_STRUCTURE,
+				message: "Invalid JSON in request body",
+			};
+			return c.json(errorResponse, 400);
+		}
 
 		if (!body.planId) {
 			logger.error(handlerName, "Missing planId in request");
-			const errorResponse: ErrorResponse = {
-				code: "MISSING_PLAN_ID",
+			const errorResponse: CreateEventDrivenSubscriptionErrorResponse = {
+				code: ErrorCodes.MISSING_PLAN_ID,
 				message: "planId is required",
+			};
+			return c.json(errorResponse, 400);
+		}
+
+		// Validate planId format (basic validation)
+		if (
+			typeof body.planId !== "string" || body.planId.trim().length === 0
+		) {
+			logger.error(handlerName, "Invalid planId format");
+			const errorResponse: CreateEventDrivenSubscriptionErrorResponse = {
+				code: ErrorCodes.MISSING_PLAN_ID,
+				message: "planId must be a non-empty string",
 			};
 			return c.json(errorResponse, 400);
 		}
@@ -62,18 +95,61 @@ export async function handleCreateEventDrivenSubscription(c: Context) {
 				lastUpdated: latestRequest?.state_updated_at,
 			});
 
-			const errorResponse: ErrorResponse = {
-				code: "PENDING_SUBSCRIPTION_REQUEST",
+			const errorResponse: CreateEventDrivenSubscriptionErrorResponse = {
+				code: ErrorCodes.PENDING_SUBSCRIPTION_REQUEST,
 				message:
 					`You have a pending subscription request in state: ${latestRequest?.current_state}. Please wait for it to complete or contact support.`,
+				correlation_id: latestRequest?.entity_id,
 			};
 			return c.json(errorResponse, 409);
 		}
 
-		// Check for existing active subscription
-		const activeSubscription = await killBillService.getActiveSubscription(
-			user.id,
-		);
+		// Check for existing active subscription with retry for transient errors
+		let activeSubscription;
+		try {
+			activeSubscription = await withRetry(
+				() => killBillService.getActiveSubscription(user.id),
+				{
+					maxRetries: 2,
+					baseDelayMs: 500,
+					onRetry: (error, attempt, delay) => {
+						logger.warn(
+							handlerName,
+							`Retrying getActiveSubscription (attempt ${attempt})`,
+							{ delay, error: String(error) },
+						);
+					},
+				},
+			);
+		} catch (error) {
+			const errorClassification = classifyError(error);
+			logger.error(
+				handlerName,
+				"Failed to check for active subscription",
+				{
+					error: error instanceof Error
+						? error.message
+						: String(error),
+					errorCode: errorClassification.code,
+				},
+			);
+
+			// If it's a transient error, ask user to retry
+			if (errorClassification.retryable) {
+				const errorResponse:
+					CreateEventDrivenSubscriptionErrorResponse = {
+						code: errorClassification.code,
+						message:
+							"Unable to verify subscription status. Please try again.",
+						details: error instanceof Error
+							? error.message
+							: undefined,
+					};
+				return c.json(errorResponse, 503);
+			}
+
+			throw error;
+		}
 
 		if (activeSubscription) {
 			logger.warn(handlerName, "User already has active subscription", {
@@ -81,8 +157,8 @@ export async function handleCreateEventDrivenSubscription(c: Context) {
 				planName: activeSubscription.planName,
 			});
 
-			const errorResponse: ErrorResponse = {
-				code: "DUPLICATE_SUBSCRIPTION",
+			const errorResponse: CreateEventDrivenSubscriptionErrorResponse = {
+				code: ErrorCodes.DUPLICATE_SUBSCRIPTION,
 				message:
 					`Subscription already exists with id: ${activeSubscription.subscriptionId}`,
 			};
@@ -90,28 +166,57 @@ export async function handleCreateEventDrivenSubscription(c: Context) {
 		}
 
 		// Create correlation ID for tracking
-		const correlationId = crypto.randomUUID();
+		correlationId = crypto.randomUUID();
 
-		// Create initial state transition
-		await subscriptionStateManager.transitionState(
-			"subscription_request",
-			correlationId,
-			"requested",
-			{
-				triggeredBy: "api-handler",
-				eventType: "SubscriptionRequested",
-				reason: "User initiated subscription request via API",
-				metadata: {
-					userId: user.id,
-					email: user.email || "",
-					name: user.user_metadata?.full_name ||
-						user.user_metadata?.name || "",
-					planId: body.planId,
+		// Create initial state transition with retry
+		try {
+			await withRetry(
+				() =>
+					subscriptionStateManager.transitionState(
+						"subscription_request",
+						correlationId!,
+						"requested",
+						{
+							triggeredBy: "api-handler",
+							eventType: "SubscriptionRequested",
+							reason:
+								"User initiated subscription request via API",
+							metadata: {
+								userId: user.id,
+								email: user.email || "",
+								name: user.user_metadata?.full_name ||
+									user.user_metadata?.name || "",
+								planId: body.planId,
+							},
+						},
+					),
+				{
+					maxRetries: 2,
+					baseDelayMs: 500,
+					onRetry: (error, attempt, delay) => {
+						logger.warn(
+							handlerName,
+							`Retrying state transition (attempt ${attempt})`,
+							{ correlationId, delay, error: String(error) },
+						);
+					},
 				},
-			},
-		);
+			);
+		} catch (error) {
+			logger.error(handlerName, "Failed to create initial state", {
+				correlationId,
+				error: error instanceof Error ? error.message : String(error),
+			});
 
-		// Create and publish SubscriptionRequested event
+			const errorResponse: CreateEventDrivenSubscriptionErrorResponse = {
+				code: ErrorCodes.STATE_TRANSITION_FAILED,
+				message: "Failed to initialize subscription request",
+				correlation_id: correlationId,
+			};
+			return c.json(errorResponse, 500);
+		}
+
+		// Create and publish SubscriptionRequested event with retry
 		const event = createSubscriptionRequestedEvent(
 			correlationId,
 			user.id,
@@ -127,7 +232,65 @@ export async function handleCreateEventDrivenSubscription(c: Context) {
 			planId: body.planId,
 		});
 
-		await publishEvent("subscription.requested", event);
+		try {
+			await withRetry(
+				() => publishEvent("subscription.requested", event),
+				{
+					maxRetries: 3,
+					baseDelayMs: 1000,
+					onRetry: (error, attempt, delay) => {
+						logger.warn(
+							handlerName,
+							`Retrying event publish (attempt ${attempt})`,
+							{ correlationId, delay, error: String(error) },
+						);
+					},
+				},
+			);
+		} catch (error) {
+			// Event publish failed - update state to failed
+			logger.error(handlerName, "Failed to publish event", {
+				correlationId,
+				error: error instanceof Error ? error.message : String(error),
+			});
+
+			// Try to mark the state as failed
+			try {
+				await subscriptionStateManager.transitionToFailed(
+					correlationId,
+					"Failed to publish subscription requested event",
+					{
+						triggeredBy: "api-handler",
+						reason: "RabbitMQ publish failure",
+						errorDetails: {
+							errorCode: getErrorCode(error),
+							errorMessage: error instanceof Error
+								? error.message
+								: String(error),
+						},
+					},
+				);
+			} catch (stateError) {
+				logger.error(
+					handlerName,
+					"Failed to update state after publish failure",
+					{
+						correlationId,
+						error: stateError instanceof Error
+							? stateError.message
+							: String(stateError),
+					},
+				);
+			}
+
+			const errorResponse: CreateEventDrivenSubscriptionErrorResponse = {
+				code: ErrorCodes.RABBITMQ_PUBLISH_ERROR,
+				message:
+					"Failed to queue subscription request. Please try again.",
+				correlation_id: correlationId,
+			};
+			return c.json(errorResponse, 503);
+		}
 
 		// Return immediate response
 		const responseData: CreateEventDrivenSubscriptionResponse = {
@@ -150,15 +313,55 @@ export async function handleCreateEventDrivenSubscription(c: Context) {
 
 		return c.json(successResponse, 202);
 	} catch (error: unknown) {
+		const errorClassification = classifyError(error);
+
 		logger.error(handlerName, "Event-driven subscription request failed", {
+			correlationId,
 			error: error instanceof Error ? error.message : String(error),
+			errorCode: errorClassification.code,
+			errorType: errorClassification.type,
+			retryable: errorClassification.retryable,
 		});
 
-		const errorResponse: ErrorResponse = {
-			code: "INTERNAL_ERROR",
+		// If we have a correlation ID, try to mark the request as failed
+		if (correlationId) {
+			try {
+				await subscriptionStateManager.transitionToFailed(
+					correlationId,
+					error instanceof Error ? error.message : "Unknown error",
+					{
+						triggeredBy: "api-handler",
+						reason:
+							"Unhandled error in subscription request handler",
+						errorDetails: {
+							errorCode: errorClassification.code,
+							errorType: errorClassification.type,
+						},
+					},
+				);
+			} catch (stateError) {
+				logger.error(
+					handlerName,
+					"Failed to record failure state",
+					{
+						correlationId,
+						stateError: stateError instanceof Error
+							? stateError.message
+							: String(stateError),
+					},
+				);
+			}
+		}
+
+		const errorResponse: CreateEventDrivenSubscriptionErrorResponse = {
+			code: errorClassification.code,
 			message: "Failed to process event-driven subscription request",
+			details: error instanceof Error ? error.message : undefined,
+			correlation_id: correlationId,
 		};
 
-		return c.json(errorResponse, 500);
+		// Return 503 for transient errors, 500 for permanent
+		const statusCode = errorClassification.retryable ? 503 : 500;
+		return c.json(errorResponse, statusCode);
 	}
 }

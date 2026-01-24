@@ -5,9 +5,9 @@
  * Usage: deno run --allow-all start-all-services.ts
  */
 
-import { AccountService } from "./account-service/account-service.ts";
-import { InvoiceService } from "./invoice-service/invoice-service.ts";
-import { SubscriptionService } from "./subscription-service/subscription-service.ts";
+import { AccountService } from "./account-service/index.ts";
+import { InvoiceService } from "./invoice-service/index.ts";
+import { SubscriptionService } from "./subscription-service/index.ts";
 import process from "node:process";
 
 class ServiceOrchestrator {

@@ -1,23 +1,26 @@
-import { RabbitMQClient } from "../_shared/rabbitmq.ts";
+import { RabbitMQClient } from "@shared/rabbitmq.ts";
 import {
 	createInvoiceGeneratedEvent,
 	DomainEvent,
 	SubscriptionCreatedEvent,
-} from "../_shared/types/events.ts";
-import { killBillService } from "../_shared/services/killbill.ts";
-import { subscriptionStateManager } from "../_shared/services/subscription-state-management.ts";
+} from "@shared/types/events.ts";
+import { killBillService } from "@shared/services/killbill.ts";
+import { subscriptionStateManager } from "@shared/services/subscription-state-management.ts";
+import { ApplicationError, classifyError } from "@shared/errors/index.ts";
 
 interface ServiceStatus {
 	status: "healthy" | "unhealthy" | "starting";
 	consumer_active: boolean;
 	last_event: string | null;
 	events_processed: number;
+	events_skipped: number;
 }
 
 export class InvoiceService {
 	private rabbitMQClient: RabbitMQClient;
 	private consumerActive = false;
 	private eventsProcessed = 0;
+	private eventsSkipped = 0;
 	private lastEvent: string | null = null;
 	private status: ServiceStatus["status"] = "starting";
 
@@ -28,44 +31,82 @@ export class InvoiceService {
 	async start() {
 		console.log("🧾 Invoice Service starting...");
 
+		// Try to connect, but don't fail if RabbitMQ isn't ready yet
 		try {
 			await this.rabbitMQClient.connect();
-
-			// Start consuming subscription.created events
-			this.rabbitMQClient.consume(
-				"subscription-created",
-				async (event: DomainEvent) => {
-					try {
-						if (event.type === "SubscriptionCreated") {
-							await this.handleSubscriptionCreated(
-								event as SubscriptionCreatedEvent,
-							);
-							this.eventsProcessed++;
-							this.lastEvent = new Date().toISOString();
-						}
-					} catch (error) {
-						console.error("Error processing event:", error);
-						throw error; // This will nack the message
-					}
-				},
-			);
-
-			this.consumerActive = true;
-			this.status = "healthy";
-			console.log("✅ Invoice Service consumer started");
 		} catch (error) {
-			console.error("❌ Failed to start Invoice Service:", error);
-			this.status = "unhealthy";
-			throw error;
+			console.warn(
+				"⚠️ Initial RabbitMQ connection failed, will retry in background:",
+				error,
+			);
+			// Don't throw - let the reconnection logic handle it
 		}
+
+		// Register consumer even if not connected yet
+		// It will be created when connection is established
+		this.rabbitMQClient.consume(
+			"subscription-created",
+			async (event: DomainEvent) => {
+				try {
+					if (event.type === "SubscriptionCreated") {
+						await this.handleSubscriptionCreated(
+							event as SubscriptionCreatedEvent,
+						);
+						this.eventsProcessed++;
+						this.lastEvent = new Date().toISOString();
+					}
+				} catch (error) {
+					console.error("Error processing event:", error);
+					throw error; // This will nack the message
+				}
+			},
+		);
+
+		this.consumerActive = true;
+		this.status = "healthy";
+		console.log(
+			"✅ Invoice Service started (consumer will activate when RabbitMQ connects)",
+		);
 	}
 
 	private async handleSubscriptionCreated(event: SubscriptionCreatedEvent) {
+		const _handlerName = "InvoiceService.handleSubscriptionCreated";
 		console.log(
 			`🧾 Processing subscription created for user: ${event.userId}, subscription: ${event.subscriptionId}`,
 		);
 
 		try {
+			// IDEMPOTENCY CHECK: Check if this event has already been processed
+			const currentState = await subscriptionStateManager.getCurrentState(
+				event.correlationId,
+			);
+
+			if (currentState) {
+				const state = currentState.current_state;
+				// If already completed, skip processing
+				if (state === "completed") {
+					console.log(
+						`⏭️ Skipping already completed event ${event.correlationId}`,
+					);
+					this.eventsSkipped++;
+					return; // Idempotent - already processed
+				}
+
+				// If in generating_invoice state, check if we can resume
+				if (state === "generating_invoice") {
+					console.log(
+						`🔄 Resuming invoice generation for ${event.correlationId}`,
+					);
+				}
+
+				// If failed, allow retry
+				if (state === "failed") {
+					console.log(
+						`🔄 Retrying failed invoice generation for ${event.correlationId}`,
+					);
+				}
+			}
+
 			// 1. Update subscription status to generating_invoice
 			await subscriptionStateManager.transitionToGeneratingInvoice(
 				event.correlationId,
@@ -189,6 +230,9 @@ export class InvoiceService {
 				error,
 			);
 
+			// Classify error for better handling
+			const errorClassification = classifyError(error);
+
 			// Update subscription status to failed
 			await subscriptionStateManager.transitionToFailed(
 				event.correlationId,
@@ -201,10 +245,28 @@ export class InvoiceService {
 						accountId: event.accountId,
 						subscriptionId: event.subscriptionId,
 					},
+					errorDetails: {
+						errorCode: errorClassification.code,
+						errorType: errorClassification.type,
+						retryable: errorClassification.retryable,
+					},
 				},
 			);
 
-			throw error;
+			// Re-throw with classification for RabbitMQ retry logic
+			if (error instanceof ApplicationError) {
+				throw error;
+			}
+
+			throw new ApplicationError(
+				errorClassification.code,
+				error instanceof Error ? error.message : "Unknown error",
+				{
+					type: errorClassification.type,
+					retryable: errorClassification.retryable,
+					cause: error instanceof Error ? error : undefined,
+				},
+			);
 		}
 	}
 
@@ -214,6 +276,7 @@ export class InvoiceService {
 			consumer_active: this.consumerActive,
 			last_event: this.lastEvent,
 			events_processed: this.eventsProcessed,
+			events_skipped: this.eventsSkipped,
 		};
 	}
 

@@ -1,0 +1,30 @@
+services:
+  account-service:
+    image: denoland/deno:alpine
+    container_name: account-service
+    ports:
+      - "8001:8001"
+    volumes:
+      - ..:/workspace
+    working_dir: /workspace/services/account-service
+    command: deno run --allow-all --config=/workspace/deno.json --env-file=/workspace/.env index.ts
+    
+  invoice-service:
+    image: denoland/deno:alpine
+    container_name: invoice-service
+    ports:
+      - "8002:8002"
+    volumes:
+      - ..:/workspace
+    working_dir: /workspace/services/invoice-service
+    command: deno run --allow-all --config=/workspace/deno.json --env-file=/workspace/.env index.ts
+    
+  subscription-service:
+    image: denoland/deno:alpine
+    container_name: subscription-service
+    ports:
+      - "8003:8003"
+    volumes:
+      - ..:/workspace
+    working_dir: /workspace/services/subscription-service
+    command: deno run --allow-all --config=/workspace/deno.json --env-file=/workspace/.env index.ts

@@ -3,7 +3,7 @@ import { ErrorResponse } from "../../../_shared/types/response.ts";
 import { CreateSubscriptionRequest } from "../../../_shared/types/index.ts";
 import { logger } from "../../middleware/logger.ts";
 import { getUser } from "../../middleware/auth.ts";
-import { killBillService } from "../../../_shared/services/killbill.ts";
+import { killBillService } from "@shared/services/killbill.ts";
 /**
  * Handler for POST /subscriptions
  * Creates a subscription for the authenticated user

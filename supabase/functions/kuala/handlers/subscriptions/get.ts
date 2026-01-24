@@ -3,7 +3,7 @@ import { ErrorResponse } from "../../../_shared/types/response.ts";
 import { authLogger, logger } from "../../middleware/logger.ts";
 import { getUser } from "../../middleware/auth.ts";
 import { mapKillBillSubscriptionToSubscription } from "../../utils/subscription-mapper.ts";
-import { killBillService } from "../../../_shared/services/killbill.ts";
+import { killBillService } from "@shared/services/killbill.ts";
 import { subscriptionStateManager } from "../../../_shared/services/subscription-state-management.ts";
 
 /**
