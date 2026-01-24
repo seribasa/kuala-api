@@ -207,10 +207,11 @@ export class KillBillService {
 
 	/**
 	 * Get subscription by external ID (user ID)
+	 * Returns null if subscription not found (404)
 	 */
 	async getSubscriptionByExternalId(
 		externalKey: string,
-	): Promise<KillBillSubscription> {
+	): Promise<KillBillSubscription | null> {
 		const handlerName = "killbill-service";
 		const url = `${this.baseUrl}/1.0/kb/subscriptions?externalKey=${
 			encodeURIComponent(
@@ -228,9 +229,16 @@ export class KillBillService {
 			headers: this.getHeaders(),
 		});
 
-		const responseData = await response.clone().text();
+		// Handle 404 as "no subscription found" - this is expected for new users
+		if (response.status === 404) {
+			logger.info(handlerName, "No subscription found for external key", {
+				externalKey: externalKey.substring(0, 8) + "...",
+			});
+			return null;
+		}
 
 		if (!response.ok) {
+			const responseData = await response.clone().text();
 			logger.error(handlerName, "Failed to get account subscriptions", {
 				response: responseData,
 				status: response.status,
@@ -677,6 +685,41 @@ export class KillBillService {
 		});
 
 		return invoiceId;
+	}
+
+	/**
+	 * Void an invoice
+	 * @param invoiceId string
+	 * @return void
+	 */
+	async voidInvoice(invoiceId: string): Promise<void> {
+		const handlerName = "killbill-service";
+		const url = `${this.baseUrl}/1.0/kb/invoices/${invoiceId}/voidInvoice`;
+
+		logger.info(handlerName, "Voiding invoice", {
+			url,
+			invoiceId: invoiceId.substring(0, 8) + "...",
+		});
+
+		const response = await fetch(url, {
+			method: "PUT",
+			headers: this.getHeaders(),
+		});
+
+		if (!response.ok) {
+			const errorText = await response.text();
+			logger.error(handlerName, "Failed to void invoice", {
+				status: response.status,
+				error: errorText,
+			});
+			throw new Error(
+				`Failed to void invoice: ${response.status} - ${errorText}`,
+			);
+		}
+
+		logger.info(handlerName, "Voided invoice successfully", {
+			invoiceId: invoiceId.substring(0, 8) + "...",
+		});
 	}
 }
 

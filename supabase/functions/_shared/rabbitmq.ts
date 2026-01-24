@@ -1,6 +1,7 @@
 // RabbitMQ Connection and Event Handling for Supabase Edge Functions
 import { Connection } from "rabbitmq-client";
 import { DomainEvent } from "./types/events.ts";
+import { classifyError } from "./errors/index.ts";
 
 // Custom Error Classes
 export class RabbitMQConnectionError extends Error {
@@ -35,11 +36,18 @@ enum ConnectionState {
 interface RabbitMQConfig {
 	url: string;
 	exchange: string;
+	deadLetterExchange: string;
 	queues: {
 		subscriptionRequested: string;
 		accountReady: string;
 		subscriptionCreated: string;
 		invoiceGenerated: string;
+		deadLetter: string;
+	};
+	retry: {
+		maxRetries: number;
+		baseDelayMs: number;
+		maxDelayMs: number;
 	};
 }
 
@@ -53,13 +61,24 @@ if (!rabbitmqUrl) {
 const config: RabbitMQConfig = {
 	url: rabbitmqUrl,
 	exchange: "subscription-events",
+	deadLetterExchange: "subscription-events-dlx",
 	queues: {
 		subscriptionRequested: "subscription-requested",
 		accountReady: "account-ready",
 		subscriptionCreated: "subscription-created",
 		invoiceGenerated: "invoice-generated",
+		deadLetter: "subscription-dead-letter",
+	},
+	retry: {
+		maxRetries: 3,
+		baseDelayMs: 1000,
+		maxDelayMs: 30000,
 	},
 };
+
+// Type for Connection factory - allows dependency injection for testing
+// deno-lint-ignore no-explicit-any
+export type ConnectionFactory = (url: string) => any;
 
 export class RabbitMQClient {
 	private connection: Connection | null = null;
@@ -68,11 +87,31 @@ export class RabbitMQClient {
 	// deno-lint-ignore no-explicit-any
 	private consumer: any | null = null;
 	private connectionState: ConnectionState = ConnectionState.DISCONNECTED;
-	private maxRetries = 3;
 	private connectionRetries = 0;
 	private reconnectDelay = 1000; // Start with 1 second
 	private maxReconnectDelay = 30000; // Max 30 seconds
 	private reconnectTimeout: number | null = null;
+	// Store consumer configurations for auto-resume after reconnection
+	private consumerConfigs: Array<{
+		queueName: string;
+		// deno-lint-ignore no-explicit-any
+		handler: (event: any) => Promise<void>;
+		options: { handlerTimeoutMs?: number; maxRetries?: number };
+	}> = [];
+	// Connection factory for dependency injection (testing)
+	private connectionFactory: ConnectionFactory;
+
+	/**
+	 * Create a new RabbitMQClient
+	 * @param connectionFactory Optional factory function for creating Connection instances.
+	 *                          Defaults to the real rabbitmq-client Connection class.
+	 *                          Inject a mock factory for testing.
+	 */
+	constructor(connectionFactory?: ConnectionFactory) {
+		// Use provided factory or default to real Connection class
+		this.connectionFactory = connectionFactory ||
+			((url: string) => new Connection(url));
+	}
 
 	async connect(): Promise<void> {
 		if (this.connectionState === ConnectionState.CONNECTED) {
@@ -88,25 +127,32 @@ export class RabbitMQClient {
 			console.log(
 				`🔌 Connecting to RabbitMQ (attempt ${
 					this.connectionRetries + 1
-				}/${this.maxRetries + 1})...`,
+				})...`,
 			);
 
-			const rabbitmq = new Connection(config.url);
+			const rabbitmq = this.connectionFactory(config.url);
 
 			// Set up connection event handlers
-			rabbitmq.on("error", (err) => {
+			// deno-lint-ignore no-explicit-any
+			rabbitmq.on("error", (err: any) => {
 				console.error("❌ RabbitMQ connection error:", err);
 				this.connectionState = ConnectionState.ERROR;
 				this.connection = null;
 				this.scheduleReconnect();
 			});
 
-			rabbitmq.on("connection", () => {
+			rabbitmq.on("connection", async () => {
 				console.log("✅ RabbitMQ connection established");
 				this.connectionState = ConnectionState.CONNECTED;
 				this.connection = rabbitmq;
 				this.connectionRetries = 0;
 				this.reconnectDelay = 1000; // Reset delay
+
+				// Reset publisher to force recreation
+				this.publisher = null;
+
+				// Recreate all consumers that were previously registered
+				await this.recreateAllConsumers();
 			});
 
 			// Wait for connection to be established
@@ -122,13 +168,6 @@ export class RabbitMQClient {
 	}
 
 	private scheduleReconnect(): void {
-		if (this.connectionRetries >= this.maxRetries) {
-			console.error(
-				`❌ Max reconnection attempts (${this.maxRetries}) exceeded`,
-			);
-			return;
-		}
-
 		if (this.reconnectTimeout) {
 			clearTimeout(this.reconnectTimeout);
 		}
@@ -140,7 +179,7 @@ export class RabbitMQClient {
 		);
 
 		console.log(
-			`🔄 Scheduling reconnection in ${delay}ms (attempt ${this.connectionRetries}/${this.maxRetries})`,
+			`🔄 Scheduling reconnection in ${delay}ms (attempt ${this.connectionRetries}) - Infinite retry enabled for HA RabbitMQ`,
 		);
 
 		this.reconnectTimeout = setTimeout(async () => {
@@ -154,23 +193,24 @@ export class RabbitMQClient {
 
 	private waitForConnection(timeoutMs = 10000): Promise<void> {
 		return new Promise((resolve, reject) => {
+			let checkInterval: number;
+
 			const timeout = setTimeout(() => {
+				clearInterval(checkInterval);
 				reject(new RabbitMQConnectionError("Connection timeout"));
 			}, timeoutMs);
 
-			const checkConnection = () => {
+			checkInterval = setInterval(() => {
 				if (this.connectionState === ConnectionState.CONNECTED) {
 					clearTimeout(timeout);
+					clearInterval(checkInterval);
 					resolve();
 				} else if (this.connectionState === ConnectionState.ERROR) {
 					clearTimeout(timeout);
+					clearInterval(checkInterval);
 					reject(new RabbitMQConnectionError("Connection failed"));
-				} else {
-					setTimeout(checkConnection, 100);
 				}
-			};
-
-			checkConnection();
+			}, 100);
 		});
 	}
 
@@ -206,29 +246,60 @@ export class RabbitMQClient {
 				try {
 					this.publisher = this.connection.createPublisher({
 						// Retry configuration
-						maxAttempts: this.maxRetries,
+						maxAttempts: config.retry.maxRetries,
 						// Declare queues and exchanges
 						confirm: true,
-						exchanges: [{
-							exchange: config.exchange,
-							type: "topic",
-							durable: true,
-						}],
+						exchanges: [
+							{
+								exchange: config.exchange,
+								type: "topic",
+								durable: true,
+							},
+							{
+								exchange: config.deadLetterExchange,
+								type: "topic",
+								durable: true,
+							},
+						],
 						queues: [
 							{
 								queue: config.queues.subscriptionRequested,
 								durable: true,
+								arguments: {
+									"x-dead-letter-exchange":
+										config.deadLetterExchange,
+									"x-dead-letter-routing-key": "failed",
+								},
 							},
 							{
 								queue: config.queues.accountReady,
 								durable: true,
+								arguments: {
+									"x-dead-letter-exchange":
+										config.deadLetterExchange,
+									"x-dead-letter-routing-key": "failed",
+								},
 							},
 							{
 								queue: config.queues.subscriptionCreated,
 								durable: true,
+								arguments: {
+									"x-dead-letter-exchange":
+										config.deadLetterExchange,
+									"x-dead-letter-routing-key": "failed",
+								},
 							},
 							{
 								queue: config.queues.invoiceGenerated,
+								durable: true,
+								arguments: {
+									"x-dead-letter-exchange":
+										config.deadLetterExchange,
+									"x-dead-letter-routing-key": "failed",
+								},
+							},
+							{
+								queue: config.queues.deadLetter,
 								durable: true,
 							},
 						],
@@ -252,6 +323,11 @@ export class RabbitMQClient {
 								queue: config.queues.invoiceGenerated,
 								exchange: config.exchange,
 								routingKey: "invoice.generated",
+							},
+							{
+								queue: config.queues.deadLetter,
+								exchange: config.deadLetterExchange,
+								routingKey: "failed",
 							},
 						],
 					});
@@ -311,6 +387,10 @@ export class RabbitMQClient {
 	consume<T extends DomainEvent>(
 		queueName: string,
 		handler: (event: T) => Promise<void>,
+		options: {
+			handlerTimeoutMs?: number;
+			maxRetries?: number;
+		} = {},
 	): void {
 		// Validate inputs
 		if (!queueName?.trim()) {
@@ -320,6 +400,38 @@ export class RabbitMQClient {
 		if (!handler || typeof handler !== "function") {
 			throw new RabbitMQConsumerError("Handler must be a valid function");
 		}
+
+		// Store consumer configuration for auto-resume after reconnection
+		const existingConfigIndex = this.consumerConfigs.findIndex(
+			(c) => c.queueName === queueName,
+		);
+		if (existingConfigIndex === -1) {
+			this.consumerConfigs.push({ queueName, handler, options });
+			console.log(
+				`📝 Registered consumer configuration for queue: ${queueName}`,
+			);
+		}
+
+		// Create the consumer if currently connected
+		if (this.connectionState === ConnectionState.CONNECTED) {
+			this._createConsumer(queueName, handler, options);
+		} else {
+			console.log(
+				`⏸️ Consumer for ${queueName} registered, will be created when connection is established`,
+			);
+		}
+	}
+
+	private _createConsumer<T extends DomainEvent>(
+		queueName: string,
+		handler: (event: T) => Promise<void>,
+		options: {
+			handlerTimeoutMs?: number;
+			maxRetries?: number;
+		} = {},
+	): void {
+		const handlerTimeoutMs = options.handlerTimeoutMs ?? 30000;
+		const maxRetries = options.maxRetries ?? config.retry.maxRetries;
 
 		try {
 			console.log(`🔄 Starting consumer for queue: ${queueName}`);
@@ -337,20 +449,30 @@ export class RabbitMQClient {
 			this.consumer = this.connection.createConsumer(
 				{
 					queue: queueName,
-					queueOptions: { durable: true },
+					queueOptions: {
+						durable: true,
+						arguments: {
+							"x-dead-letter-exchange": config.deadLetterExchange,
+							"x-dead-letter-routing-key": "failed",
+						},
+					},
 					// Prefetch 1 message at a time
 					qos: { prefetchCount: 1 },
 				},
 				async (message) => {
+					// Get retry count from headers
+					const retryCount =
+						(message.headers?.["x-retry-count"] as number) || 0;
+					let event: T | null = null;
+
 					try {
 						// Validate message
 						if (!message?.body) {
 							console.error("❌ Received empty message body");
-							return;
+							return; // ACK - don't retry invalid messages
 						}
 
 						// Parse event with error handling
-						let event: T;
 						try {
 							event = JSON.parse(message.body) as T;
 						} catch (parseError) {
@@ -358,7 +480,7 @@ export class RabbitMQClient {
 								"❌ Failed to parse event JSON:",
 								parseError,
 							);
-							return;
+							return; // ACK - don't retry unparseable messages
 						}
 
 						// Validate event structure
@@ -366,47 +488,145 @@ export class RabbitMQClient {
 							console.error(
 								"❌ Invalid event structure: missing eventId or type",
 							);
-							return;
+							return; // ACK - don't retry invalid messages
 						}
 
 						console.log(
-							`📥 Received event: ${event.type} (${event.eventId})`,
+							`📥 Received event: ${event.type} (${event.eventId}) [retry: ${retryCount}/${maxRetries}]`,
 						);
 
 						// Process the event with timeout
-						try {
-							const timeoutPromise = new Promise<never>(
-								(_, reject) => {
-									setTimeout(
-										() =>
-											reject(
-												new Error("Handler timeout"),
+						let timeoutId: number;
+						const timeoutPromise = new Promise<never>(
+							(_, reject) => {
+								timeoutId = setTimeout(
+									() =>
+										reject(
+											new Error(
+												`Handler timeout after ${handlerTimeoutMs}ms`,
 											),
-										30000,
-									);
-								},
-							);
+										),
+									handlerTimeoutMs,
+								);
+							},
+						);
 
+						try {
 							await Promise.race([
 								handler(event),
 								timeoutPromise,
 							]);
-
-							console.log(
-								`✅ Processed event: ${event.type} (${event.eventId})`,
-							);
-						} catch (handlerError) {
-							console.error(
-								`❌ Handler failed for event ${event.type} (${event.eventId}):`,
-								handlerError,
-							);
-							// Consider implementing dead letter queue here
+						} finally {
+							clearTimeout(timeoutId!);
 						}
-					} catch (error) {
-						console.error(
-							"❌ Unexpected error processing message:",
-							error,
+
+						console.log(
+							`✅ Processed event: ${event.type} (${event.eventId})`,
 						);
+					} catch (handlerError) {
+						const errorClassification = classifyError(handlerError);
+						const eventInfo = event
+							? `${event.type} (${event.eventId})`
+							: "unknown event";
+
+						console.error(
+							`❌ Handler failed for event ${eventInfo}:`,
+							{
+								error: handlerError instanceof Error
+									? handlerError.message
+									: String(handlerError),
+								errorType: errorClassification.type,
+								errorCode: errorClassification.code,
+								retryable: errorClassification.retryable,
+								retryCount,
+								maxRetries,
+							},
+						);
+
+						// Check if we should retry
+						if (
+							errorClassification.retryable &&
+							retryCount < maxRetries
+						) {
+							console.log(
+								`🔄 Scheduling retry ${
+									retryCount + 1
+								}/${maxRetries} for event ${eventInfo}`,
+							);
+
+							// Republish with incremented retry count
+							if (event && this.publisher) {
+								const delay = Math.min(
+									config.retry.baseDelayMs *
+										Math.pow(2, retryCount),
+									config.retry.maxDelayMs,
+								);
+
+								// Wait before republishing
+								await new Promise((resolve) =>
+									setTimeout(resolve, delay)
+								);
+
+								try {
+									await this.publisher.send(
+										{
+											exchange: config.exchange,
+											routingKey: this
+												.getRoutingKeyForQueue(
+													queueName,
+												),
+										},
+										message.body,
+										{
+											contentType: "application/json",
+											correlationId: event.correlationId,
+											messageId:
+												`${event.eventId}-retry-${
+													retryCount + 1
+												}`,
+											timestamp: Date.now(),
+											type: event.type,
+											deliveryMode: 2,
+											headers: {
+												"x-retry-count": retryCount + 1,
+												"x-original-event-id":
+													event.eventId,
+												"x-last-error":
+													handlerError instanceof
+															Error
+														? handlerError.message
+														: String(handlerError),
+												"x-error-type":
+													errorClassification.type,
+												"x-error-code":
+													errorClassification.code,
+											},
+										},
+									);
+									console.log(
+										`📤 Republished event for retry: ${eventInfo}`,
+									);
+								} catch (republishError) {
+									console.error(
+										`❌ Failed to republish event for retry: ${eventInfo}`,
+										republishError,
+									);
+									// Message will be nacked and go to DLQ
+									throw handlerError;
+								}
+							}
+						} else {
+							// Max retries exceeded or non-retryable error
+							console.error(
+								`💀 Event ${eventInfo} sent to dead letter queue after ${retryCount} retries. Reason: ${
+									errorClassification.retryable
+										? "max retries exceeded"
+										: "non-retryable error"
+								}`,
+							);
+							// Re-throw to nack the message and send to DLQ
+							throw handlerError;
+						}
 					}
 				},
 			);
@@ -438,6 +658,50 @@ export class RabbitMQClient {
 				error,
 			);
 		}
+	}
+
+	/**
+	 * Recreate all registered consumers after reconnection
+	 */
+	private recreateAllConsumers(): void {
+		if (this.consumerConfigs.length === 0) {
+			return;
+		}
+
+		console.log(
+			`🔄 Recreating ${this.consumerConfigs.length} consumer(s)...`,
+		);
+
+		for (const config of this.consumerConfigs) {
+			try {
+				this._createConsumer(
+					config.queueName,
+					config.handler,
+					config.options,
+				);
+				console.log(
+					`✅ Recreated consumer for queue: ${config.queueName}`,
+				);
+			} catch (error) {
+				console.error(
+					`❌ Failed to recreate consumer for ${config.queueName}:`,
+					error,
+				);
+			}
+		}
+	}
+
+	/**
+	 * Get routing key for a given queue name
+	 */
+	private getRoutingKeyForQueue(queueName: string): string {
+		const routingKeyMap: Record<string, string> = {
+			[config.queues.subscriptionRequested]: "subscription.requested",
+			[config.queues.accountReady]: "account.ready",
+			[config.queues.subscriptionCreated]: "subscription.created",
+			[config.queues.invoiceGenerated]: "invoice.generated",
+		};
+		return routingKeyMap[queueName] || queueName;
 	}
 
 	async disconnect(): Promise<void> {
@@ -503,6 +767,8 @@ export class RabbitMQClient {
 			this.connectionState = ConnectionState.DISCONNECTED;
 			this.connectionRetries = 0;
 			this.reconnectDelay = 1000;
+			// Clear consumer configurations on explicit disconnect
+			this.consumerConfigs = [];
 
 			if (errors.length === 0) {
 				console.log("🔌 Successfully disconnected from RabbitMQ");
@@ -540,6 +806,7 @@ export class RabbitMQClient {
 export async function publishEvent(
 	routingKey: string,
 	event: DomainEvent,
+	connectionFactory?: ConnectionFactory,
 ): Promise<void> {
 	if (!routingKey?.trim()) {
 		throw new RabbitMQPublishError("Routing key cannot be empty");
@@ -549,7 +816,7 @@ export async function publishEvent(
 		throw new RabbitMQPublishError("Event cannot be null or undefined");
 	}
 
-	const client = new RabbitMQClient();
+	const client = new RabbitMQClient(connectionFactory);
 	try {
 		// Wait for connection to be established
 		await client.connect();
@@ -591,10 +858,12 @@ export async function publishEvent(
 // Singleton client for long-running consumers (not recommended for serverless)
 let globalClient: RabbitMQClient | null = null;
 
-export async function getGlobalRabbitMQClient(): Promise<RabbitMQClient> {
+export async function getGlobalRabbitMQClient(
+	connectionFactory?: ConnectionFactory,
+): Promise<RabbitMQClient> {
 	try {
 		if (!globalClient) {
-			globalClient = new RabbitMQClient();
+			globalClient = new RabbitMQClient(connectionFactory);
 			await globalClient.connect();
 		} else if (!globalClient.isConnected()) {
 			// Reconnect if connection was lost

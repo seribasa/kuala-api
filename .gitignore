@@ -1,8 +1,6 @@
 # dotenvx
-.env
-.env.keys
-.env.local
-.env.*.local
+!.env.example
+.env*
 coverage
 node_modules
 .DS_Store

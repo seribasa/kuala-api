@@ -1,6 +1,5 @@
 {
   "nodeModulesDir": "auto",
-  "lock": false,
   "npm": {
     "specifiers": []
   },
@@ -11,13 +10,14 @@
     "@hono/hono": "jsr:@hono/hono@^4.6.3",
     "@hono/hono/logger": "jsr:@hono/hono@^4.6.3/logger",
     "@supabase/supabase-js": "npm:@supabase/supabase-js@^2.87.1",
-    "rabbitmq-client": "npm:rabbitmq-client@^5.0.8"
+    "rabbitmq-client": "npm:rabbitmq-client@^5.0.8",
+    "@shared/": "./supabase/functions/_shared/"
   },
   "tasks": {
-    "dev": "deno run --allow-net --allow-env --watch=supabase/functions,infra/self-hosted --config=deno.json --env-file=../../.env ../../infra/self-hosted/server.ts",
-    "start": "deno run --allow-net --allow-env --config=deno.json --env-file=../../.env ../../infra/self-hosted/server.ts",
-    "services": "deno run --allow-all --config=deno.json --env-file=../../.env.service start-all-services.ts",
-    "services:dev": "deno run --allow-all --watch=supabase/functions --config=deno.json --env-file=../../.env.service start-all-services.ts",
+    "dev": "deno run --allow-net --allow-env --watch=supabase/functions,infra/self-hosted --config=deno.json --env-file=./.env ./infra/self-hosted/server.ts",
+    "start": "deno run --allow-net --allow-env --config=deno.json --env-file=./.env ./infra/self-hosted/server.ts",
+    "services": "deno run --allow-all --config=deno.json --env-file=./.env ./services/start-all-services.ts",
+    "services:dev": "deno run --allow-all --watch=supabase/functions --config=deno.json --env-file=./.env ./services/start-all-services.ts",
     "test": "deno test --allow-net --allow-env --env-file=.env.test --coverage=coverage",
     "lcov": "deno coverage --lcov coverage/ > coverage.lcov",
     "lint": "deno lint"
