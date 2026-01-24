@@ -41,6 +41,71 @@ export interface TransitionOptions {
 }
 
 /**
+ * Valid state transitions for subscription requests
+ * Maps from_state -> allowed to_states
+ */
+export const VALID_STATE_TRANSITIONS: Record<string, string[]> = {
+	// Initial state - can only go to requested
+	"": ["requested"],
+	// Requested - can proceed to account_ready or fail
+	"requested": ["account_ready", "failed", "cancelled"],
+	// Account ready - can proceed to creating_subscription or fail
+	"account_ready": ["creating_subscription", "failed", "cancelled"],
+	// Creating subscription - can proceed to subscription_created or fail
+	"creating_subscription": ["subscription_created", "failed", "cancelled"],
+	// Subscription created - can proceed to generating_invoice or fail
+	"subscription_created": ["generating_invoice", "failed", "cancelled"],
+	// Generating invoice - can proceed to completed or fail
+	"generating_invoice": ["completed", "failed", "cancelled"],
+	// Terminal states
+	"completed": [], // No transitions allowed from completed
+	"failed": ["requested"], // Can retry from failed
+	"cancelled": [], // No transitions allowed from cancelled
+};
+
+/**
+ * Check if a state transition is valid
+ */
+export function isValidTransition(
+	fromState: string | null,
+	toState: string,
+	entityType = "subscription_request",
+): boolean {
+	// Only validate subscription_request entity type for now
+	if (entityType !== "subscription_request") {
+		return true; // Allow all transitions for other entity types
+	}
+
+	const currentState = fromState || "";
+	const allowedStates = VALID_STATE_TRANSITIONS[currentState];
+
+	if (!allowedStates) {
+		// Unknown from state - allow transition
+		return true;
+	}
+
+	return allowedStates.includes(toState);
+}
+
+/**
+ * Custom error for invalid state transitions
+ */
+export class InvalidStateTransitionError extends Error {
+	constructor(
+		public readonly fromState: string | null,
+		public readonly toState: string,
+		public readonly entityType: string,
+		public readonly entityId: string,
+	) {
+		const fromStateDisplay = fromState || "(initial)";
+		super(
+			`Invalid state transition: ${fromStateDisplay} → ${toState} for ${entityType}:${entityId}`,
+		);
+		this.name = "InvalidStateTransitionError";
+	}
+}
+
+/**
  * A general-purpose state management service that provides:
  * - State transitions with full audit trail
  * - History tracking for all entities
@@ -49,9 +114,11 @@ export interface TransitionOptions {
  */
 export class StateManagementService {
 	private supabase: SupabaseClient;
+	private validateTransitions: boolean;
 
-	constructor() {
+	constructor(options: { validateTransitions?: boolean } = {}) {
 		this.supabase = createClient(supabaseUrl, supabaseServiceKey);
+		this.validateTransitions = options.validateTransitions ?? true;
 	}
 
 	/**
@@ -72,6 +139,24 @@ export class StateManagementService {
 		} = options;
 
 		try {
+			// Validate state transition if enabled
+			if (this.validateTransitions) {
+				const currentState = await this.getCurrentState(
+					entityType,
+					entityId,
+				);
+				const fromState = currentState?.current_state || null;
+
+				if (!isValidTransition(fromState, toState, entityType)) {
+					throw new InvalidStateTransitionError(
+						fromState,
+						toState,
+						entityType,
+						entityId,
+					);
+				}
+			}
+
 			const { data, error } = await this.supabase.rpc(
 				"transition_entity_state",
 				{

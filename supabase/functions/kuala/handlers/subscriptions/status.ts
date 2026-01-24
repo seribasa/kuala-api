@@ -6,78 +6,101 @@ import type {
 	BaseResponse,
 	ErrorResponse,
 } from "../../../_shared/types/response.ts";
+import { subscriptionStateManager } from "../../../_shared/services/subscription-state-management.ts";
 
 interface SubscriptionStatusResponse {
 	correlation_id: string;
 	status: "processing" | "completed" | "failed";
+	current_state: string;
 	last_event?: string;
+	last_updated: string;
 	total_events: number;
 	events: Array<{
 		event_id: string;
 		event_type: string;
+		from_state: string | null;
+		to_state: string;
 		timestamp: string;
-		status: string;
+		triggered_by: string;
+		reason?: string;
 	}>;
 }
 
-// Mock status tracking - replace with actual Redis/database implementation
-// TODO: Implement actual storage and retrieval of saga state
-function getSubscriptionStatus(
+/**
+ * Get real subscription status from state management system
+ */
+async function getSubscriptionStatus(
 	correlationId: string,
 	userId: string,
 ): Promise<SubscriptionStatusResponse | null> {
-	// In real implementation, this would query Redis or database for saga state
-	// For now, return mock data based on correlation ID
-
 	logger.info("getSubscriptionStatus", "Fetching subscription status", {
 		correlationId,
 		userId,
 	});
 
-	// Simulate different states based on correlation ID patterns
-	const statusStates = ["processing", "completed", "failed"] as const;
-	const randomState =
-		statusStates[Math.floor(Math.random() * statusStates.length)];
+	try {
+		// Get current state
+		const currentState = await subscriptionStateManager.getCurrentState(
+			correlationId,
+		);
 
-	const mockEvents = [
-		{
-			event_id: crypto.randomUUID(),
-			event_type: "SubscriptionRequested",
-			timestamp: new Date().toISOString(),
-			status: "completed",
-		},
-		{
-			event_id: crypto.randomUUID(),
-			event_type: "AccountReady",
-			timestamp: new Date().toISOString(),
-			status: randomState === "processing" ? "processing" : "completed",
-		},
-	];
+		if (!currentState) {
+			logger.warn(
+				"getSubscriptionStatus",
+				"No state found for correlation ID",
+				{
+					correlationId,
+				},
+			);
+			return null;
+		}
 
-	if (randomState === "completed") {
-		mockEvents.push(
+		// Get state history
+		const history = await subscriptionStateManager.getHistory(
+			correlationId,
+		);
+
+		// Map state to status
+		let status: "processing" | "completed" | "failed";
+		if (currentState.current_state === "completed") {
+			status = "completed";
+		} else if (currentState.current_state === "failed") {
+			status = "failed";
+		} else {
+			status = "processing";
+		}
+
+		// Map history to events
+		const events = history.map((transition) => ({
+			event_id: transition.id,
+			event_type: transition.event_type || transition.to_state,
+			from_state: transition.from_state,
+			to_state: transition.to_state,
+			timestamp: transition.created_at,
+			triggered_by: transition.triggered_by,
+			reason: transition.transition_reason,
+		}));
+
+		return {
+			correlation_id: correlationId,
+			status,
+			current_state: currentState.current_state,
+			last_event: currentState.last_event_type,
+			last_updated: currentState.state_updated_at,
+			total_events: events.length,
+			events,
+		};
+	} catch (error) {
+		logger.error(
+			"getSubscriptionStatus",
+			"Failed to fetch status from state management",
 			{
-				event_id: crypto.randomUUID(),
-				event_type: "SubscriptionCreated",
-				timestamp: new Date().toISOString(),
-				status: "completed",
-			},
-			{
-				event_id: crypto.randomUUID(),
-				event_type: "InvoiceGenerated",
-				timestamp: new Date().toISOString(),
-				status: "completed",
+				correlationId,
+				error: error instanceof Error ? error.message : String(error),
 			},
 		);
+		throw error;
 	}
-
-	return Promise.resolve({
-		correlation_id: correlationId,
-		status: randomState,
-		last_event: mockEvents[mockEvents.length - 1]?.event_type,
-		total_events: mockEvents.length,
-		events: mockEvents,
-	});
 }
 
 export async function handleGetSubscriptionStatus(c: Context) {
@@ -104,7 +127,7 @@ export async function handleGetSubscriptionStatus(c: Context) {
 			userId: user.id,
 		});
 
-		// Get subscription status
+		// Get subscription status from state management
 		const status = await getSubscriptionStatus(correlationId, user.id);
 
 		if (!status) {
@@ -129,6 +152,7 @@ export async function handleGetSubscriptionStatus(c: Context) {
 		logger.info(handlerName, "Subscription status retrieved", {
 			correlationId,
 			status: status.status,
+			currentState: status.current_state,
 			totalEvents: status.total_events,
 		});
 

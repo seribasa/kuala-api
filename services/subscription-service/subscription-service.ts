@@ -1,24 +1,27 @@
-import { RabbitMQClient } from "../_shared/rabbitmq.ts";
+import { RabbitMQClient } from "@shared/rabbitmq.ts";
 import {
 	AccountReadyEvent,
 	createSubscriptionCreatedEvent,
 	DomainEvent,
-} from "../_shared/types/events.ts";
-import { killBillService } from "../_shared/services/killbill.ts";
-import { logger } from "../_shared/middleware/logger.ts";
-import { subscriptionStateManager } from "../_shared/services/subscription-state-management.ts";
+} from "@shared/types/events.ts";
+import { killBillService } from "@shared/services/killbill.ts";
+import { logger } from "@shared/middleware/logger.ts";
+import { subscriptionStateManager } from "@shared/services/subscription-state-management.ts";
+import { ApplicationError, classifyError } from "@shared/errors/index.ts";
 
 interface ServiceStatus {
 	status: "healthy" | "unhealthy" | "starting";
 	consumer_active: boolean;
 	last_event: string | null;
 	events_processed: number;
+	events_skipped: number;
 }
 
 export class SubscriptionService {
 	private rabbitMQClient: RabbitMQClient;
 	private consumerActive = false;
 	private eventsProcessed = 0;
+	private eventsSkipped = 0;
 	private lastEvent: string | null = null;
 	private status: ServiceStatus["status"] = "starting";
 
@@ -29,36 +32,42 @@ export class SubscriptionService {
 	async start() {
 		console.log("📋 Subscription Service starting...");
 
+		// Try to connect, but don't fail if RabbitMQ isn't ready yet
 		try {
 			await this.rabbitMQClient.connect();
-
-			// Start consuming subscription-requested events
-			this.rabbitMQClient.consume(
-				"account-ready",
-				async (event: DomainEvent) => {
-					try {
-						if (event.type === "AccountReady") {
-							await this.handleAccountReady(
-								event as AccountReadyEvent,
-							);
-							this.eventsProcessed++;
-							this.lastEvent = new Date().toISOString();
-						}
-					} catch (error) {
-						console.error("Error processing event:", error);
-						throw error; // This will nack the message
-					}
-				},
-			);
-
-			this.consumerActive = true;
-			this.status = "healthy";
-			console.log("✅ Subscription Service consumer started");
 		} catch (error) {
-			console.error("❌ Failed to start Subscription Service:", error);
-			this.status = "unhealthy";
-			throw error;
+			console.warn(
+				"⚠️ Initial RabbitMQ connection failed, will retry in background:",
+				error,
+			);
+			// Don't throw - let the reconnection logic handle it
 		}
+
+		// Register consumer even if not connected yet
+		// It will be created when connection is established
+		this.rabbitMQClient.consume(
+			"account-ready",
+			async (event: DomainEvent) => {
+				try {
+					if (event.type === "AccountReady") {
+						await this.handleAccountReady(
+							event as AccountReadyEvent,
+						);
+						this.eventsProcessed++;
+						this.lastEvent = new Date().toISOString();
+					}
+				} catch (error) {
+					console.error("Error processing event:", error);
+					throw error; // This will nack the message
+				}
+			},
+		);
+
+		this.consumerActive = true;
+		this.status = "healthy";
+		console.log(
+			"✅ Subscription Service started (consumer will activate when RabbitMQ connects)",
+		);
 	}
 
 	private async handleAccountReady(event: AccountReadyEvent) {
@@ -68,6 +77,81 @@ export class SubscriptionService {
 		);
 
 		try {
+			// IDEMPOTENCY CHECK: Check if this event has already been processed
+			const currentState = await subscriptionStateManager.getCurrentState(
+				event.correlationId,
+			);
+
+			if (currentState) {
+				const state = currentState.current_state;
+				// If already past subscription_created state, skip processing
+				if (
+					state === "subscription_created" ||
+					state === "generating_invoice" ||
+					state === "completed"
+				) {
+					logger.info(
+						handlerName,
+						`Skipping already processed event, current state: ${state}`,
+						{ correlationId: event.correlationId },
+					);
+					this.eventsSkipped++;
+					return; // Idempotent - already processed
+				}
+
+				// If in creating_subscription state, check if subscription exists
+				if (state === "creating_subscription") {
+					const existingSub = await killBillService
+						.getSubscriptionByExternalId(event.userId);
+					if (existingSub && existingSub.state !== "CANCELLED") {
+						logger.info(
+							handlerName,
+							"Subscription already created, transitioning state",
+							{ subscriptionId: existingSub.subscriptionId },
+						);
+						// Update state and publish event
+						await subscriptionStateManager
+							.transitionToSubscriptionCreated(
+								event.correlationId,
+								{
+									triggeredBy: "subscription-service",
+									reason:
+										"Subscription already exists (idempotency recovery)",
+									metadata: {
+										userId: event.userId,
+										subscriptionId:
+											existingSub.subscriptionId,
+										accountId: event.accountId,
+										planId: event.planId,
+									},
+								},
+							);
+						const subscriptionCreatedEvent =
+							createSubscriptionCreatedEvent(
+								event.correlationId,
+								event.userId,
+								event.accountId,
+								existingSub.subscriptionId,
+								event.planId,
+							);
+						await this.rabbitMQClient.publishEvent(
+							"subscription.created",
+							subscriptionCreatedEvent,
+						);
+						return;
+					}
+				}
+
+				// If failed, allow retry
+				if (state === "failed") {
+					logger.info(
+						handlerName,
+						`Retrying failed subscription creation`,
+						{ correlationId: event.correlationId },
+					);
+				}
+			}
+
 			// Update subscription status to creating_subscription
 			await subscriptionStateManager.transitionToCreatingSubscription(
 				event.correlationId,
@@ -108,7 +192,7 @@ export class SubscriptionService {
 					);
 					await killBillService.uncancelSubscription(
 						existingSubscription.subscriptionId,
-					).catch((error) => {
+					).catch((error: unknown) => {
 						throw new Error(
 							`Failed to uncancel existing subscription: ${
 								error instanceof Error
@@ -117,6 +201,9 @@ export class SubscriptionService {
 							}`,
 						);
 					});
+					subscriptionId = existingSubscription.subscriptionId;
+				} else {
+					// Active subscription exists - use it
 					subscriptionId = existingSubscription.subscriptionId;
 				}
 			} else {
@@ -129,7 +216,7 @@ export class SubscriptionService {
 					event.userId,
 					event.accountId,
 					event.planId,
-				).catch((error) => {
+				).catch((error: unknown) => {
 					throw new Error(
 						`Failed to create subscription: ${
 							error instanceof Error
@@ -171,7 +258,7 @@ export class SubscriptionService {
 				subscriptionId,
 				event.planId,
 			);
-			this.rabbitMQClient.publishEvent(
+			await this.rabbitMQClient.publishEvent(
 				"subscription.created",
 				subscriptionCreatedEvent,
 			);
@@ -181,6 +268,9 @@ export class SubscriptionService {
 			);
 		} catch (error) {
 			console.error(`❌ Failed to process account ready event:`, error);
+
+			// Classify error for better handling
+			const errorClassification = classifyError(error);
 
 			// Update subscription status to failed
 			await subscriptionStateManager.transitionToFailed(
@@ -194,10 +284,28 @@ export class SubscriptionService {
 						accountId: event.accountId,
 						planId: event.planId,
 					},
+					errorDetails: {
+						errorCode: errorClassification.code,
+						errorType: errorClassification.type,
+						retryable: errorClassification.retryable,
+					},
 				},
 			);
 
-			throw error;
+			// Re-throw with classification for RabbitMQ retry logic
+			if (error instanceof ApplicationError) {
+				throw error;
+			}
+
+			throw new ApplicationError(
+				errorClassification.code,
+				error instanceof Error ? error.message : "Unknown error",
+				{
+					type: errorClassification.type,
+					retryable: errorClassification.retryable,
+					cause: error instanceof Error ? error : undefined,
+				},
+			);
 		}
 	}
 
@@ -207,6 +315,7 @@ export class SubscriptionService {
 			consumer_active: this.consumerActive,
 			last_event: this.lastEvent,
 			events_processed: this.eventsProcessed,
+			events_skipped: this.eventsSkipped,
 		};
 	}
 

@@ -1,4 +1,5 @@
 import { InvoiceService } from "./invoice-service.ts";
+export { InvoiceService };
 
 const invoiceService = new InvoiceService();
 
@@ -7,5 +8,5 @@ invoiceService.start().catch(console.error);
 
 // Graceful shutdown
 globalThis.addEventListener("unload", () => {
-	invoiceService.stop().catch(console.error);
+	invoiceService.stop();
 });

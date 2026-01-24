@@ -1,4 +1,5 @@
 import { AccountService } from "./account-service.ts";
+export { AccountService };
 
 const accountService = new AccountService();
 
@@ -7,5 +8,5 @@ accountService.start().catch(console.error);
 
 // Graceful shutdown
 globalThis.addEventListener("unload", () => {
-	accountService.stop().catch(console.error);
+	accountService.stop();
 });

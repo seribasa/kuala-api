@@ -1,4 +1,5 @@
 import { SubscriptionService } from "./subscription-service.ts";
+export { SubscriptionService };
 
 const subscriptionService = new SubscriptionService();
 
@@ -7,5 +8,5 @@ subscriptionService.start().catch(console.error);
 
 // Graceful shutdown
 globalThis.addEventListener("unload", () => {
-	subscriptionService.stop().catch(console.error);
+	subscriptionService.stop();
 });
