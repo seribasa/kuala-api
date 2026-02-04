@@ -80,26 +80,29 @@ export async function handleCreateEventDrivenSubscription(c: Context) {
 			return c.json(errorResponse, 400);
 		}
 
-		// Check for existing pending subscription request in state management system
-		const hasPendingRequest = await subscriptionStateManager
-			.hasPendingSubscriptionRequest(user.id);
+		// Check for existing pending subscription request using database lock table
+		// This is more reliable than querying state as it uses atomic operations
+		const existingRequest = await subscriptionStateManager.getActiveRequest(
+			user.id,
+		);
 
-		if (hasPendingRequest) {
+		if (existingRequest) {
 			const latestRequest = await subscriptionStateManager
 				.getLatestSubscriptionRequest(user.id);
 
 			logger.warn(handlerName, "User has pending subscription request", {
 				userId: user.id,
 				currentState: latestRequest?.current_state,
-				correlationId: latestRequest?.entity_id,
-				lastUpdated: latestRequest?.state_updated_at,
+				correlationId: existingRequest.correlation_id,
+				lastUpdated: existingRequest.created_at,
 			});
 
 			const errorResponse: CreateEventDrivenSubscriptionErrorResponse = {
 				code: ErrorCodes.PENDING_SUBSCRIPTION_REQUEST,
-				message:
-					`You have a pending subscription request in state: ${latestRequest?.current_state}. Please wait for it to complete or contact support.`,
-				correlation_id: latestRequest?.entity_id,
+				message: `You have a pending subscription request in state: ${
+					latestRequest?.current_state || "processing"
+				}. Please wait for it to complete or contact support.`,
+				correlation_id: existingRequest.correlation_id,
 			};
 			return c.json(errorResponse, 409);
 		}
@@ -167,6 +170,32 @@ export async function handleCreateEventDrivenSubscription(c: Context) {
 
 		// Create correlation ID for tracking
 		correlationId = crypto.randomUUID();
+
+		// Acquire database lock to ensure only 1 user can have 1 active subscription request
+		// This is an atomic operation that prevents race conditions
+		const lockAcquired = await subscriptionStateManager.acquireUserLock(
+			user.id,
+			correlationId,
+		);
+
+		if (!lockAcquired) {
+			// Another request acquired the lock between our check and now (race condition)
+			logger.warn(
+				handlerName,
+				"Failed to acquire subscription lock (race condition)",
+				{
+					userId: user.id,
+					correlationId,
+				},
+			);
+
+			const errorResponse: CreateEventDrivenSubscriptionErrorResponse = {
+				code: ErrorCodes.PENDING_SUBSCRIPTION_REQUEST,
+				message:
+					"You already have a pending subscription request. Please wait for it to complete or contact support.",
+			};
+			return c.json(errorResponse, 409);
+		}
 
 		// Create initial state transition with retry
 		try {
