@@ -337,4 +337,4 @@ s3_secret_key = "env(S3_SECRET_KEY)"
 [functions.kuala]
 enabled = true
 verify_jwt = false
-import_map = "./functions/deno.json"
+import_map = "../deno.json"

@@ -10,3 +10,11 @@ subscriptionService.start().catch(console.error);
 globalThis.addEventListener("unload", () => {
 	subscriptionService.stop();
 });
+
+// Start HTTP server for health checks
+Deno.serve({ port: 8003 }, (_req) => {
+	const status = subscriptionService.getStatus();
+	return new Response(JSON.stringify(status), {
+		headers: { "content-type": "application/json" },
+	});
+});

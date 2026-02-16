@@ -3,7 +3,7 @@ services:
     image: denoland/deno:alpine
     container_name: account-service
     ports:
-      - "8001:8001"
+      - "9001:8001"
     volumes:
       - ..:/workspace
     working_dir: /workspace/services/account-service
@@ -13,7 +13,7 @@ services:
     image: denoland/deno:alpine
     container_name: invoice-service
     ports:
-      - "8002:8002"
+      - "9002:8002"
     volumes:
       - ..:/workspace
     working_dir: /workspace/services/invoice-service
@@ -23,7 +23,7 @@ services:
     image: denoland/deno:alpine
     container_name: subscription-service
     ports:
-      - "8003:8003"
+      - "9003:8003"
     volumes:
       - ..:/workspace
     working_dir: /workspace/services/subscription-service
