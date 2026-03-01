@@ -11,6 +11,7 @@ interface JsonResponse {
 
 // Mock fetch response
 class MockResponse {
+	headers = new Headers();
 	constructor(
 		private body: unknown,
 		private statusCode: number,
@@ -31,6 +32,10 @@ class MockResponse {
 
 	text() {
 		return Promise.resolve(JSON.stringify(this.body));
+	}
+
+	clone() {
+		return new MockResponse(this.body, this.statusCode, this.isOk);
 	}
 }
 
@@ -220,9 +225,9 @@ Deno.test("handleCreateSubscription - should create subscription successfully", 
 			}
 
 			// Fourth call: check for existing subscriptions
-			if (callCount === 4 && urlString.includes("/bundles")) {
+			if (callCount === 4 && urlString.includes("/1.0/kb/subscriptions")) {
 				return Promise.resolve(
-					new MockResponse([], 200) as unknown as Response,
+					new MockResponse(null, 404, false) as unknown as Response,
 				);
 			}
 
@@ -331,11 +336,9 @@ Deno.test("handleCreateSubscription - should return 409 when user already has ac
 			}
 
 			// Second call: get bundles with active subscription
-			if (callCount === 2 && urlString.includes("/bundles")) {
+			if (callCount === 2 && urlString.includes("/1.0/kb/subscriptions")) {
 				return Promise.resolve(
-					new MockResponse([{
-						subscriptions: [mockExistingSubscription],
-					}], 200) as unknown as Response,
+					new MockResponse(mockExistingSubscription, 200) as unknown as Response,
 				);
 			}
 
@@ -678,9 +681,9 @@ Deno.test("handleCreateSubscription - should handle existing account with networ
 			}
 
 			// Fourth call: check for existing subscriptions (empty)
-			if (callCount === 4 && urlString.includes("/bundles")) {
+			if (callCount === 4 && urlString.includes("/1.0/kb/subscriptions")) {
 				return Promise.resolve(
-					new MockResponse([], 200) as unknown as Response,
+					new MockResponse(null, 404, false) as unknown as Response,
 				);
 			}
 
@@ -781,7 +784,7 @@ Deno.test("handleCreateSubscription - should handle bundles fetch failure", asyn
 			}
 
 			// Second call: get bundles (fails)
-			if (callCount === 2 && urlString.includes("/bundles")) {
+			if (callCount === 2 && urlString.includes("/1.0/kb/subscriptions")) {
 				return Promise.resolve(
 					new MockResponse(
 						{ error: "Server error" },
@@ -889,7 +892,7 @@ Deno.test("handleCreateSubscription - should handle bundles with no subscription
 			}
 
 			// Second call: get bundles with bundles that have no subscriptions
-			if (callCount === 2 && urlString.includes("/bundles")) {
+			if (callCount === 2 && urlString.includes("/1.0/kb/subscriptions")) {
 				return Promise.resolve(
 					new MockResponse([{
 						bundleId: "bundle123",
@@ -1003,7 +1006,7 @@ Deno.test("handleCreateSubscription - should handle subscription with canceled d
 			}
 
 			// Second call: get bundles with cancelled subscription
-			if (callCount === 2 && urlString.includes("/bundles")) {
+			if (callCount === 2 && urlString.includes("/1.0/kb/subscriptions")) {
 				return Promise.resolve(
 					new MockResponse([{
 						subscriptions: [mockCancelledSubscription],
@@ -1117,7 +1120,7 @@ Deno.test("handleCreateSubscription - should handle non-ACTIVE subscription", as
 			}
 
 			// Second call: get bundles with inactive subscription
-			if (callCount === 2 && urlString.includes("/bundles")) {
+			if (callCount === 2 && urlString.includes("/1.0/kb/subscriptions")) {
 				return Promise.resolve(
 					new MockResponse([{
 						subscriptions: [mockInactiveSubscription],
@@ -1223,9 +1226,9 @@ Deno.test("handleCreateSubscription - should handle subscription creation failur
 			}
 
 			// Second call: get bundles (no active subscriptions)
-			if (callCount === 2 && urlString.includes("/bundles")) {
+			if (callCount === 2 && urlString.includes("/1.0/kb/subscriptions")) {
 				return Promise.resolve(
-					new MockResponse([], 200) as unknown as Response,
+					new MockResponse(null, 404, false) as unknown as Response,
 				);
 			}
 
@@ -1322,7 +1325,7 @@ Deno.test("handleCreateSubscription - should handle checkExistingSubscription ne
 			}
 
 			// Second call: get bundles (network error)
-			if (callCount === 2 && urlString.includes("/bundles")) {
+			if (callCount === 2 && urlString.includes("/1.0/kb/subscriptions")) {
 				return Promise.reject(new Error("Network error"));
 			}
 

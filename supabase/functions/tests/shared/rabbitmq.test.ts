@@ -48,7 +48,6 @@ class MockConnection {
 	public shouldDelayConnection = false;
 	public shouldFailPublisherCreation = false;
 	private publisher: any = null;
-	// deno-lint-ignore no-explicit-any
 	public consumers: any[] = []; // Changed to public for test access
 
 	on(event: string, handler: (arg?: any) => void | Promise<void>) {
@@ -86,7 +85,7 @@ class MockConnection {
 			_lastMessage: null as any,
 		};
 		// Spy on send
-		// deno-lint-ignore no-explicit-any
+		//
 		this.publisher.send = async (...args: any[]) => {
 			this.publisher._lastMessage = args;
 		};
@@ -137,7 +136,7 @@ Deno.test("RabbitMQClient - should connect successfully", async () => {
 			"init",
 			{ eventId: "1", type: "init" } as any,
 		);
-	} catch {}
+	} catch { /* ignore */ }
 
 	assertEquals(client.isConnected(), true);
 	assertEquals(client.getConnectionState(), "CONNECTED");
@@ -155,14 +154,14 @@ Deno.test("RabbitMQClient - should not connect twice", async () => {
 			"init",
 			{ eventId: "1", type: "init" } as any,
 		);
-	} catch {}
+	} catch { /* ignore */ }
 	await client.connect();
 	try {
 		await client.publishEvent(
 			"init",
 			{ eventId: "1", type: "init" } as any,
 		);
-	} catch {} // Second call should be ignored
+	} catch { /* ignore */ } // Second call should be ignored
 
 	assertEquals(client.isConnected(), true);
 
@@ -179,7 +178,7 @@ Deno.test("RabbitMQClient - should disconnect cleanly", async () => {
 			"init",
 			{ eventId: "1", type: "init" } as any,
 		);
-	} catch {}
+	} catch { /* ignore */ }
 	assertEquals(client.isConnected(), true);
 
 	await client.disconnect();
@@ -243,7 +242,7 @@ Deno.test("RabbitMQClient - should register consumer when connected", async () =
 			"init",
 			{ eventId: "1", type: "init" } as any,
 		);
-	} catch {}
+	} catch { /* ignore */ }
 
 	let handlerCalled = false;
 	client.consume("test-queue", async (_event: DomainEvent) => {
@@ -279,7 +278,7 @@ Deno.test("RabbitMQClient - should register multiple consumers", async () => {
 			"init",
 			{ eventId: "1", type: "init" } as any,
 		);
-	} catch {}
+	} catch { /* ignore */ }
 
 	let handler1Called = false;
 	let handler2Called = false;
@@ -308,7 +307,7 @@ Deno.test("RabbitMQClient - should allow re-registering same queue", async () =>
 			"init",
 			{ eventId: "1", type: "init" } as any,
 		);
-	} catch {}
+	} catch { /* ignore */ }
 
 	client.consume("test-queue", async () => {});
 	client.consume("test-queue", async () => {}); // Should not error
@@ -396,7 +395,7 @@ Deno.test("RabbitMQClient - publishEvent should work when connected", async () =
 			"init",
 			{ eventId: "1", type: "init" } as any,
 		);
-	} catch {}
+	} catch { /* ignore */ }
 
 	const event: DomainEvent = createSubscriptionCreatedEvent(
 		"test-correlation",
@@ -422,7 +421,7 @@ Deno.test("RabbitMQClient - should publish  multiple events", async () => {
 			"init",
 			{ eventId: "1", type: "init" } as any,
 		);
-	} catch {}
+	} catch { /* ignore */ }
 
 	const event1 = createSubscriptionRequestedEvent(
 		"corr-1",
@@ -464,7 +463,7 @@ Deno.test("RabbitMQClient - should handle consumer with custom timeout", async (
 			"init",
 			{ eventId: "1", type: "init" } as any,
 		);
-	} catch {}
+	} catch { /* ignore */ }
 
 	client.consume(
 		"test-queue",
@@ -485,7 +484,7 @@ Deno.test("RabbitMQClient - should handle consumer with max retries", async () =
 			"init",
 			{ eventId: "1", type: "init" } as any,
 		);
-	} catch {}
+	} catch { /* ignore */ }
 
 	client.consume(
 		"test-queue",
@@ -528,7 +527,7 @@ Deno.test("RabbitMQClient - should recreate consumers after reconnection", async
 			"init",
 			{ eventId: "1", type: "init" } as any,
 		);
-	} catch {}
+	} catch { /* ignore */ }
 
 	// Register a consumer
 	let consumerCalls = 0;
@@ -575,7 +574,7 @@ Deno.test("RabbitMQClient - should handle connection in progress error", async (
 				"init",
 				{ eventId: "1", type: "init" } as any,
 			);
-		} catch {}
+		} catch { /* ignore */ }
 		assertEquals(false, true, "Should have thrown error");
 	} catch (error: any) {
 		assertEquals(error.name, "RabbitMQConnectionError");
@@ -602,7 +601,7 @@ Deno.test("RabbitMQClient - should handle multiple disconnect calls", async () =
 			"init",
 			{ eventId: "1", type: "init" } as any,
 		);
-	} catch {}
+	} catch { /* ignore */ }
 	await client.disconnect();
 	await client.disconnect(); // Second disconnect should be safe
 
@@ -623,7 +622,7 @@ Deno.test("RabbitMQClient - should register consumer before connection and creat
 			"init",
 			{ eventId: "1", type: "init" } as any,
 		);
-	} catch {}
+	} catch { /* ignore */ }
 
 	// Consumer should exist
 	await client.disconnect();
@@ -655,7 +654,7 @@ Deno.test("RabbitMQClient - should create publisher on first publish", async () 
 			"init",
 			{ eventId: "1", type: "init" } as any,
 		);
-	} catch {}
+	} catch { /* ignore */ }
 
 	const event = createSubscriptionRequestedEvent(
 		"test",
@@ -684,7 +683,7 @@ Deno.test("RabbitMQClient - should handle consumer with both timeout and retries
 			"init",
 			{ eventId: "1", type: "init" } as any,
 		);
-	} catch {}
+	} catch { /* ignore */ }
 
 	client.consume(
 		"test-queue",
@@ -709,7 +708,7 @@ Deno.test("RabbitMQClient - should not register duplicate consumer configs", asy
 			"init",
 			{ eventId: "1", type: "init" } as any,
 		);
-	} catch {}
+	} catch { /* ignore */ }
 	await client.disconnect();
 });
 
@@ -723,7 +722,7 @@ Deno.test("RabbitMQClient - should handle empty metadata in events", async () =>
 			"init",
 			{ eventId: "1", type: "init" } as any,
 		);
-	} catch {}
+	} catch { /* ignore */ }
 
 	const event = createAccountReadyEvent(
 		"corr-id",
@@ -755,7 +754,7 @@ Deno.test("RabbitMQClient - should handle recreateAllConsumers when no consumers
 			"init",
 			{ eventId: "1", type: "init" } as any,
 		);
-	} catch {}
+	} catch { /* ignore */ }
 	// No consumers registered, should handle gracefully
 	await client.disconnect();
 });
@@ -770,7 +769,7 @@ Deno.test("RabbitMQClient - should clear consumer configs on disconnect", async 
 			"init",
 			{ eventId: "1", type: "init" } as any,
 		);
-	} catch {}
+	} catch { /* ignore */ }
 
 	client.consume("queue1", async () => {});
 	client.consume("queue2", async () => {});
@@ -784,7 +783,7 @@ Deno.test("RabbitMQClient - should clear consumer configs on disconnect", async 
 			"init",
 			{ eventId: "1", type: "init" } as any,
 		);
-	} catch {}
+	} catch { /* ignore */ }
 	await client.disconnect();
 });
 
@@ -798,7 +797,7 @@ Deno.test("RabbitMQClient - should handle consumer with default options", async 
 			"init",
 			{ eventId: "1", type: "init" } as any,
 		);
-	} catch {}
+	} catch { /* ignore */ }
 
 	// No options passed, should use defaults
 	client.consume("test-queue", async () => {});
@@ -816,7 +815,7 @@ Deno.test("RabbitMQClient - should handle event with all required fields", async
 			"init",
 			{ eventId: "1", type: "init" } as any,
 		);
-	} catch {}
+	} catch { /* ignore */ }
 
 	const event = createInvoiceGeneratedEvent(
 		"corr-id",
@@ -841,7 +840,7 @@ Deno.test("RabbitMQClient - should handle publisher creation only once", async (
 			"init",
 			{ eventId: "1", type: "init" } as any,
 		);
-	} catch {}
+	} catch { /* ignore */ }
 
 	const event1 = createSubscriptionRequestedEvent(
 		"corr-1",
@@ -888,7 +887,7 @@ Deno.test("RabbitMQClient - should publish events with different types", async (
 			"init",
 			{ eventId: "1", type: "init" } as any,
 		);
-	} catch {}
+	} catch { /* ignore */ }
 
 	const events = [
 		createSubscriptionRequestedEvent("c1", "u1", "p1", "e1@test.com", "N1"),
@@ -930,7 +929,7 @@ Deno.test("RabbitMQClient - should handle non-duplicate consumer configs properl
 			"init",
 			{ eventId: "1", type: "init" } as any,
 		);
-	} catch {}
+	} catch { /* ignore */ }
 	await client.disconnect();
 });
 
@@ -944,7 +943,7 @@ Deno.test("RabbitMQClient - should handle consumer options combinations", async 
 			"init",
 			{ eventId: "1", type: "init" } as any,
 		);
-	} catch {}
+	} catch { /* ignore */ }
 
 	// Different option combinations
 	client.consume("queue1", async () => {}, { handlerTimeoutMs: 10000 });
@@ -963,7 +962,7 @@ Deno.test("RabbitMQClient - should handle publisher creation failure", async () 
 	setupMockEnv();
 
 	let connectionInstance: MockConnection | null = null;
-	const factory: ConnectionFactory = (url) => {
+	const factory: ConnectionFactory = (_url) => {
 		connectionInstance = new MockConnection();
 		connectionInstance.shouldFailPublisherCreation = true;
 		return connectionInstance;
@@ -976,7 +975,7 @@ Deno.test("RabbitMQClient - should handle publisher creation failure", async () 
 			"init",
 			{ eventId: "1", type: "init" } as any,
 		);
-	} catch {}
+	} catch { /* ignore */ }
 
 	const event = createAccountReadyEvent(
 		"c",
@@ -1007,7 +1006,7 @@ Deno.test("RabbitMQClient - should handle event serialization failure", async ()
 			"init",
 			{ eventId: "1", type: "init" } as any,
 		);
-	} catch {}
+	} catch { /* ignore */ }
 
 	// Create circular object
 	const circular: any = { a: 1 };
@@ -1032,7 +1031,7 @@ Deno.test("RabbitMQClient - should handle event serialization failure", async ()
 Deno.test("RabbitMQClient - should retry consumer handler failure", async () => {
 	setupMockEnv();
 	let connectionInstance: MockConnection | null = null;
-	const factory: ConnectionFactory = (url) => {
+	const factory: ConnectionFactory = (_url) => {
 		connectionInstance = new MockConnection();
 		return connectionInstance;
 	};
@@ -1044,10 +1043,10 @@ Deno.test("RabbitMQClient - should retry consumer handler failure", async () => 
 			"init",
 			{ eventId: "1", type: "init" } as any,
 		);
-	} catch {}
+	} catch { /* ignore */ }
 
 	// Register consumer
-	client.consume("retry-queue", async (msg) => {
+	client.consume("retry-queue", async (_msg) => {
 		throw new Error("Service temporarily unavailable"); // Matches retryable pattern
 	}, { maxRetries: 1 });
 
@@ -1094,7 +1093,7 @@ Deno.test("RabbitMQClient - should retry consumer handler failure", async () => 
 Deno.test("RabbitMQClient - should not retry if max retries reached", async () => {
 	setupMockEnv();
 	let connectionInstance: MockConnection | null = null;
-	const factory: ConnectionFactory = (url) => {
+	const factory: ConnectionFactory = (_url) => {
 		connectionInstance = new MockConnection();
 		return connectionInstance;
 	};
@@ -1106,9 +1105,9 @@ Deno.test("RabbitMQClient - should not retry if max retries reached", async () =
 			"init",
 			{ eventId: "1", type: "init" } as any,
 		);
-	} catch {}
+	} catch { /* ignore */ }
 
-	client.consume("no-retry-queue", async (msg) => {
+	client.consume("no-retry-queue", async (_msg) => {
 		throw new Error("Service temporarily unavailable");
 	}, { maxRetries: 0 }); // 0 retries
 
@@ -1119,7 +1118,7 @@ Deno.test("RabbitMQClient - should not retry if max retries reached", async () =
 	// Create publisher
 	const event = createSubscriptionCreatedEvent("c", "u", "a", "s", "p");
 	const bodyString = JSON.stringify(event);
-	const bodyBytes = new TextEncoder().encode(bodyString);
+	const _bodyBytes = new TextEncoder().encode(bodyString);
 
 	await client.publishEvent("setup", event);
 	connectionInstance!.lastPublisher._lastMessage = null; // Reset
@@ -1138,7 +1137,7 @@ Deno.test("RabbitMQClient - should not retry if max retries reached", async () =
 Deno.test("Global Functions - publishEvent", async () => {
 	setupMockEnv();
 	let connectionInstance: MockConnection | null = null;
-	const factory: ConnectionFactory = (url) => {
+	const factory: ConnectionFactory = (_url) => {
 		connectionInstance = new MockConnection();
 		return connectionInstance;
 	};
@@ -1168,7 +1167,7 @@ Deno.test("Global Functions - getGlobalRabbitMQClient and closeGlobalRabbitMQCli
 	await closeGlobalRabbitMQClient();
 
 	let connectionInstance: MockConnection | null = null;
-	const factory: ConnectionFactory = (url) => {
+	const factory: ConnectionFactory = (_url) => {
 		connectionInstance = new MockConnection();
 		return connectionInstance;
 	};
@@ -1198,7 +1197,7 @@ Deno.test("Global Functions - getGlobalRabbitMQClient reconnects if disconnected
 	await closeGlobalRabbitMQClient();
 
 	let connectionInstance: MockConnection | null = null;
-	const factory: ConnectionFactory = (url) => {
+	const factory: ConnectionFactory = (_url) => {
 		connectionInstance = new MockConnection();
 		return connectionInstance;
 	};
@@ -1223,7 +1222,7 @@ Deno.test("RabbitMQClient - should timeout if connection takes too long", async 
 	setupMockEnv();
 
 	let connectionInstance: MockConnection | null = null;
-	const factory: ConnectionFactory = (url) => {
+	const factory: ConnectionFactory = (_url) => {
 		connectionInstance = new MockConnection();
 		connectionInstance.shouldDelayConnection = true;
 		return connectionInstance;
@@ -1232,7 +1231,7 @@ Deno.test("RabbitMQClient - should timeout if connection takes too long", async 
 	const client = new RabbitMQClient(factory);
 
 	// Stub waitForConnection to throw timeout immediately
-	// deno-lint-ignore no-explicit-any
+	//
 	const stubWait = stub(client as any, "waitForConnection", () => {
 		return Promise.reject(
 			new RabbitMQConnectionError("Connection timeout"),
@@ -1254,20 +1253,20 @@ Deno.test("RabbitMQClient - should reconnect and recreate consumers on error", a
 	setupMockEnv();
 
 	const connections: MockConnection[] = [];
-	const factory: ConnectionFactory = (url) => {
+	const factory: ConnectionFactory = (_url) => {
 		const conn = new MockConnection();
 		try {
 			conn.shouldDelayConnection = false;
-		} catch (e) {}
+		} catch (_e) { /* ignore */ }
 		connections.push(conn);
 		return conn;
 	};
 
 	const client = new RabbitMQClient(factory);
 	// Reduce reconnect delay for testing
-	// deno-lint-ignore no-explicit-any
+	//
 	(client as any).reconnectDelay = 50;
-	// deno-lint-ignore no-explicit-any
+	//
 	(client as any).maxReconnectDelay = 50;
 
 	await client.connect();
@@ -1276,7 +1275,7 @@ Deno.test("RabbitMQClient - should reconnect and recreate consumers on error", a
 			"init",
 			{ eventId: "1", type: "init" } as any,
 		);
-	} catch {}
+	} catch { /* ignore */ }
 
 	// Register consumer
 	client.consume("queue-reconnect", async () => {});
@@ -1304,7 +1303,7 @@ Deno.test("RabbitMQClient - should handle consumer setup failure", async () => {
 	setupMockEnv();
 
 	let connectionInstance: MockConnection | null = null;
-	const factory: ConnectionFactory = (url) => {
+	const factory: ConnectionFactory = (_url) => {
 		connectionInstance = new MockConnection();
 		// Mock createConsumer to fail
 		connectionInstance.createConsumer = () => {
@@ -1320,7 +1319,7 @@ Deno.test("RabbitMQClient - should handle consumer setup failure", async () => {
 			"init",
 			{ eventId: "1", type: "init" } as any,
 		);
-	} catch {}
+	} catch { /* ignore */ }
 
 	// consume() doesn't await setup immediately, it pushes to config.
 	// actual setup happens in setupConsumer called by connect or when consuming if connected?
@@ -1371,7 +1370,7 @@ Deno.test("RabbitMQClient - should handle consumer setup failure", async () => {
 
 Deno.test("RabbitMQClient - should handle consumer handler timeout", async () => {
 	setupMockEnv();
-	const factory: ConnectionFactory = (url) => new MockConnection();
+	const factory: ConnectionFactory = (_url) => new MockConnection();
 	const client = new RabbitMQClient(factory);
 	await client.connect();
 	try {
@@ -1379,16 +1378,16 @@ Deno.test("RabbitMQClient - should handle consumer handler timeout", async () =>
 			"init",
 			{ eventId: "1", type: "init" } as any,
 		);
-	} catch {}
+	} catch { /* ignore */ }
 
-	let errorLogged = false;
+	let _errorLogged = false;
 	const originalConsoleError = console.error;
 	console.error = (...args) => {
 		if (
 			args[0] && typeof args[0] === "string" &&
 			args[0].includes("Handler failed")
 		) {
-			errorLogged = true;
+			_errorLogged = true;
 			if (args[1] && args[1].error) {
 				// specific check for timeout error?
 			}
@@ -1414,7 +1413,7 @@ Deno.test("RabbitMQClient - should handle consumer handler timeout", async () =>
 		// Wait for processing
 		await new Promise((r) => setTimeout(r, 200));
 
-		assertEquals(errorLogged, true);
+		assertEquals(_errorLogged, true);
 	} finally {
 		console.error = originalConsoleError;
 		await client.disconnect();
@@ -1423,10 +1422,10 @@ Deno.test("RabbitMQClient - should handle consumer handler timeout", async () =>
 
 Deno.test("RabbitMQClient - should handle republishing failure", async () => {
 	setupMockEnv();
-	const factory: ConnectionFactory = (url) => {
+	const factory: ConnectionFactory = (_url) => {
 		const conn = new MockConnection();
 		// Allow creating publisher, but make sending fail
-		conn.createPublisher = (opts) => {
+		conn.createPublisher = (_opts) => {
 			return {
 				send: async () => {
 					throw new Error("Republish failed");
@@ -1443,13 +1442,12 @@ Deno.test("RabbitMQClient - should handle republishing failure", async () => {
 	// Create publisher and override console in one go
 	// Suppress expected errors
 	const originalConsoleError = console.error;
-	let errorLogged = false;
 	console.error = (...args) => {
 		if (
 			args[0] && typeof args[0] === "string" &&
 			args[0].includes("Failed to republish event")
 		) {
-			errorLogged = true;
+			/* ignore */
 		}
 	};
 
@@ -1460,7 +1458,7 @@ Deno.test("RabbitMQClient - should handle republishing failure", async () => {
 				"init",
 				{ eventId: "1", type: "init" } as any,
 			);
-		} catch {}
+		} catch { /* ignore */ }
 
 		// Use transient error to force retry logic
 		await client.consume("republish-fail-queue", async () => {
@@ -1496,7 +1494,7 @@ Deno.test("RabbitMQClient - should handle republishing failure", async () => {
 Deno.test("RabbitMQClient - should handle consumer recreation failure", async () => {
 	setupMockEnv();
 	let failCreate = false;
-	const factory: ConnectionFactory = (url) => {
+	const factory: ConnectionFactory = (_url) => {
 		const conn = new MockConnection();
 		const origCreate = conn.createConsumer.bind(conn);
 		conn.createConsumer = (opts, handler) => {
@@ -1533,10 +1531,10 @@ Deno.test("RabbitMQClient - should handle consumer recreation failure", async ()
 
 Deno.test("RabbitMQClient - should handle permanent error immediately", async () => {
 	setupMockEnv();
-	const factory: ConnectionFactory = (url) => {
+	const factory: ConnectionFactory = (_url) => {
 		const conn = new MockConnection();
 		// Mock dead letter handling
-		conn.createPublisher = (opts) => {
+		conn.createPublisher = (_opts) => {
 			return {
 				send: async () => {},
 				close: async () => {},
@@ -1554,7 +1552,7 @@ Deno.test("RabbitMQClient - should handle permanent error immediately", async ()
 			"init",
 			{ eventId: "1", type: "init" } as any,
 		);
-	} catch {}
+	} catch { /* ignore */ }
 
 	let dlqSent = false;
 	const originalConsoleError = console.error;
@@ -1568,7 +1566,7 @@ Deno.test("RabbitMQClient - should handle permanent error immediately", async ()
 	};
 
 	try {
-		let consumerErr: any;
+		let _consumerErr: any;
 		await client.consume("permanent-fail-queue", async () => {
 			throw new Error("Permanent failure");
 		});
@@ -1637,7 +1635,7 @@ Deno.test("RabbitMQClient - should handle disconnect with consumer close error",
 			"init",
 			{ eventId: "1", type: "init" } as any,
 		);
-	} catch {}
+	} catch { /* ignore */ }
 
 	// Register a consumer
 	client.consume("test-queue", async () => {});
@@ -1670,7 +1668,7 @@ Deno.test("RabbitMQClient - should handle disconnect with publisher close error"
 			"init",
 			{ eventId: "1", type: "init" } as any,
 		);
-	} catch {}
+	} catch { /* ignore */ }
 
 	// Publish an event to create the publisher
 	const event = createSubscriptionCreatedEvent("c", "u", "a", "s", "p");
@@ -1704,7 +1702,7 @@ Deno.test("RabbitMQClient - should handle disconnect with connection close error
 			"init",
 			{ eventId: "1", type: "init" } as any,
 		);
-	} catch {}
+	} catch { /* ignore */ }
 
 	// Make connection.close() throw an error
 	const conn = connectionInstance as unknown as MockConnection;
@@ -1732,7 +1730,7 @@ Deno.test("RabbitMQClient - should handle disconnect with multiple errors", asyn
 			"init",
 			{ eventId: "1", type: "init" } as any,
 		);
-	} catch {}
+	} catch { /* ignore */ }
 
 	// Register a consumer and publish to create publisher
 	client.consume("test-queue", async () => {});
@@ -1775,7 +1773,7 @@ Deno.test("RabbitMQClient - should handle publisher creation failure", async () 
 			"init",
 			{ eventId: "1", type: "init" } as any,
 		);
-	} catch {}
+	} catch { /* ignore */ }
 
 	const event = createSubscriptionCreatedEvent("c", "u", "a", "s", "p");
 
@@ -1912,7 +1910,7 @@ Deno.test("RabbitMQClient - should handle consumer with empty message body", asy
 			"init",
 			{ eventId: "1", type: "init" } as any,
 		);
-	} catch {}
+	} catch { /* ignore */ }
 
 	let handlerCalled = false;
 	client.consume("test-queue", async (_event) => {
@@ -1946,7 +1944,7 @@ Deno.test("RabbitMQClient - should handle consumer with invalid JSON", async () 
 			"init",
 			{ eventId: "1", type: "init" } as any,
 		);
-	} catch {}
+	} catch { /* ignore */ }
 
 	let handlerCalled = false;
 	client.consume("test-queue", async (_event) => {
@@ -1980,7 +1978,7 @@ Deno.test("RabbitMQClient - should handle consumer with missing event fields", a
 			"init",
 			{ eventId: "1", type: "init" } as any,
 		);
-	} catch {}
+	} catch { /* ignore */ }
 
 	let handlerCalled = false;
 	client.consume("test-queue", async (_event) => {
@@ -2014,7 +2012,7 @@ Deno.test("RabbitMQClient - should use routing key from queue name if not in map
 			"init",
 			{ eventId: "1", type: "init" } as any,
 		);
-	} catch {}
+	} catch { /* ignore */ }
 
 	// Register consumer with unknown queue name
 	client.consume("unknown-custom-queue", async () => {
@@ -2034,7 +2032,7 @@ Deno.test("RabbitMQClient - should use routing key from queue name if not in map
 	const validEvent = { eventId: "1", type: "test" };
 	try {
 		await consumer._handler({ body: JSON.stringify(validEvent) });
-	} catch {}
+	} catch { /* ignore */ }
 
 	await new Promise((r) => setTimeout(r, 100));
 

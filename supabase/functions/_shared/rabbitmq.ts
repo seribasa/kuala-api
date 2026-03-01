@@ -193,14 +193,12 @@ export class RabbitMQClient {
 
 	private waitForConnection(timeoutMs = 10000): Promise<void> {
 		return new Promise((resolve, reject) => {
-			let checkInterval: number;
-
 			const timeout = setTimeout(() => {
 				clearInterval(checkInterval);
 				reject(new RabbitMQConnectionError("Connection timeout"));
 			}, timeoutMs);
 
-			checkInterval = setInterval(() => {
+			const checkInterval = setInterval(() => {
 				if (this.connectionState === ConnectionState.CONNECTED) {
 					clearTimeout(timeout);
 					clearInterval(checkInterval);

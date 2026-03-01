@@ -335,14 +335,19 @@ export function createCircuitBreaker<T>(
 /**
  * Timeout wrapper for operations
  */
-export function withTimeout<T>(
+export async function withTimeout<T>(
 	operation: () => Promise<T>,
 	timeoutMs: number,
 	errorMessage = "Operation timed out",
 ): Promise<T> {
+	let timer: number | undefined;
 	const timeoutPromise = new Promise<never>((_, reject) => {
-		setTimeout(() => reject(new Error(errorMessage)), timeoutMs);
+		timer = setTimeout(() => reject(new Error(errorMessage)), timeoutMs);
 	});
 
-	return Promise.race([operation(), timeoutPromise]);
+	try {
+		return await Promise.race([operation(), timeoutPromise]);
+	} finally {
+		if (timer) clearTimeout(timer);
+	}
 }

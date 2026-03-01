@@ -1,6 +1,5 @@
-// deno-lint-ignore-file require-await
 import { assertEquals } from "@std/assert";
-import { Stub, stub } from "@std/testing/mock";
+import { stub } from "@std/testing/mock";
 import { killBillConfig } from "../../_shared/config/killbill-config.ts";
 
 Deno.test("killBillConfig - should return config with environment variables", () => {

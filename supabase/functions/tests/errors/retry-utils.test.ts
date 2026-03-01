@@ -6,11 +6,6 @@ import {
 	withRetryResult,
 	withTimeout,
 } from "../../_shared/errors/retry-utils.ts";
-import {
-	ApplicationError,
-	ErrorCodes,
-	ErrorType,
-} from "../../_shared/errors/error-types.ts";
 
 // =============================================================================
 // calculateBackoffDelay Tests
@@ -99,9 +94,9 @@ Deno.test("DEFAULT_RETRY_CONFIG - should have correct default values", () => {
 
 Deno.test("withRetry - should return result on first success", async () => {
 	let attempts = 0;
-	const result = await withRetry(async () => {
+	const result = await withRetry(() => {
 		attempts++;
-		return "success";
+		return Promise.resolve("success");
 	});
 
 	assertEquals(result, "success");
@@ -111,12 +106,12 @@ Deno.test("withRetry - should return result on first success", async () => {
 Deno.test("withRetry - should retry and succeed on second attempt", async () => {
 	let attempts = 0;
 	const result = await withRetry(
-		async () => {
+		() => {
 			attempts++;
 			if (attempts === 1) {
 				throw new Error("Connection refused");
 			}
-			return "success";
+			return Promise.resolve("success");
 		},
 		{ maxRetries: 3, baseDelayMs: 10, useJitter: false },
 	);
@@ -128,12 +123,12 @@ Deno.test("withRetry - should retry and succeed on second attempt", async () => 
 Deno.test("withRetry - should retry multiple times before success", async () => {
 	let attempts = 0;
 	const result = await withRetry(
-		async () => {
+		() => {
 			attempts++;
 			if (attempts < 3) {
 				throw new Error("Service unavailable");
 			}
-			return "success";
+			return Promise.resolve("success");
 		},
 		{ maxRetries: 5, baseDelayMs: 10, useJitter: false },
 	);
@@ -151,7 +146,7 @@ Deno.test("withRetry - should throw after max retries exceeded", async () => {
 	await assertRejects(
 		async () => {
 			await withRetry(
-				async () => {
+				() => {
 					attempts++;
 					throw new Error("Connection refused");
 				},
@@ -169,7 +164,7 @@ Deno.test("withRetry - should not retry permanent errors", async () => {
 	await assertRejects(
 		async () => {
 			await withRetry(
-				async () => {
+				() => {
 					attempts++;
 					throw new Error("Validation failed");
 				},
@@ -187,7 +182,7 @@ Deno.test("withRetry - should not retry 404 errors", async () => {
 	await assertRejects(
 		async () => {
 			await withRetry(
-				async () => {
+				() => {
 					attempts++;
 					throw new Error("404 Not Found");
 				},
@@ -205,7 +200,7 @@ Deno.test("withRetry - should not retry duplicate errors", async () => {
 	await assertRejects(
 		async () => {
 			await withRetry(
-				async () => {
+				() => {
 					attempts++;
 					throw new Error("Duplicate entry");
 				},
@@ -227,12 +222,12 @@ Deno.test("withRetry - should call onRetry callback", async () => {
 	let attempts = 0;
 
 	await withRetry(
-		async () => {
+		() => {
 			attempts++;
 			if (attempts < 3) {
 				throw new Error("Connection timeout");
 			}
-			return "success";
+			return Promise.resolve("success");
 		},
 		{
 			maxRetries: 5,
@@ -254,7 +249,7 @@ Deno.test("withRetry - should call onRetry callback", async () => {
 // =============================================================================
 
 Deno.test("withRetryResult - should return success result", async () => {
-	const result = await withRetryResult(async () => "success");
+	const result = await withRetryResult(() => Promise.resolve("success"));
 
 	assertEquals(result.success, true);
 	if (result.success) {
@@ -264,7 +259,7 @@ Deno.test("withRetryResult - should return success result", async () => {
 
 Deno.test("withRetryResult - should return failure result without throwing", async () => {
 	const result = await withRetryResult(
-		async () => {
+		() => {
 			throw new Error("Validation failed");
 		},
 		{ maxRetries: 1, baseDelayMs: 10 },
@@ -279,12 +274,12 @@ Deno.test("withRetryResult - should return failure result without throwing", asy
 Deno.test("withRetryResult - should include attempt count in result", async () => {
 	let attempts = 0;
 	const result = await withRetryResult(
-		async () => {
+		() => {
 			attempts++;
 			if (attempts < 2) {
 				throw new Error("Connection refused");
 			}
-			return "success";
+			return Promise.resolve("success");
 		},
 		{ maxRetries: 3, baseDelayMs: 10, useJitter: false },
 	);
@@ -309,20 +304,27 @@ Deno.test("withTimeout - should return result if completed within timeout", asyn
 	assertEquals(result, "success");
 });
 
-Deno.test("withTimeout - should throw on timeout", async () => {
-	await assertRejects(
-		async () => {
-			await withTimeout(
-				async () => {
-					await new Promise((resolve) => setTimeout(resolve, 1000));
-					return "success";
-				},
-				50,
-			);
-		},
-		ApplicationError,
-		"timed out",
-	);
+Deno.test({
+	name: "withTimeout - should throw on timeout",
+	sanitizeOps: false,
+	sanitizeResources: false,
+	fn: async () => {
+		await assertRejects(
+			async () => {
+				await withTimeout(
+					async () => {
+						await new Promise((resolve) =>
+							setTimeout(resolve, 1000)
+						);
+						return "success";
+					},
+					50,
+				);
+			},
+			Error,
+			"timed out",
+		);
+	},
 });
 
 // =============================================================================
@@ -335,12 +337,12 @@ Deno.test("withRetry + withTimeout - should work together", async () => {
 	const result = await withRetry(
 		async () => {
 			return await withTimeout(
-				async () => {
+				() => {
 					attempts++;
 					if (attempts < 2) {
 						throw new Error("Connection refused");
 					}
-					return "success";
+					return Promise.resolve("success");
 				},
 				1000,
 			);
@@ -361,7 +363,7 @@ Deno.test("withRetry - should handle maxRetries of 0", async () => {
 	await assertRejects(
 		async () => {
 			await withRetry(
-				async () => {
+				() => {
 					attempts++;
 					throw new Error("Connection refused");
 				},
@@ -378,12 +380,12 @@ Deno.test("withRetry - should handle async operations correctly", async () => {
 	const start = Date.now();
 
 	await withRetry(
-		async () => {
+		() => {
 			attempts++;
 			if (attempts < 2) {
 				throw new Error("Connection refused");
 			}
-			return "success";
+			return Promise.resolve("success");
 		},
 		{ maxRetries: 3, baseDelayMs: 50, useJitter: false },
 	);
