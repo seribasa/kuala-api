@@ -11,6 +11,7 @@ interface JsonResponse {
 
 // Mock fetch response
 class MockResponse {
+	
 	private _headers: Headers;
 
 	constructor(
@@ -40,6 +41,10 @@ class MockResponse {
 
 	text() {
 		return Promise.resolve(JSON.stringify(this.body));
+	}
+
+	clone() {
+		return new MockResponse(this.body, this.statusCode, this.isOk);
 	}
 }
 

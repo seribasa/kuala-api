@@ -78,12 +78,12 @@ Deno.test("mapKillBillStatus - should return active as default for empty string"
 });
 
 Deno.test("mapKillBillStatus - should return active as default for null", () => {
-	const result = mapKillBillStatus(null as any);
+	const result = mapKillBillStatus(null as unknown as string);
 	assertEquals(result, "active");
 });
 
 Deno.test("mapKillBillStatus - should return active as default for undefined", () => {
-	const result = mapKillBillStatus(undefined as any);
+	const result = mapKillBillStatus(undefined as unknown as string);
 	assertEquals(result, "active");
 });
 
@@ -232,7 +232,7 @@ Deno.test("mapKillBillSubscriptionToSubscription - should handle null planName",
 		productCategory: "BASE",
 		billingPeriod: "MONTHLY",
 		priceList: "DEFAULT",
-		planName: null as any, // Null plan name
+		planName: null as unknown as string, // Null plan name
 		state: "ACTIVE",
 		sourceType: "USER_API",
 		cancelledDate: null,

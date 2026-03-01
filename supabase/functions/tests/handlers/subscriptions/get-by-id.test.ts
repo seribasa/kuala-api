@@ -2,6 +2,14 @@ import { assertEquals } from "@std/assert";
 import { stub } from "@std/testing/mock";
 import { Context } from "@hono/hono";
 import { handleGetSubscriptionById } from "../../../kuala/handlers/subscriptions/get-by-id.ts";
+import { subscriptionStateManager } from "../../../_shared/services/subscription-state-management.ts";
+
+// Stub state manager globally to prevent Supabase queries from hitting mocked fetch
+stub(
+	subscriptionStateManager,
+	"hasPendingSubscriptionRequest",
+	() => Promise.resolve(false),
+);
 
 // Type definitions for test responses
 interface JsonResponse {
@@ -11,6 +19,7 @@ interface JsonResponse {
 
 // Mock fetch response
 class MockResponse {
+	headers = new Headers();
 	constructor(
 		private body: unknown,
 		private statusCode: number,
@@ -31,6 +40,10 @@ class MockResponse {
 
 	text() {
 		return Promise.resolve(JSON.stringify(this.body));
+	}
+
+	clone() {
+		return new MockResponse(this.body, this.statusCode, this.isOk);
 	}
 }
 
@@ -283,7 +296,10 @@ Deno.test("handleGetSubscriptionById - should return subscription successfully",
 			if (urlString.includes("/1.0/kb/subscriptions/sub123")) {
 				// Get subscription calls for ownership verification and actual data
 				return Promise.resolve(
-					new MockResponse(mockSubscription, 200) as unknown as Response,
+					new MockResponse(
+						mockSubscription,
+						200,
+					) as unknown as Response,
 				);
 			}
 
@@ -385,14 +401,20 @@ Deno.test("handleGetSubscriptionById - should map different subscription statuse
 			if (urlString.includes("/1.0/kb/subscriptions/sub123")) {
 				// Get subscription calls
 				return Promise.resolve(
-					new MockResponse(mockSubscription, 200) as unknown as Response,
+					new MockResponse(
+						mockSubscription,
+						200,
+					) as unknown as Response,
 				);
 			}
 
 			if (urlString.includes("externalKey=user123")) {
 				// Get user's account
 				return Promise.resolve(
-					new MockResponse(mockUserAccount, 200) as unknown as Response,
+					new MockResponse(
+						mockUserAccount,
+						200,
+					) as unknown as Response,
 				);
 			}
 
@@ -471,14 +493,20 @@ Deno.test("handleGetSubscriptionById - should handle annual billing period", asy
 			if (urlString.includes("/1.0/kb/subscriptions/sub123")) {
 				// Get subscription calls
 				return Promise.resolve(
-					new MockResponse(mockSubscription, 200) as unknown as Response,
+					new MockResponse(
+						mockSubscription,
+						200,
+					) as unknown as Response,
 				);
 			}
 
 			if (urlString.includes("externalKey=user123")) {
 				// Get user's account
 				return Promise.resolve(
-					new MockResponse(mockUserAccount, 200) as unknown as Response,
+					new MockResponse(
+						mockUserAccount,
+						200,
+					) as unknown as Response,
 				);
 			}
 

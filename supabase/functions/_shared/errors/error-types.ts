@@ -124,7 +124,8 @@ const ERROR_PATTERNS: Array<{
 }> = [
 	// Network/Connection errors (TRANSIENT)
 	{
-		pattern: /connection.*refused|ECONNREFUSED|network.*error/i,
+		pattern:
+			/connection.*refused|ECONNREFUSED|network.*error|fetch failed|DNS resolution|socket hang up|ECONNRESET/i,
 		classification: {
 			type: ErrorType.TRANSIENT,
 			code: ErrorCodes.KILLBILL_CONNECTION_ERROR,
@@ -221,6 +222,17 @@ const ERROR_PATTERNS: Array<{
  * Classify an error based on its characteristics
  */
 export function classifyError(error: unknown): ClassifiedError {
+	if (error instanceof ApplicationError) {
+		return {
+			type: error.type,
+			code: error.code,
+			message: error.message,
+			originalError: error as Error,
+			retryable: error.retryable,
+			compensationRequired: error.compensationRequired,
+		};
+	}
+
 	const errorObj = error instanceof Error ? error : new Error(String(error));
 	const errorMessage = errorObj.message;
 
