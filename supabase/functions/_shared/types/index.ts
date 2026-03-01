@@ -206,7 +206,7 @@ interface KillBillSubscription {
 // itemDetails	string	system	JSON list correpsonding to usage items being invoiced. It contains one entry per tier
 // catalogEffectiveDate	DateTime	system	The effective date of the underlying catalog. Applicable only for itemType=RECURRING
 // childItems	list	user or system	In the hierarchical model, the items for the children.
-// auditLogs	array	system	Array of audit log records for 
+// auditLogs	array	system	Array of audit log records for
 interface KillBillInvoiceItem {
 	invoiceItemId: string;
 	invoiceId: string;
