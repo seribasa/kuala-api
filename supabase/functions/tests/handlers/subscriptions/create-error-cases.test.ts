@@ -11,7 +11,6 @@ interface JsonResponse {
 
 // Mock fetch response
 class MockResponse {
-	
 	private _headers: Headers;
 
 	constructor(
