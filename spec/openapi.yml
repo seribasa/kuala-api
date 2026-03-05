@@ -660,19 +660,209 @@ paths:
               schema: { $ref: "#/components/schemas/Error" }
     get:
       tags: [Subscriptions]
-      summary: Get subscription for current user
-      operationId: getSubscriptionUser
+      summary: Get subscriptions for current user
+      description: |
+        Returns all subscriptions for the authenticated user, enriched with account details.
+        If the user has a pending subscription request (saga in progress), returns 409.
+        If the Kill Bill billing service is unavailable, returns 502.
+      operationId: getSubscriptions
       security:
         - bearerAuth: []
       responses:
         "200":
-          description: Subscription
+          description: List of subscriptions
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Subscription"
+                $ref: "#/components/schemas/GetSubscriptionsResponse"
+              example:
+                subscriptions:
+                  - id: "sub-uuid-123"
+                    bundleId: "bundle-uuid-123"
+                    accountId: "acc-uuid-123"
+                    userId: "user-uuid-123"
+                    planName: "basic-monthly"
+                    productName: "Basic"
+                    billingPeriod: "MONTHLY"
+                    state: "ACTIVE"
+                    billingStartDate: "2024-01-01T00:00:00Z"
+                    billingEndDate: null
+                    chargedThroughDate: "2024-02-01T00:00:00Z"
+                    account:
+                      name: "John Doe"
+                      email: "john@example.com"
+                      currency: "USD"
+                message: "Subscriptions retrieved successfully"
+        "409":
+          description: User has a pending subscription request
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "502":
+          description: Kill Bill billing service is unavailable or returned an error
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "500":
+          description: Internal server error
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+
+  /subscriptions/event-driven:
+    post:
+      tags: [Subscriptions]
+      summary: Create subscription via event-driven saga
+      description: |
+        Initiates an asynchronous subscription creation saga. The request is validated,
+        a correlation ID is generated, and a `SubscriptionRequested` event is published
+        to RabbitMQ. The saga then proceeds through Account → Subscription → Invoice
+        steps asynchronously.
+
+        Use `GET /subscriptions/status/{correlationId}` to poll for progress.
+      operationId: createEventDrivenSubscription
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/EventDrivenSubscriptionRequest"
+            example:
+              planId: basic-monthly
+      responses:
+        "202":
+          description: Subscription request accepted for processing
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EventDrivenSubscriptionResponse"
+              example:
+                successful: true
+                message: "Event-driven subscription request accepted"
+                data:
+                  correlation_id: "550e8400-e29b-41d4-a716-446655440000"
+                  status: "processing"
+                  message: "Subscription request is being processed"
+        "400":
+          description: Invalid request (missing or invalid planId)
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "401":
+          description: Unauthorized - Invalid or missing token
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "409":
+          description: User has a pending subscription request or already has an active subscription
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/Error"
+                  - type: object
+                    properties:
+                      correlation_id:
+                        type: string
+                        description: Correlation ID of the existing pending request
+        "503":
+          description: Service temporarily unavailable (RabbitMQ or Kill Bill down)
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+
+  /subscriptions/status/{correlationId}:
+    get:
+      tags: [Subscriptions]
+      summary: Get subscription saga status
+      description: |
+        Returns the real-time status of an event-driven subscription saga.
+        Includes progress percentage, event history, and extracted data
+        (accountId, subscriptionId, invoiceId).
+
+        Users can only view their own sagas. Attempting to access another
+        user's saga returns 404.
+      operationId: getSubscriptionStatus
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: correlationId
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: The correlation ID returned from POST /subscriptions/event-driven
+      responses:
+        "200":
+          description: Subscription saga status
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SubscriptionStatusResponse"
+              example:
+                successful: true
+                message: "Subscription status retrieved successfully"
+                data:
+                  correlation_id: "550e8400-e29b-41d4-a716-446655440000"
+                  status: "completed"
+                  current_state: "completed"
+                  message: "Subscription setup completed successfully!"
+                  progress:
+                    totalSteps: 4
+                    completedSteps: 4
+                    percentage: 100
+                  events:
+                    - event_id: "evt-1"
+                      event_type: "SubscriptionRequested"
+                      from_state: null
+                      to_state: "requested"
+                      timestamp: "2024-01-01T00:00:00Z"
+                      triggered_by: "api-handler"
+                    - event_id: "evt-2"
+                      event_type: "AccountReady"
+                      from_state: "requested"
+                      to_state: "account_ready"
+                      timestamp: "2024-01-01T00:00:01Z"
+                      triggered_by: "account-service"
+                    - event_id: "evt-3"
+                      event_type: "SubscriptionCreated"
+                      from_state: "account_ready"
+                      to_state: "subscription_created"
+                      timestamp: "2024-01-01T00:00:02Z"
+                      triggered_by: "subscription-service"
+                    - event_id: "evt-4"
+                      event_type: "InvoiceGenerated"
+                      from_state: "subscription_created"
+                      to_state: "completed"
+                      timestamp: "2024-01-01T00:00:03Z"
+                      triggered_by: "invoice-service"
+                  data:
+                    accountId: "kb-acc-123"
+                    subscriptionId: "sub-456"
+                    invoiceId: "inv-789"
+        "400":
+          description: Missing correlation ID
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
         "404":
-          $ref: "#/components/responses/NotFound"
+          description: Saga not found or belongs to another user
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "500":
+          description: Internal server error
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
 
   /invoices:
     post:
@@ -1281,6 +1471,132 @@ components:
           type: object
           additionalProperties: true
       required: [eventType]
+
+    EventDrivenSubscriptionRequest:
+      type: object
+      properties:
+        planId:
+          type: string
+          description: One of the plan IDs from `/plans`
+      required: [planId]
+
+    EventDrivenSubscriptionResponse:
+      type: object
+      properties:
+        successful: { type: boolean }
+        message: { type: string }
+        data:
+          type: object
+          properties:
+            correlation_id:
+              type: string
+              format: uuid
+              description: Unique ID to track the saga progress
+            status:
+              type: string
+              enum: [processing, failed]
+            message:
+              type: string
+              description: Human-readable status message
+          required: [correlation_id, status, message]
+      required: [successful, message, data]
+
+    SubscriptionStatusResponse:
+      type: object
+      properties:
+        successful: { type: boolean }
+        message: { type: string }
+        data:
+          type: object
+          properties:
+            correlation_id:
+              type: string
+              format: uuid
+            status:
+              type: string
+              enum: [processing, completed, failed]
+            current_state:
+              type: string
+              description: Internal saga state
+              enum: [requested, account_ready, creating_subscription, subscription_created, generating_invoice, completed, failed]
+            message:
+              type: string
+              description: Human-readable status message
+            progress:
+              type: object
+              properties:
+                totalSteps:
+                  type: integer
+                  example: 4
+                completedSteps:
+                  type: integer
+                  example: 2
+                percentage:
+                  type: integer
+                  minimum: 0
+                  maximum: 100
+                  example: 50
+              required: [totalSteps, completedSteps, percentage]
+            events:
+              type: array
+              items:
+                type: object
+                properties:
+                  event_id: { type: string }
+                  event_type: { type: string }
+                  from_state: { type: string, nullable: true }
+                  to_state: { type: string }
+                  timestamp: { type: string, format: date-time }
+                  triggered_by: { type: string }
+                  reason: { type: string, nullable: true }
+                required: [event_id, event_type, to_state, timestamp, triggered_by]
+            data:
+              type: object
+              description: Extracted saga data from transition metadata
+              properties:
+                accountId: { type: string, nullable: true }
+                subscriptionId: { type: string, nullable: true }
+                invoiceId: { type: string, nullable: true }
+          required: [correlation_id, status, current_state, message, progress, events, data]
+      required: [successful, message, data]
+
+    GetSubscriptionsResponse:
+      type: object
+      properties:
+        subscriptions:
+          type: array
+          items:
+            $ref: "#/components/schemas/SubscriptionItem"
+        message:
+          type: string
+          description: Success message for the list operation.
+      required: [subscriptions]
+
+    SubscriptionItem:
+      type: object
+      properties:
+        id: { type: string }
+        bundleId: { type: string }
+        accountId: { type: string }
+        userId: { type: string }
+        planName: { type: string }
+        productName: { type: string }
+        billingPeriod: { type: string }
+        state: { type: string }
+        billingStartDate: { type: string, format: date-time }
+        billingEndDate: { type: string, format: date-time, nullable: true }
+        chargedThroughDate: { type: string, format: date-time }
+        account:
+          $ref: "#/components/schemas/SubscriptionAccountInfo"
+      required: [id, bundleId, accountId, userId, planName, productName, billingPeriod, state, billingStartDate, chargedThroughDate, account]
+
+    SubscriptionAccountInfo:
+      type: object
+      properties:
+        name: { type: string }
+        email: { type: string, format: email }
+        currency: { type: string }
+      required: [name, email, currency]
 
     Error:
       type: object

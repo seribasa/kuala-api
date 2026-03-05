@@ -5,7 +5,7 @@ import { handleGetSubscriptionById } from "../../../kuala/handlers/subscriptions
 import { subscriptionStateManager } from "../../../_shared/services/subscription-state-management.ts";
 
 // Stub state manager globally to prevent Supabase queries from hitting mocked fetch
-stub(
+const globalPendingStub = stub(
 	subscriptionStateManager,
 	"hasPendingSubscriptionRequest",
 	() => Promise.resolve(false),
@@ -620,6 +620,225 @@ Deno.test("handleGetSubscriptionById - should handle network errors gracefully",
 		assertEquals(response.status, 404);
 		assertEquals(response.data.code, "SUBSCRIPTION_NOT_FOUND");
 	} finally {
+		envStub.restore();
+		fetchStub.restore();
+	}
+});
+
+Deno.test("handleGetSubscriptionById - should return 409 when user has pending subscription request", async () => {
+	const mockUser = {
+		id: "user123",
+		email: "test@example.com",
+	};
+
+	// Restore global stub so we can re-stub with different behavior
+	globalPendingStub.restore();
+
+	const pendingStub = stub(
+		subscriptionStateManager,
+		"hasPendingSubscriptionRequest",
+		() => Promise.resolve(true),
+	);
+
+	const latestRequestStub = stub(
+		subscriptionStateManager,
+		"getLatestSubscriptionRequest",
+		() =>
+			Promise.resolve({
+				entity_id: "corr-123",
+				entity_type: "subscription_request",
+				current_state: "creating_subscription",
+				state_updated_at: "2023-01-01T00:00:00.000Z",
+				last_updated_by: "system",
+				last_metadata: {},
+			}),
+	);
+
+	try {
+		const mockContext = createMockContext("sub123", mockUser);
+
+		const response = await handleGetSubscriptionById(
+			mockContext,
+		) as unknown as JsonResponse;
+
+		assertEquals(response.status, 409);
+		assertEquals(response.data.code, "PENDING_SUBSCRIPTION_REQUEST");
+	} finally {
+		pendingStub.restore();
+		latestRequestStub.restore();
+	}
+});
+
+Deno.test("handleGetSubscriptionById - should return 404 when Kill Bill throws SUBSCRIPTION_NOT_FOUND", async () => {
+	const mockUser = {
+		id: "user123",
+		email: "test@example.com",
+	};
+
+	// Re-stub pending request to return false for this test
+	const pendingStub = stub(
+		subscriptionStateManager,
+		"hasPendingSubscriptionRequest",
+		() => Promise.resolve(false),
+	);
+
+	// Mock environment variables
+	const envStub = stub(Deno.env, "get", (key: string) => {
+		if (key === "KILLBILL_BASE_URL") return "http://localhost:8080";
+		if (key === "KILLBILL_API_KEY") return "test_key";
+		if (key === "KILLBILL_API_SECRET") return "test_secret";
+		if (key === "KILLBILL_USERNAME") return "admin";
+		if (key === "KILLBILL_PASSWORD") return "password";
+		if (key === "KILLBILL_DEFAULT_CURRENCY") return "USD";
+		return undefined;
+	});
+
+	let callCount = 0;
+	const fetchStub = stub(
+		globalThis,
+		"fetch",
+		() => {
+			callCount++;
+
+			// Call 1: verifySubscriptionOwnership -> getSubscriptionById (success)
+			if (callCount === 1) {
+				return Promise.resolve(
+					new MockResponse(
+						{ subscriptionId: "sub123", accountId: "acc123" },
+						200,
+					) as unknown as Response,
+				);
+			}
+
+			// Call 2: verifySubscriptionOwnership -> getAccountByExternalKey (returns matching)
+			if (callCount === 2) {
+				return Promise.resolve(
+					new MockResponse(
+						{ accountId: "acc123", externalKey: "user123" },
+						200,
+					) as unknown as Response,
+				);
+			}
+
+			// Call 3: handler's getSubscriptionById - returns 404
+			if (callCount === 3) {
+				return Promise.resolve(
+					new MockResponse(
+						{ error: "Not found" },
+						404,
+						false,
+					) as unknown as Response,
+				);
+			}
+
+			return Promise.resolve(
+				new MockResponse(
+					{ error: "Unexpected call" },
+					500,
+					false,
+				) as unknown as Response,
+			);
+		},
+	);
+
+	try {
+		const mockContext = createMockContext("sub123", mockUser);
+
+		const response = await handleGetSubscriptionById(
+			mockContext,
+		) as unknown as JsonResponse;
+
+		assertEquals(response.status, 404);
+		assertEquals(response.data.code, "SUBSCRIPTION_NOT_FOUND");
+	} finally {
+		pendingStub.restore();
+		envStub.restore();
+		fetchStub.restore();
+	}
+});
+
+Deno.test("handleGetSubscriptionById - should return 500 when Kill Bill throws Failed to get error", async () => {
+	const mockUser = {
+		id: "user123",
+		email: "test@example.com",
+	};
+
+	const pendingStub = stub(
+		subscriptionStateManager,
+		"hasPendingSubscriptionRequest",
+		() => Promise.resolve(false),
+	);
+
+	// Mock environment variables
+	const envStub = stub(Deno.env, "get", (key: string) => {
+		if (key === "KILLBILL_BASE_URL") return "http://localhost:8080";
+		if (key === "KILLBILL_API_KEY") return "test_key";
+		if (key === "KILLBILL_API_SECRET") return "test_secret";
+		if (key === "KILLBILL_USERNAME") return "admin";
+		if (key === "KILLBILL_PASSWORD") return "password";
+		if (key === "KILLBILL_DEFAULT_CURRENCY") return "USD";
+		return undefined;
+	});
+
+	let callCount = 0;
+	const fetchStub = stub(
+		globalThis,
+		"fetch",
+		() => {
+			callCount++;
+
+			// Call 1: verifySubscriptionOwnership -> getSubscriptionById (success)
+			if (callCount === 1) {
+				return Promise.resolve(
+					new MockResponse(
+						{ subscriptionId: "sub123", accountId: "acc123" },
+						200,
+					) as unknown as Response,
+				);
+			}
+
+			// Call 2: verifySubscriptionOwnership -> getAccountByExternalKey (returns matching account)
+			if (callCount === 2) {
+				return Promise.resolve(
+					new MockResponse(
+						{ accountId: "acc123", externalKey: "user123" },
+						200,
+					) as unknown as Response,
+				);
+			}
+
+			// Call 3: handler's getSubscriptionById - Kill Bill service error
+			if (callCount === 3) {
+				return Promise.resolve(
+					new MockResponse(
+						{ error: "Service unavailable" },
+						503,
+						false,
+					) as unknown as Response,
+				);
+			}
+
+			return Promise.resolve(
+				new MockResponse(
+					{ error: "Unexpected call" },
+					500,
+					false,
+				) as unknown as Response,
+			);
+		},
+	);
+
+	try {
+		const mockContext = createMockContext("sub123", mockUser);
+
+		const response = await handleGetSubscriptionById(
+			mockContext,
+		) as unknown as JsonResponse;
+
+		assertEquals(response.status, 500);
+		assertEquals(response.data.code, "KILLBILL_ERROR");
+	} finally {
+		pendingStub.restore();
 		envStub.restore();
 		fetchStub.restore();
 	}

@@ -8,13 +8,72 @@ import type {
 } from "../../../_shared/types/response.ts";
 import { subscriptionStateManager } from "../../../_shared/services/subscription-state-management.ts";
 
+// Ordered steps in the subscription saga
+const SAGA_STEPS = [
+	"requested",
+	"account_ready",
+	"creating_subscription",
+	"subscription_created",
+	"generating_invoice",
+	"completed",
+] as const;
+
+const TOTAL_STEPS = 4; // The 4 user-facing milestones
+
+// Map internal state to user-facing step number (1-based)
+function getCompletedSteps(state: string): number {
+	switch (state) {
+		case "requested":
+			return 0;
+		case "account_ready":
+			return 1;
+		case "creating_subscription":
+			return 1;
+		case "subscription_created":
+			return 2;
+		case "generating_invoice":
+			return 3;
+		case "completed":
+			return 4;
+		case "failed":
+			return 0; // failed doesn't have a meaningful step count
+		default:
+			return 0;
+	}
+}
+
+// Map state to human-readable message
+function getStatusMessage(state: string): string {
+	switch (state) {
+		case "requested":
+			return "Subscription request received. Setting up your account...";
+		case "account_ready":
+			return "Account is ready. Creating your subscription...";
+		case "creating_subscription":
+			return "Creating your subscription in the billing system...";
+		case "subscription_created":
+			return "Subscription created. Generating invoice...";
+		case "generating_invoice":
+			return "Generating your first invoice...";
+		case "completed":
+			return "Subscription setup completed successfully!";
+		case "failed":
+			return "Subscription setup failed. Please contact support or try again.";
+		default:
+			return "Processing your subscription request...";
+	}
+}
+
 interface SubscriptionStatusResponse {
 	correlation_id: string;
 	status: "processing" | "completed" | "failed";
 	current_state: string;
-	last_event?: string;
-	last_updated: string;
-	total_events: number;
+	message: string;
+	progress: {
+		totalSteps: number;
+		completedSteps: number;
+		percentage: number;
+	};
 	events: Array<{
 		event_id: string;
 		event_type: string;
@@ -24,6 +83,37 @@ interface SubscriptionStatusResponse {
 		triggered_by: string;
 		reason?: string;
 	}>;
+	data: {
+		accountId?: string;
+		subscriptionId?: string;
+		invoiceId?: string;
+	};
+}
+
+/**
+ * Extract saga data (accountId, subscriptionId, invoiceId) from transition history metadata.
+ */
+// deno-lint-ignore no-explicit-any
+function extractSagaData(transitions: any[]): {
+	accountId?: string;
+	subscriptionId?: string;
+	invoiceId?: string;
+} {
+	const data: {
+		accountId?: string;
+		subscriptionId?: string;
+		invoiceId?: string;
+	} = {};
+
+	for (const t of transitions) {
+		const meta = t.metadata;
+		if (!meta) continue;
+		if (meta.accountId) data.accountId = meta.accountId;
+		if (meta.subscriptionId) data.subscriptionId = meta.subscriptionId;
+		if (meta.invoiceId) data.invoiceId = meta.invoiceId;
+	}
+
+	return data;
 }
 
 /**
@@ -55,10 +145,29 @@ async function getSubscriptionStatus(
 			return null;
 		}
 
-		// Get state history
+		// Authorization check: verify the saga belongs to the requesting user
+		// The userId is stored in last_metadata when the saga is created
 		const history = await subscriptionStateManager.getHistory(
 			correlationId,
 		);
+
+		// Check ownership from the first transition's metadata
+		if (history.length > 0) {
+			const firstTransition = history[0];
+			const sagaUserId = firstTransition.metadata?.userId;
+			if (sagaUserId && sagaUserId !== userId) {
+				logger.warn(
+					"getSubscriptionStatus",
+					"User attempting to access another user's saga",
+					{
+						correlationId,
+						requestUserId: userId,
+						sagaUserId,
+					},
+				);
+				return null; // Return null so it appears as 404 (don't leak existence)
+			}
+		}
 
 		// Map state to status
 		let status: "processing" | "completed" | "failed";
@@ -69,6 +178,10 @@ async function getSubscriptionStatus(
 		} else {
 			status = "processing";
 		}
+
+		// Calculate progress
+		const completedSteps = getCompletedSteps(currentState.current_state);
+		const percentage = Math.round((completedSteps / TOTAL_STEPS) * 100);
 
 		// Map history to events
 		const events = history.map((transition) => ({
@@ -81,14 +194,21 @@ async function getSubscriptionStatus(
 			reason: transition.transition_reason,
 		}));
 
+		// Extract data from saga transitions
+		const sagaData = extractSagaData(history);
+
 		return {
 			correlation_id: correlationId,
 			status,
 			current_state: currentState.current_state,
-			last_event: currentState.last_event_type,
-			last_updated: currentState.state_updated_at,
-			total_events: events.length,
+			message: getStatusMessage(currentState.current_state),
+			progress: {
+				totalSteps: TOTAL_STEPS,
+				completedSteps,
+				percentage,
+			},
 			events,
+			data: sagaData,
 		};
 	} catch (error) {
 		logger.error(
@@ -127,7 +247,7 @@ export async function handleGetSubscriptionStatus(c: Context) {
 			userId: user.id,
 		});
 
-		// Get subscription status from state management
+		// Get subscription status from state management (includes auth check)
 		const status = await getSubscriptionStatus(correlationId, user.id);
 
 		if (!status) {
@@ -153,7 +273,7 @@ export async function handleGetSubscriptionStatus(c: Context) {
 			correlationId,
 			status: status.status,
 			currentState: status.current_state,
-			totalEvents: status.total_events,
+			progress: status.progress.percentage,
 		});
 
 		return c.json(successResponse, 200);

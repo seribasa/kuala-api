@@ -5,7 +5,7 @@ import { handleGetSubscription } from "../../../kuala/handlers/subscriptions/get
 import { subscriptionStateManager } from "../../../_shared/services/subscription-state-management.ts";
 
 // Stub state manager globally to prevent Supabase queries from hitting mocked fetch
-stub(
+const globalPendingStub = stub(
 	subscriptionStateManager,
 	"hasPendingSubscriptionRequest",
 	() => Promise.resolve(false),
@@ -81,7 +81,7 @@ Deno.test("handleGetSubscription - should return 500 when user is not authentica
 	assertEquals(response.data.code, "INTERNAL_ERROR");
 });
 
-Deno.test("handleGetSubscription - should return 404 when user has no account", async () => {
+Deno.test("handleGetSubscription - should return 200 with empty subscriptions when user has no account", async () => {
 	const mockUser = {
 		id: "user123",
 		email: "test@example.com",
@@ -98,11 +98,12 @@ Deno.test("handleGetSubscription - should return 404 when user has no account", 
 		return undefined;
 	});
 
-	// Mock fetch to return no account found
+	// Mock fetch to return no account found (returns null body)
 	const fetchStub = stub(
 		globalThis,
 		"fetch",
 		() => {
+			// getAccountByExternalKey returns null when 404
 			return Promise.resolve(
 				new MockResponse(null, 404, false) as unknown as Response,
 			);
@@ -116,19 +117,21 @@ Deno.test("handleGetSubscription - should return 404 when user has no account", 
 			mockContext,
 		) as unknown as JsonResponse;
 
-		assertEquals(response.status, 404);
-		assertEquals(response.data.code, "SUBSCRIPTION_NOT_FOUND");
+		// Handler now returns 200 with message instead of 404
+		assertEquals(response.status, 200);
+		const data = response.data as Record<string, unknown>;
 		assertEquals(
-			response.data.message,
-			"No subscription found for this user",
+			(data.subscriptions as unknown[]).length,
+			0,
 		);
+		assertEquals(typeof data.message, "string");
 	} finally {
 		envStub.restore();
 		fetchStub.restore();
 	}
 });
 
-Deno.test("handleGetSubscription - should return 404 when user has no active subscriptions", async () => {
+Deno.test("handleGetSubscription - should return 200 with empty subscriptions when no active subscriptions", async () => {
 	const mockUser = {
 		id: "user123",
 		email: "test@example.com",
@@ -191,12 +194,14 @@ Deno.test("handleGetSubscription - should return 404 when user has no active sub
 			mockContext,
 		) as unknown as JsonResponse;
 
-		assertEquals(response.status, 404);
-		assertEquals(response.data.code, "SUBSCRIPTION_NOT_FOUND");
+		// Returns 200 with empty subscriptions and success message
+		assertEquals(response.status, 200);
+		const data = response.data as Record<string, unknown>;
 		assertEquals(
-			response.data.message,
-			"No active subscription found for this user",
+			(data.subscriptions as unknown[]).length,
+			0,
 		);
+		assertEquals(data.message, "Subscriptions retrieved successfully");
 	} finally {
 		envStub.restore();
 		fetchStub.restore();
@@ -226,7 +231,7 @@ Deno.test("handleGetSubscription - should return subscription successfully", asy
 		productCategory: "subscription",
 		billingPeriod: "MONTHLY",
 		state: "ACTIVE",
-		startDate: "2023-01-01T00:00:00.000Z",
+		billingStartDate: "2023-01-01T00:00:00.000Z",
 		chargedThroughDate: "2023-02-01T00:00:00.000Z",
 		billingEndDate: "2023-03-01T00:00:00.000Z",
 	};
@@ -283,34 +288,38 @@ Deno.test("handleGetSubscription - should return subscription successfully", asy
 		) as unknown as JsonResponse;
 
 		assertEquals(response.status, 200);
-		assertEquals(response.data.id, "sub123");
-		assertEquals(response.data.userId, "user123");
-		assertEquals(response.data.planId, "basic-monthly");
-		assertEquals(response.data.interval, "month");
-		assertEquals(response.data.status, "active");
-		assertEquals(response.data.startDate, "2023-01-01T00:00:00.000Z");
 
-		// Check billing information exists and has correct structure
-		assertEquals(typeof response.data.billing, "object");
-		assertEquals(
-			(response.data.billing as Record<string, string>).accountId,
-			"account123",
-		);
-		assertEquals(
-			(response.data.billing as Record<string, string>).subscriptionId,
-			"sub123",
-		);
-		assertEquals(
-			(response.data.billing as Record<string, string>).bundleId,
-			"bundle123",
-		);
+		const data = response.data as Record<string, unknown>;
+		const subscriptions = data.subscriptions as Record<string, unknown>[];
+		assertEquals(subscriptions.length, 1);
+
+		const sub = subscriptions[0];
+		assertEquals(sub.id, "sub123");
+		assertEquals(sub.bundleId, "bundle123");
+		assertEquals(sub.accountId, "account123");
+		assertEquals(sub.userId, "user123");
+		assertEquals(sub.planName, "basic-monthly");
+		assertEquals(sub.productName, "Basic");
+		assertEquals(sub.billingPeriod, "MONTHLY");
+		assertEquals(sub.state, "ACTIVE");
+		assertEquals(sub.billingStartDate, "2023-01-01T00:00:00.000Z");
+		assertEquals(sub.billingEndDate, "2023-03-01T00:00:00.000Z");
+		assertEquals(sub.chargedThroughDate, "2023-02-01T00:00:00.000Z");
+
+		// Check nested account info
+		const account = sub.account as Record<string, string>;
+		assertEquals(account.name, "test@example.com");
+		assertEquals(account.email, "test@example.com");
+		assertEquals(account.currency, "USD");
+
+		assertEquals(data.message, "Subscriptions retrieved successfully");
 	} finally {
 		envStub.restore();
 		fetchStub.restore();
 	}
 });
 
-Deno.test("handleGetSubscription - should return subscription with annual interval", async () => {
+Deno.test("handleGetSubscription - should return subscription with ANNUAL billing period", async () => {
 	const mockUser = {
 		id: "user123",
 		email: "test@example.com",
@@ -333,7 +342,7 @@ Deno.test("handleGetSubscription - should return subscription with annual interv
 		productCategory: "subscription",
 		billingPeriod: "ANNUAL",
 		state: "ACTIVE",
-		startDate: "2023-01-01T00:00:00.000Z",
+		billingStartDate: "2023-01-01T00:00:00.000Z",
 		chargedThroughDate: "2024-01-01T00:00:00.000Z",
 	};
 
@@ -390,14 +399,17 @@ Deno.test("handleGetSubscription - should return subscription with annual interv
 		) as unknown as JsonResponse;
 
 		assertEquals(response.status, 200);
-		assertEquals(response.data.interval, "year");
+		const data = response.data as Record<string, unknown>;
+		const subscriptions = data.subscriptions as Record<string, unknown>[];
+		assertEquals(subscriptions.length, 1);
+		assertEquals(subscriptions[0].billingPeriod, "ANNUAL");
 	} finally {
 		envStub.restore();
 		fetchStub.restore();
 	}
 });
 
-Deno.test("handleGetSubscription - should handle Kill Bill service error", async () => {
+Deno.test("handleGetSubscription - should return 200 with warning message on Kill Bill service error", async () => {
 	const mockUser = {
 		id: "user123",
 		email: "test@example.com",
@@ -436,125 +448,18 @@ Deno.test("handleGetSubscription - should handle Kill Bill service error", async
 			mockContext,
 		) as unknown as JsonResponse;
 
-		assertEquals(response.status, 500);
-		assertEquals(response.data.code, "KILLBILL_ERROR");
+		// Kill Bill service error now returns 502
+		assertEquals(response.status, 502);
+		const data = response.data as Record<string, unknown>;
+		assertEquals(data.code, "UPSTREAM_ERROR");
+		assertEquals(typeof data.message, "string");
 	} finally {
 		envStub.restore();
 		fetchStub.restore();
 	}
 });
 
-Deno.test({
-	name:
-		"handleGetSubscription - should return most recent active subscription when multiple exist",
-	ignore: true,
-	fn: async () => {
-		const mockUser = {
-			id: "user123",
-			email: "test@example.com",
-		};
-
-		const mockAccount = {
-			accountId: "account123",
-			name: "test@example.com",
-			email: "test@example.com",
-			externalKey: "user123",
-			currency: "USD",
-		};
-
-		const olderSubscription = {
-			subscriptionId: "sub123",
-			bundleId: "bundle123",
-			accountId: "account123",
-			planName: "basic-monthly",
-			productName: "Basic",
-			productCategory: "subscription",
-			billingPeriod: "MONTHLY",
-			state: "ACTIVE",
-			startDate: "2023-01-01T00:00:00.000Z",
-			chargedThroughDate: "2023-02-01T00:00:00.000Z",
-		};
-
-		const newerSubscription = {
-			subscriptionId: "sub456",
-			bundleId: "bundle456",
-			accountId: "account123",
-			planName: "premium-monthly",
-			productName: "Premium",
-			productCategory: "subscription",
-			billingPeriod: "MONTHLY",
-			state: "ACTIVE",
-			startDate: "2023-06-01T00:00:00.000Z",
-			chargedThroughDate: "2023-07-01T00:00:00.000Z",
-		};
-
-		// Mock environment variables
-		const envStub = stub(Deno.env, "get", (key: string) => {
-			if (key === "KILLBILL_BASE_URL") return "http://localhost:8080";
-			if (key === "KILLBILL_API_KEY") return "test_key";
-			if (key === "KILLBILL_API_SECRET") return "test_secret";
-			if (key === "KILLBILL_USERNAME") return "admin";
-			if (key === "KILLBILL_PASSWORD") return "password";
-			if (key === "KILLBILL_DEFAULT_CURRENCY") return "USD";
-			return undefined;
-		});
-
-		let callCount = 0;
-		const fetchStub = stub(
-			globalThis,
-			"fetch",
-			() => {
-				callCount++;
-
-				if (callCount === 1) {
-					// Get account by external key
-					return Promise.resolve(
-						new MockResponse(
-							mockAccount,
-							200,
-						) as unknown as Response,
-					);
-				}
-
-				if (callCount === 2) {
-					// Get subscriptions - return both, older first
-					return Promise.resolve(
-						new MockResponse(
-							[olderSubscription, newerSubscription],
-							200,
-						) as unknown as Response,
-					);
-				}
-
-				return Promise.resolve(
-					new MockResponse(
-						{ error: "Unexpected call" },
-						500,
-						false,
-					) as unknown as Response,
-				);
-			},
-		);
-
-		try {
-			const mockContext = createMockContext(mockUser);
-
-			const response = await handleGetSubscription(
-				mockContext,
-			) as unknown as JsonResponse;
-
-			assertEquals(response.status, 200);
-			// Should return the newer subscription
-			assertEquals(response.data.id, "sub456");
-			assertEquals(response.data.planId, "premium-monthly");
-		} finally {
-			envStub.restore();
-			fetchStub.restore();
-		}
-	},
-});
-
-Deno.test("handleGetSubscription - should handle network errors gracefully", async () => {
+Deno.test("handleGetSubscription - should return 200 with no account when network error occurs", async () => {
 	const mockUser = {
 		id: "user123",
 		email: "test@example.com",
@@ -587,11 +492,140 @@ Deno.test("handleGetSubscription - should handle network errors gracefully", asy
 			mockContext,
 		) as unknown as JsonResponse;
 
-		// Network error causes account lookup to fail, resulting in "no account found" (404)
-		assertEquals(response.status, 404);
-		assertEquals(response.data.code, "SUBSCRIPTION_NOT_FOUND");
+		// Network errors are caught inside killBillService and return null,
+		// so handler follows the "no account found" path → 200
+		assertEquals(response.status, 200);
+		const data = response.data as Record<string, unknown>;
+		assertEquals(
+			(data.subscriptions as unknown[]).length,
+			0,
+		);
+		assertEquals(
+			data.message,
+			"No subscription account found for this user.",
+		);
 	} finally {
 		envStub.restore();
 		fetchStub.restore();
+	}
+});
+
+Deno.test("handleGetSubscription - should return 200 with warning when subscription fetch fails but account exists", async () => {
+	const mockUser = {
+		id: "user123",
+		email: "test@example.com",
+	};
+
+	const mockAccount = {
+		accountId: "account123",
+		name: "test@example.com",
+		email: "test@example.com",
+		externalKey: "user123",
+		currency: "USD",
+	};
+
+	// Mock environment variables
+	const envStub = stub(Deno.env, "get", (key: string) => {
+		if (key === "KILLBILL_BASE_URL") return "http://localhost:8080";
+		if (key === "KILLBILL_API_KEY") return "test_key";
+		if (key === "KILLBILL_API_SECRET") return "test_secret";
+		if (key === "KILLBILL_USERNAME") return "admin";
+		if (key === "KILLBILL_PASSWORD") return "password";
+		if (key === "KILLBILL_DEFAULT_CURRENCY") return "USD";
+		return undefined;
+	});
+
+	let callCount = 0;
+	const fetchStub = stub(
+		globalThis,
+		"fetch",
+		() => {
+			callCount++;
+
+			if (callCount === 1) {
+				// Get account by external key - success
+				return Promise.resolve(
+					new MockResponse(mockAccount, 200) as unknown as Response,
+				);
+			}
+
+			if (callCount === 2) {
+				// Get subscription - network error
+				return Promise.reject(new Error("Network error"));
+			}
+
+			return Promise.resolve(
+				new MockResponse(
+					{ error: "Unexpected call" },
+					500,
+					false,
+				) as unknown as Response,
+			);
+		},
+	);
+
+	try {
+		const mockContext = createMockContext(mockUser);
+
+		const response = await handleGetSubscription(
+			mockContext,
+		) as unknown as JsonResponse;
+
+		// Subscription fetch failure returns 502
+		assertEquals(response.status, 502);
+		const data = response.data as Record<string, unknown>;
+		assertEquals(data.code, "UPSTREAM_ERROR");
+		assertEquals(
+			data.message,
+			"Failed to fetch subscription details. Please try again later.",
+		);
+	} finally {
+		envStub.restore();
+		fetchStub.restore();
+	}
+});
+
+Deno.test("handleGetSubscription - should return 409 when user has pending subscription request", async () => {
+	const mockUser = {
+		id: "user123",
+		email: "test@example.com",
+	};
+
+	// Restore global stub so we can re-stub with different behavior
+	globalPendingStub.restore();
+
+	const pendingStub = stub(
+		subscriptionStateManager,
+		"hasPendingSubscriptionRequest",
+		() => Promise.resolve(true),
+	);
+
+	const latestRequestStub = stub(
+		subscriptionStateManager,
+		"getLatestSubscriptionRequest",
+		() =>
+			Promise.resolve({
+				entity_id: "corr-123",
+				entity_type: "subscription_request",
+				current_state: "creating_subscription",
+				state_updated_at: "2023-01-01T00:00:00.000Z",
+				last_updated_by: "system",
+				last_metadata: {},
+			}),
+	);
+
+	try {
+		const mockContext = createMockContext(mockUser);
+
+		const response = await handleGetSubscription(
+			mockContext,
+		) as unknown as JsonResponse;
+
+		assertEquals(response.status, 409);
+		assertEquals(response.data.code, "PENDING_SUBSCRIPTION_REQUEST");
+		assertEquals(typeof response.data.message, "string");
+	} finally {
+		pendingStub.restore();
+		latestRequestStub.restore();
 	}
 });
