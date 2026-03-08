@@ -72,17 +72,17 @@ jobs:
 
       - name: Generate .env file
         run: |
-          cat > supabase/functions/.env << 'EOF'
-          SUPABASE_URL=http://localhost:54321
-          SUPABASE_SERVICE_ROLE_KEY=test-key
-          RABBITMQ_URL=amqp://localhost:5672
-          KILLBILL_BASE_URL=http://localhost:8080
-          KILLBILL_API_KEY=test-api-key
-          KILLBILL_API_SECRET=test-api-secret
-          KILLBILL_USERNAME=admin
-          KILLBILL_PASSWORD=password
-          KILLBILL_DEFAULT_CURRENCY=USD
-          EOF
+          printf '%s\n' \
+            'SUPABASE_URL=http://localhost:54321' \
+            'SUPABASE_SERVICE_ROLE_KEY=test-key' \
+            'RABBITMQ_URL=amqp://localhost:5672' \
+            'KILLBILL_BASE_URL=http://localhost:8080' \
+            'KILLBILL_API_KEY=test-api-key' \
+            'KILLBILL_API_SECRET=test-api-secret' \
+            'KILLBILL_USERNAME=admin' \
+            'KILLBILL_PASSWORD=password' \
+            'KILLBILL_DEFAULT_CURRENCY=USD' \
+            > supabase/functions/.env
 
       - name: Run tests with coverage
         run: |
@@ -217,17 +217,17 @@ jobs:
           deno-version: ${{ env.DENO_VERSION }}
       - name: Generate .env file
         run: |
-          cat > supabase/functions/.env << 'EOF'
-          SUPABASE_URL=http://localhost:54321
-          SUPABASE_SERVICE_ROLE_KEY=test-key
-          RABBITMQ_URL=amqp://localhost:5672
-          KILLBILL_BASE_URL=http://localhost:8080
-          KILLBILL_API_KEY=test-api-key
-          KILLBILL_API_SECRET=test-api-secret
-          KILLBILL_USERNAME=admin
-          KILLBILL_PASSWORD=password
-          KILLBILL_DEFAULT_CURRENCY=USD
-          EOF
+          printf '%s\n' \
+            'SUPABASE_URL=http://localhost:54321' \
+            'SUPABASE_SERVICE_ROLE_KEY=test-key' \
+            'RABBITMQ_URL=amqp://localhost:5672' \
+            'KILLBILL_BASE_URL=http://localhost:8080' \
+            'KILLBILL_API_KEY=test-api-key' \
+            'KILLBILL_API_SECRET=test-api-secret' \
+            'KILLBILL_USERNAME=admin' \
+            'KILLBILL_PASSWORD=password' \
+            'KILLBILL_DEFAULT_CURRENCY=USD' \
+            > supabase/functions/.env
 
       - name: Run tests and check coverage
         run: |
