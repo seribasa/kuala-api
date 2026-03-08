@@ -87,7 +87,7 @@ jobs:
       - name: Run tests with coverage
         run: |
           cd supabase/functions
-          deno test --allow-net --allow-env --coverage=coverage  --junit-path=test_report.xml
+          deno test --allow-net --allow-env --env-file=.env --coverage=coverage  --junit-path=test_report.xml
 
       - name: Generate coverage report
         run: |
@@ -232,7 +232,7 @@ jobs:
       - name: Run tests and check coverage
         run: |
             cd supabase/functions
-            deno test --allow-net --allow-env --coverage=coverage
+            deno test --allow-net --allow-env --env-file=.env --coverage=coverage
 
             # Generate coverage report dan bersihkan ANSI escape sequences
             COVERAGE_OUTPUT=$(deno coverage coverage/ | sed 's/\x1b\[[0-9;]*m//g')
