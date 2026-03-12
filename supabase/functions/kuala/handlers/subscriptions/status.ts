@@ -8,16 +8,6 @@ import type {
 } from "../../../_shared/types/response.ts";
 import { subscriptionStateManager } from "../../../_shared/services/subscription-state-management.ts";
 
-// Ordered steps in the subscription saga
-const SAGA_STEPS = [
-	"requested",
-	"account_ready",
-	"creating_subscription",
-	"subscription_created",
-	"generating_invoice",
-	"completed",
-] as const;
-
 const TOTAL_STEPS = 4; // The 4 user-facing milestones
 
 // Map internal state to user-facing step number (1-based)
