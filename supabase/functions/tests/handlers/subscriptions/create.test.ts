@@ -1397,3 +1397,101 @@ Deno.test("handleCreateSubscription - should handle checkExistingSubscription ne
 		fetchStub.restore();
 	}
 });
+
+Deno.test("handleCreateSubscription - should return 409 when DUPLICATE_SUBSCRIPTION error is thrown", async () => {
+	const mockUser = {
+		id: "user123",
+		email: "test@example.com",
+	};
+
+	const mockAccount = {
+		accountId: "account123",
+		name: "test@example.com",
+		email: "test@example.com",
+		externalKey: "user123",
+		currency: "USD",
+	};
+
+	// Mock environment variables
+	const envStub = stub(Deno.env, "get", (key: string) => {
+		if (key === "KILLBILL_BASE_URL") return "http://localhost:8080";
+		if (key === "KILLBILL_API_KEY") return "test_key";
+		if (key === "KILLBILL_API_SECRET") return "test_secret";
+		if (key === "KILLBILL_USERNAME") return "admin";
+		if (key === "KILLBILL_PASSWORD") return "password";
+		if (key === "KILLBILL_DEFAULT_CURRENCY") return "USD";
+		return undefined;
+	});
+
+	let callCount = 0;
+	const fetchStub = stub(
+		globalThis,
+		"fetch",
+		(url: string | URL | Request) => {
+			callCount++;
+			const urlString = typeof url === "string"
+				? url
+				: url instanceof URL
+				? url.toString()
+				: url.url;
+
+			// First call: get existing account
+			if (
+				callCount === 1 && urlString.includes("/1.0/kb/accounts") &&
+				urlString.includes("externalKey")
+			) {
+				return Promise.resolve(
+					new MockResponse(mockAccount, 200) as unknown as Response,
+				);
+			}
+
+			// Second call: get bundles (no active subscriptions)
+			if (
+				callCount === 2 && urlString.includes("/1.0/kb/subscriptions")
+			) {
+				return Promise.resolve(
+					new MockResponse(null, 404, false) as unknown as Response,
+				);
+			}
+
+			// Third call: create subscription throws DUPLICATE_SUBSCRIPTION
+			if (
+				callCount === 3 && urlString.includes("/1.0/kb/subscriptions")
+			) {
+				return Promise.reject(
+					new Error(
+						"DUPLICATE_SUBSCRIPTION: Subscription already exists for this account",
+					),
+				);
+			}
+
+			return Promise.resolve(
+				new MockResponse(
+					{ error: "Unexpected call" },
+					500,
+					false,
+				) as unknown as Response,
+			);
+		},
+	);
+
+	try {
+		const mockContext = createMockContext(
+			"Bearer valid_token",
+			{ planId: "basic-monthly" },
+			undefined,
+			mockUser,
+		);
+
+		const response = await handleCreateSubscription(
+			mockContext,
+		) as unknown as JsonResponse;
+
+		assertEquals(response.status, 409);
+		assertEquals(response.data.code, "DUPLICATE_SUBSCRIPTION");
+		assertEquals(response.data.message, "Subscription already exists");
+	} finally {
+		envStub.restore();
+		fetchStub.restore();
+	}
+});

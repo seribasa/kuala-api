@@ -2,13 +2,42 @@ import { Context } from "@hono/hono";
 import { ErrorResponse } from "../../../_shared/types/response.ts";
 import { authLogger, logger } from "../../middleware/logger.ts";
 import { getUser } from "../../middleware/auth.ts";
-import { mapKillBillSubscriptionToSubscription } from "../../utils/subscription-mapper.ts";
 import { killBillService } from "@shared/services/killbill.ts";
 import { subscriptionStateManager } from "../../../_shared/services/subscription-state-management.ts";
 
+interface SubscriptionAccountInfo {
+	name: string;
+	email: string;
+	currency: string;
+}
+
+interface SubscriptionItem {
+	id: string;
+	bundleId: string;
+	accountId: string;
+	userId: string;
+	planName: string;
+	productName: string;
+	billingPeriod: string;
+	state: string;
+	billingStartDate: string;
+	billingEndDate: string | null;
+	chargedThroughDate: string;
+	account: SubscriptionAccountInfo;
+}
+
+interface GetSubscriptionsResponse {
+	subscriptions: SubscriptionItem[];
+	message?: string;
+}
+
 /**
- * Get subscription for current authenticated user
+ * Get subscriptions for current authenticated user
  * GET /subscriptions
+ *
+ * Returns all subscriptions with account enrichment.
+ * If the user has a pending subscription request (saga in progress),
+ * returns 409 with correlation info so the client can poll status.
  */
 export const handleGetSubscription = async (c: Context) => {
 	const handlerName = "get-subscription";
@@ -46,81 +75,119 @@ export const handleGetSubscription = async (c: Context) => {
 			return c.json(errorResponse, 409);
 		}
 
+		const returnMessage = "Subscriptions retrieved successfully";
+		const subscriptions: SubscriptionItem[] = [];
+
 		// Get user's Kill Bill account
-		const account = await killBillService.getAccountByExternalKey(userId);
+		let account;
+		try {
+			account = await killBillService.getAccountByExternalKey(userId);
+		} catch (error) {
+			logger.error(
+				handlerName,
+				"Failed to fetch Kill Bill account",
+				{
+					userId,
+					error: error instanceof Error
+						? error.message
+						: String(error),
+				},
+			);
+			const errorResponse: ErrorResponse = {
+				code: "UPSTREAM_ERROR",
+				message:
+					"Failed to fetch subscription account. Please try again later.",
+			};
+			return c.json(errorResponse, 502);
+		}
+
 		if (!account) {
 			authLogger.success(handlerName, "No account found for user", {
 				userId: userId.substring(0, 8) + "...",
 			});
-			const errorResponse: ErrorResponse = {
-				code: "SUBSCRIPTION_NOT_FOUND",
-				message: "No subscription found for this user",
+			const response: GetSubscriptionsResponse = {
+				subscriptions: [],
+				message: "No subscription account found for this user.",
 			};
-			return c.json(errorResponse, 404);
+			return c.json(response, 200);
 		}
 
 		authLogger.validation(handlerName, "Account found", {
 			accountId: account.accountId.substring(0, 8) + "...",
 		});
 
-		// Get active subscription for this account
-		const kbSubscription = await killBillService
-			.getSubscriptionByExternalId(
-				userId,
+		// Get subscription for this account
+		try {
+			const kbSubscription = await killBillService
+				.getSubscriptionByExternalId(userId);
+
+			if (kbSubscription) {
+				authLogger.validation(
+					handlerName,
+					"Active subscription found",
+					{
+						subscriptionId:
+							kbSubscription.subscriptionId?.substring(0, 8) +
+							"...",
+						planName: kbSubscription.planName,
+						state: kbSubscription.state,
+					},
+				);
+
+				subscriptions.push({
+					id: kbSubscription.subscriptionId,
+					bundleId: kbSubscription.bundleId,
+					accountId: account.accountId,
+					userId: userId,
+					planName: kbSubscription.planName,
+					productName: kbSubscription.productName,
+					billingPeriod: kbSubscription.billingPeriod,
+					state: kbSubscription.state,
+					billingStartDate: kbSubscription.billingStartDate,
+					billingEndDate: kbSubscription.billingEndDate || null,
+					chargedThroughDate: kbSubscription.chargedThroughDate,
+					account: {
+						name: account.name,
+						email: account.email,
+						currency: account.currency,
+					},
+				});
+			}
+		} catch (error) {
+			logger.error(
+				handlerName,
+				"Failed to fetch subscription details",
+				{
+					accountId: account.accountId,
+					error: error instanceof Error
+						? error.message
+						: String(error),
+				},
 			);
-		if (!kbSubscription) {
-			authLogger.success(handlerName, "No active subscription found", {
-				accountId: account.accountId.substring(0, 8) + "...",
-			});
 			const errorResponse: ErrorResponse = {
-				code: "SUBSCRIPTION_NOT_FOUND",
-				message: "No active subscription found for this user",
+				code: "UPSTREAM_ERROR",
+				message:
+					"Failed to fetch subscription details. Please try again later.",
 			};
-			return c.json(errorResponse, 404);
+			return c.json(errorResponse, 502);
 		}
 
-		authLogger.validation(handlerName, "Active subscription found", {
-			subscriptionId: kbSubscription.subscriptionId?.substring(0, 8) +
-				"...",
-			planName: kbSubscription.planName,
-			state: kbSubscription.state,
-		});
-
-		// Map Kill Bill subscription to our format
-		const subscription = mapKillBillSubscriptionToSubscription(
-			kbSubscription,
-			userId,
-			account.accountId,
+		authLogger.success(
+			handlerName,
+			"Subscriptions retrieved successfully",
+			{
+				count: subscriptions.length,
+				message: returnMessage,
+			},
 		);
 
-		authLogger.success(handlerName, "Subscription retrieved successfully", {
-			subscriptionId: subscription.id.substring(0, 8) + "...",
-			planId: subscription.planId,
-			status: subscription.status,
-		});
-
-		return c.json(subscription, 200);
+		const response: GetSubscriptionsResponse = {
+			subscriptions,
+			message: returnMessage,
+		};
+		return c.json(response, 200);
 	} catch (error) {
 		authLogger.exception(handlerName, error as Error);
-
-		// Handle specific Kill Bill errors
-		if (error instanceof Error) {
-			if (error.message === "SUBSCRIPTION_NOT_FOUND") {
-				const errorResponse: ErrorResponse = {
-					code: "SUBSCRIPTION_NOT_FOUND",
-					message: "No subscription found for this user",
-				};
-				return c.json(errorResponse, 404);
-			}
-
-			if (error.message.includes("Failed to get")) {
-				const errorResponse: ErrorResponse = {
-					code: "KILLBILL_ERROR",
-					message: "Failed to fetch subscription data",
-				};
-				return c.json(errorResponse, 500);
-			}
-		}
 
 		const errorResponse: ErrorResponse = {
 			code: "INTERNAL_ERROR",
