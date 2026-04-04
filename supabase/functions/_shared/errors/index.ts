@@ -36,14 +36,3 @@ export type {
 	RetryResult,
 } from "./retry-utils.ts";
 
-// Compensation actions
-export {
-	buildCompensationContext,
-	compensationActions,
-	executeCompensation,
-} from "./compensation.ts";
-export type {
-	CompensationContext,
-	CompensationOptions,
-	CompensationResult,
-} from "./compensation.ts";

@@ -394,3 +394,88 @@ Deno.test("withRetry - should handle async operations correctly", async () => {
 	// Should have waited at least 50ms between retries
 	assertEquals(elapsed >= 50, true);
 });
+
+// =============================================================================
+// createRetryWrapper Tests
+// =============================================================================
+
+import { createRetryWrapper } from "../../_shared/errors/retry-utils.ts";
+
+Deno.test("createRetryWrapper - should return a working wrapper", async () => {
+	let attempts = 0;
+	const myFunc = async (arg1: string, arg2: number) => {
+		attempts++;
+		if (attempts < 2) throw new Error("ECONNREFUSED");
+		return `${arg1}-${arg2}`;
+	};
+
+	const wrappedFunc = createRetryWrapper(myFunc, { maxRetries: 2, baseDelayMs: 10, useJitter: false });
+	const res = await wrappedFunc("hello", 42);
+
+	assertEquals(res, "hello-42");
+	assertEquals(attempts, 2);
+});
+
+// =============================================================================
+// createCircuitBreaker Tests
+// =============================================================================
+
+import { createCircuitBreaker } from "../../_shared/errors/retry-utils.ts";
+
+Deno.test("createCircuitBreaker - should allow success calls", async () => {
+	const myFunc = async () => "success";
+	const breaker = createCircuitBreaker(myFunc);
+	
+	assertEquals(await breaker(), "success");
+});
+
+Deno.test("createCircuitBreaker - should open circuit after failureThreshold", async () => {
+	let count = 0;
+	const myFunc = async () => {
+		count++;
+		throw new Error("Fail " + count);
+	};
+	const breaker = createCircuitBreaker(myFunc, { failureThreshold: 2, resetTimeoutMs: 1000 });
+
+	await assertRejects(() => breaker(), Error, "Fail 1");
+	await assertRejects(() => breaker(), Error, "Fail 2");
+	// 3rd call should fail fast with breaker open error
+	await assertRejects(() => breaker(), Error, "Circuit breaker is open - failing fast");
+});
+
+Deno.test("createCircuitBreaker - should try half-open after timeout", async () => {
+	let count = 0;
+	let shouldFail = true;
+	const myFunc = async () => {
+		if (shouldFail) throw new Error("Fail");
+		return "ok";
+	};
+	const breaker = createCircuitBreaker(myFunc, { failureThreshold: 1, resetTimeoutMs: 50, successThreshold: 1 });
+
+	await assertRejects(() => breaker(), Error, "Fail");
+	await assertRejects(() => breaker(), Error, "Circuit breaker is open - failing fast");
+	
+	// Wait for reset timeout
+	await new Promise(r => setTimeout(r, 60));
+	shouldFail = false;
+	
+	// Should be half-open and then close after 1 success
+	assertEquals(await breaker(), "ok");
+	assertEquals(await breaker(), "ok");
+});
+
+Deno.test("createCircuitBreaker - should reopen if half-open fails", async () => {
+	const myFunc = async () => {
+		throw new Error("Fail");
+	};
+	const breaker = createCircuitBreaker(myFunc, { failureThreshold: 1, resetTimeoutMs: 50 });
+
+	await assertRejects(() => breaker(), Error, "Fail");
+	// Wait for reset timeout
+	await new Promise(r => setTimeout(r, 60));
+	
+	// Half-open attempt fails
+	await assertRejects(() => breaker(), Error, "Fail");
+	// Next attempt fails fast
+	await assertRejects(() => breaker(), Error, "Circuit breaker is open - failing fast");
+});

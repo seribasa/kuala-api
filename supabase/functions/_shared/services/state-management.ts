@@ -117,7 +117,13 @@ export class StateManagementService {
 	private validateTransitions: boolean;
 
 	constructor(options: { validateTransitions?: boolean } = {}) {
-		this.supabase = createClient(supabaseUrl, supabaseServiceKey);
+		this.supabase = createClient(supabaseUrl, supabaseServiceKey, {
+			auth: {
+				autoRefreshToken: false,
+				persistSession: false,
+				detectSessionInUrl: false,
+			},
+		});
 		this.validateTransitions = options.validateTransitions ?? true;
 	}
 
