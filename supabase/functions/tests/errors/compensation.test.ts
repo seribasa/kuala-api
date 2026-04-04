@@ -30,7 +30,9 @@ const mockLogger = {
 };
 
 describe("compensationActions", () => {
+    // deno-lint-ignore no-explicit-any
     let cancelSubscriptionStub: any;
+    // deno-lint-ignore no-explicit-any
     let voidInvoiceStub: any;
 
     beforeEach(() => {
@@ -127,7 +129,9 @@ describe("compensationActions", () => {
 });
 
 describe("executeCompensation", () => {
+    // deno-lint-ignore no-explicit-any
     let cancelSubscriptionStub: any;
+    // deno-lint-ignore no-explicit-any
     let transitionStateStub: any;
 
     beforeEach(() => {

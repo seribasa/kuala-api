@@ -403,10 +403,10 @@ import { createRetryWrapper } from "../../_shared/errors/retry-utils.ts";
 
 Deno.test("createRetryWrapper - should return a working wrapper", async () => {
 	let attempts = 0;
-	const myFunc = async (arg1: string, arg2: number) => {
+	const myFunc = (arg1: string, arg2: number) => {
 		attempts++;
-		if (attempts < 2) throw new Error("ECONNREFUSED");
-		return `${arg1}-${arg2}`;
+		if (attempts < 2) return Promise.reject(new Error("ECONNREFUSED"));
+		return Promise.resolve(`${arg1}-${arg2}`);
 	};
 
 	const wrappedFunc = createRetryWrapper(myFunc, { maxRetries: 2, baseDelayMs: 10, useJitter: false });
@@ -423,7 +423,7 @@ Deno.test("createRetryWrapper - should return a working wrapper", async () => {
 import { createCircuitBreaker } from "../../_shared/errors/retry-utils.ts";
 
 Deno.test("createCircuitBreaker - should allow success calls", async () => {
-	const myFunc = async () => "success";
+	const myFunc = () => Promise.resolve("success");
 	const breaker = createCircuitBreaker(myFunc);
 	
 	assertEquals(await breaker(), "success");
@@ -431,9 +431,9 @@ Deno.test("createCircuitBreaker - should allow success calls", async () => {
 
 Deno.test("createCircuitBreaker - should open circuit after failureThreshold", async () => {
 	let count = 0;
-	const myFunc = async () => {
+	const myFunc = () => {
 		count++;
-		throw new Error("Fail " + count);
+		return Promise.reject(new Error("Fail " + count));
 	};
 	const breaker = createCircuitBreaker(myFunc, { failureThreshold: 2, resetTimeoutMs: 1000 });
 
@@ -444,11 +444,10 @@ Deno.test("createCircuitBreaker - should open circuit after failureThreshold", a
 });
 
 Deno.test("createCircuitBreaker - should try half-open after timeout", async () => {
-	let count = 0;
 	let shouldFail = true;
-	const myFunc = async () => {
-		if (shouldFail) throw new Error("Fail");
-		return "ok";
+	const myFunc = () => {
+		if (shouldFail) return Promise.reject(new Error("Fail"));
+		return Promise.resolve("ok");
 	};
 	const breaker = createCircuitBreaker(myFunc, { failureThreshold: 1, resetTimeoutMs: 50, successThreshold: 1 });
 
@@ -465,8 +464,8 @@ Deno.test("createCircuitBreaker - should try half-open after timeout", async () 
 });
 
 Deno.test("createCircuitBreaker - should reopen if half-open fails", async () => {
-	const myFunc = async () => {
-		throw new Error("Fail");
+	const myFunc = () => {
+		return Promise.reject(new Error("Fail"));
 	};
 	const breaker = createCircuitBreaker(myFunc, { failureThreshold: 1, resetTimeoutMs: 50 });
 

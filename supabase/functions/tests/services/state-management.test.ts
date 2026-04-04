@@ -3,13 +3,11 @@ import {
 	assertRejects,
 } from "https://deno.land/std@0.224.0/testing/asserts.ts";
 import {
-	afterEach,
 	beforeEach,
 	describe,
 	it,
 } from "https://deno.land/std@0.224.0/testing/bdd.ts";
 import {
-	assertSpyCalls,
 	returnsNext,
 	stub,
 } from "https://deno.land/std@0.224.0/testing/mock.ts";
@@ -45,6 +43,7 @@ describe("StateManagementService Transitions & Validation", () => {
 
     describe("StateManagementService API", () => {
         let service: StateManagementService;
+        // deno-lint-ignore no-explicit-any
         let mockSupabase: any;
 
         beforeEach(() => {
@@ -60,6 +59,7 @@ describe("StateManagementService Transitions & Validation", () => {
                 gte: () => mockSupabase,
                 lte: () => mockSupabase,
             };
+            // deno-lint-ignore no-explicit-any
             (service as any).supabase = mockSupabase;
         });
 
@@ -150,7 +150,7 @@ describe("StateManagementService Transitions & Validation", () => {
         });
 
         it("getStateStatistics - throws on error", async () => {
-             let queryPromise = Promise.resolve({ data: null, error: new Error("err") });
+             const queryPromise = Promise.resolve({ data: null, error: new Error("err") });
              // Mocking the query directly returning the promise
              mockSupabase.eq = () => mockSupabase;
              mockSupabase.gte = () => mockSupabase;
@@ -180,6 +180,7 @@ describe("StateManagementService Transitions & Validation", () => {
                  { data: "t3", error: null }
              ]));
              const serviceNoVal = new StateManagementService({ validateTransitions: false });
+             // deno-lint-ignore no-explicit-any
              (serviceNoVal as any).supabase = mockSupabase;
 
              const res = await serviceNoVal.bulkTransition("subs", ["id1", "id2", "id3"], "account_ready");

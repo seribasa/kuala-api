@@ -3,9 +3,7 @@ import {
 	authLogger,
 	customLogger,
 	log,
-	type LogData,
 	logger,
-	type LogLevel,
 } from "../../../_shared/middleware/logger.ts";
 
 // Helper function to capture console output

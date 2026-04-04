@@ -18,6 +18,7 @@ import { subscriptionStateManager } from "../../_shared/services/subscription-st
 import { stateManager } from "../../_shared/services/state-management.ts";
 
 describe("subscriptionStateManager Transitions", () => {
+    // deno-lint-ignore no-explicit-any
     let transitionStateStub: any;
 
     beforeEach(() => {
@@ -89,12 +90,16 @@ describe("subscriptionStateManager Transitions", () => {
 
 describe("subscriptionStateManager Queries", () => {
     afterEach(() => {
+        // deno-lint-ignore no-explicit-any
         if ((stateManager as any).getCurrentState.restore) (stateManager as any).getCurrentState.restore();
+        // deno-lint-ignore no-explicit-any
         if ((stateManager as any).getStateHistory.restore) (stateManager as any).getStateHistory.restore();
+        // deno-lint-ignore no-explicit-any
         if ((stateManager as any).getEntitiesByMetadata.restore) (stateManager as any).getEntitiesByMetadata.restore();
     });
 
     it("getCurrentState", async () => {
+        // deno-lint-ignore no-explicit-any
         const _stub = stub(stateManager, "getCurrentState", returnsNext([Promise.resolve({current_state: "c"} as any)]));
         const res = await subscriptionStateManager.getCurrentState("corr1");
         assertSpyCalls(_stub, 1);
@@ -102,6 +107,7 @@ describe("subscriptionStateManager Queries", () => {
     });
 
     it("getHistory", async () => {
+        // deno-lint-ignore no-explicit-any
         const _stub = stub(stateManager, "getStateHistory", returnsNext([Promise.resolve([{to_state: "t"}] as any)]));
         const res = await subscriptionStateManager.getHistory("corr1");
         assertSpyCalls(_stub, 1);
@@ -109,12 +115,14 @@ describe("subscriptionStateManager Queries", () => {
     });
 
     it("hasPendingSubscriptionRequest - true", async () => {
+        // deno-lint-ignore no-explicit-any
         const _stub = stub(stateManager, "getEntitiesByMetadata", returnsNext([Promise.resolve([{current_state: "requested"} as any])]));
         const res = await subscriptionStateManager.hasPendingSubscriptionRequest("u1");
         assertEquals(res, true);
     });
 
     it("hasPendingSubscriptionRequest - false", async () => {
+        // deno-lint-ignore no-explicit-any
         const _stub = stub(stateManager, "getEntitiesByMetadata", returnsNext([Promise.resolve([{current_state: "completed"} as any])]));
         const res = await subscriptionStateManager.hasPendingSubscriptionRequest("u1");
         assertEquals(res, false);
@@ -132,6 +140,7 @@ describe("subscriptionStateManager Queries", () => {
             {state_updated_at: "2021-01-01T00:00:00Z"},
             {state_updated_at: "2019-01-01T00:00:00Z"}
         ];
+        // deno-lint-ignore no-explicit-any
         const _stub = stub(stateManager, "getEntitiesByMetadata", returnsNext([Promise.resolve(entities as any)]));
         const res = await subscriptionStateManager.getLatestSubscriptionRequest("u1");
         assertEquals(res?.state_updated_at, "2021-01-01T00:00:00Z");
@@ -141,6 +150,7 @@ describe("subscriptionStateManager Queries", () => {
 describe("subscriptionStateManager Locks", () => {
     // To mock the local supabase client, we can monkey-patch fetch since supabase-js uses it under the hood.
     // Or we just rely on fetch mock.
+    // deno-lint-ignore no-explicit-any
     let fetchStub: any;
 
     beforeEach(() => {

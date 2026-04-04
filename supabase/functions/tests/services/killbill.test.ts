@@ -14,9 +14,10 @@ import {
 	stub,
 } from "https://deno.land/std@0.224.0/testing/mock.ts";
 
-import { KillBillService, killBillService } from "../../_shared/services/killbill.ts";
+import { killBillService } from "../../_shared/services/killbill.ts";
 
 describe("KillBillService", () => {
+    // deno-lint-ignore no-explicit-any
     let fetchStub: any;
 
     beforeEach(() => {
@@ -333,7 +334,7 @@ describe("KillBillService", () => {
              );
              assertEquals(res[0].invoiceId, "1");
              // ensure correct query string
-             const callArg = fetchStub.calls[0].args[0];
+             const _callArg = fetchStub.calls[0].args[0];
              assertSpyCalls(fetchStub, 1);
         });
         it("error", async () => {
