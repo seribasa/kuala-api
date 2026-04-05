@@ -1,18 +1,18 @@
 import {
 	assertEquals,
 	assertRejects,
-} from "https://deno.land/std@0.224.0/testing/asserts.ts";
+} from "@std/assert";
 import {
 	afterEach,
 	beforeEach,
 	describe,
 	it,
-} from "https://deno.land/std@0.224.0/testing/bdd.ts";
+} from "@std/testing/bdd";
 import {
 	assertSpyCalls,
 	returnsNext,
 	stub,
-} from "https://deno.land/std@0.224.0/testing/mock.ts";
+} from "@std/testing/mock";
 
 import { subscriptionStateManager } from "../../_shared/services/subscription-state-management.ts";
 import { stateManager } from "../../_shared/services/state-management.ts";
