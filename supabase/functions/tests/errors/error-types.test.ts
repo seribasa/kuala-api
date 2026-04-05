@@ -313,14 +313,18 @@ Deno.test("ErrorType - should have correct values", () => {
 // =============================================================================
 
 import {
-	createTransientError,
-	createPermanentError,
 	createPartialError,
+	createPermanentError,
+	createTransientError,
 	requiresCompensation,
 } from "../../_shared/errors/error-types.ts";
 
 Deno.test("ApplicationError - toJSON should return plain object", () => {
-	const err = new ApplicationError(ErrorCodes.INTERNAL_ERROR, "msg", { type: ErrorType.TRANSIENT, retryable: true, compensationRequired: true });
+	const err = new ApplicationError(ErrorCodes.INTERNAL_ERROR, "msg", {
+		type: ErrorType.TRANSIENT,
+		retryable: true,
+		compensationRequired: true,
+	});
 	const json = err.toJSON();
 	assertEquals(json.name, "ApplicationError");
 	assertEquals(json.code, ErrorCodes.INTERNAL_ERROR);
@@ -331,13 +335,19 @@ Deno.test("ApplicationError - toJSON should return plain object", () => {
 });
 
 Deno.test("requiresCompensation - should return true if required", () => {
-	const err = new ApplicationError(ErrorCodes.INTERNAL_ERROR, "msg", { compensationRequired: true });
+	const err = new ApplicationError(ErrorCodes.INTERNAL_ERROR, "msg", {
+		compensationRequired: true,
+	});
 	assertEquals(requiresCompensation(err), true);
 	assertEquals(requiresCompensation(new Error("standard error")), false);
 });
 
 Deno.test("createTransientError - should create right error", () => {
-	const err = createTransientError(ErrorCodes.INTERNAL_ERROR, "msg", new Error("cause"));
+	const err = createTransientError(
+		ErrorCodes.INTERNAL_ERROR,
+		"msg",
+		new Error("cause"),
+	);
 	assertEquals(err.type, ErrorType.TRANSIENT);
 	assertEquals(err.retryable, true);
 	assertEquals(err.compensationRequired, false);
@@ -345,16 +355,23 @@ Deno.test("createTransientError - should create right error", () => {
 });
 
 Deno.test("createPermanentError - should create right error", () => {
-	const err = createPermanentError(ErrorCodes.INTERNAL_ERROR, "msg", new Error("cause"));
+	const err = createPermanentError(
+		ErrorCodes.INTERNAL_ERROR,
+		"msg",
+		new Error("cause"),
+	);
 	assertEquals(err.type, ErrorType.PERMANENT);
 	assertEquals(err.retryable, false);
 	assertEquals(err.compensationRequired, false);
 });
 
 Deno.test("createPartialError - should create right error", () => {
-	const err = createPartialError(ErrorCodes.INTERNAL_ERROR, "msg", new Error("cause"));
+	const err = createPartialError(
+		ErrorCodes.INTERNAL_ERROR,
+		"msg",
+		new Error("cause"),
+	);
 	assertEquals(err.type, ErrorType.PARTIAL);
 	assertEquals(err.retryable, false);
 	assertEquals(err.compensationRequired, true);
 });
-
