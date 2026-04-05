@@ -116,25 +116,26 @@ describe("subscriptionStateManager Transitions", () => {
 
 describe("subscriptionStateManager Queries", () => {
 	afterEach(() => {
-		// deno-lint-ignore no-explicit-any
-		if ((stateManager as any).getCurrentState.restore) {
-			(stateManager as any).getCurrentState.restore();
+		const sm = stateManager as unknown as Record<
+			string,
+			{ restore?: () => void }
+		>;
+		if (sm.getCurrentState?.restore) {
+			sm.getCurrentState.restore();
 		}
-		// deno-lint-ignore no-explicit-any
-		if ((stateManager as any).getStateHistory.restore) {
-			(stateManager as any).getStateHistory.restore();
+		if (sm.getStateHistory?.restore) {
+			sm.getStateHistory.restore();
 		}
-		// deno-lint-ignore no-explicit-any
-		if ((stateManager as any).getEntitiesByMetadata.restore) {
-			(stateManager as any).getEntitiesByMetadata.restore();
+		if (sm.getEntitiesByMetadata?.restore) {
+			sm.getEntitiesByMetadata.restore();
 		}
 	});
 
 	it("getCurrentState", async () => {
-		// deno-lint-ignore no-explicit-any
 		const _stub = stub(
 			stateManager,
 			"getCurrentState",
+			// deno-lint-ignore no-explicit-any
 			returnsNext([Promise.resolve({ current_state: "c" } as any)]),
 		);
 		const res = await subscriptionStateManager.getCurrentState("corr1");
@@ -143,10 +144,10 @@ describe("subscriptionStateManager Queries", () => {
 	});
 
 	it("getHistory", async () => {
-		// deno-lint-ignore no-explicit-any
 		const _stub = stub(
 			stateManager,
 			"getStateHistory",
+			// deno-lint-ignore no-explicit-any
 			returnsNext([Promise.resolve([{ to_state: "t" }] as any)]),
 		);
 		const res = await subscriptionStateManager.getHistory("corr1");
@@ -155,11 +156,11 @@ describe("subscriptionStateManager Queries", () => {
 	});
 
 	it("hasPendingSubscriptionRequest - true", async () => {
-		// deno-lint-ignore no-explicit-any
 		const _stub = stub(
 			stateManager,
 			"getEntitiesByMetadata",
 			returnsNext([
+				// deno-lint-ignore no-explicit-any
 				Promise.resolve([{ current_state: "requested" } as any]),
 			]),
 		);
@@ -169,11 +170,11 @@ describe("subscriptionStateManager Queries", () => {
 	});
 
 	it("hasPendingSubscriptionRequest - false", async () => {
-		// deno-lint-ignore no-explicit-any
 		const _stub = stub(
 			stateManager,
 			"getEntitiesByMetadata",
 			returnsNext([
+				// deno-lint-ignore no-explicit-any
 				Promise.resolve([{ current_state: "completed" } as any]),
 			]),
 		);
@@ -200,10 +201,10 @@ describe("subscriptionStateManager Queries", () => {
 			{ state_updated_at: "2021-01-01T00:00:00Z" },
 			{ state_updated_at: "2019-01-01T00:00:00Z" },
 		];
-		// deno-lint-ignore no-explicit-any
 		const _stub = stub(
 			stateManager,
 			"getEntitiesByMetadata",
+			// deno-lint-ignore no-explicit-any
 			returnsNext([Promise.resolve(entities as any)]),
 		);
 		const res = await subscriptionStateManager.getLatestSubscriptionRequest(
