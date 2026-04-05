@@ -8,219 +8,219 @@ _transform: true
 # SERVICES - Backend service definitions
 # =============================================================================
 services:
-  # Account Service
-  - name: account-service
-    url: http://host.docker.internal:9001
-    connect_timeout: 60000
-    write_timeout: 60000
-    read_timeout: 60000
-    retries: 3
+    # Account Service
+    - name: account-service
+      url: http://host.docker.internal:9001
+      connect_timeout: 60000
+      write_timeout: 60000
+      read_timeout: 60000
+      retries: 3
 
-  # Invoice Service
-  - name: invoice-service
-    url: http://host.docker.internal:9002
-    connect_timeout: 60000
-    write_timeout: 60000
-    read_timeout: 60000
-    retries: 3
+    # Invoice Service
+    - name: invoice-service
+      url: http://host.docker.internal:9002
+      connect_timeout: 60000
+      write_timeout: 60000
+      read_timeout: 60000
+      retries: 3
 
-  # Subscription Service
-  - name: subscription-service
-    url: http://host.docker.internal:9003
-    connect_timeout: 60000
-    write_timeout: 60000
-    read_timeout: 60000
-    retries: 3
+    # Subscription Service
+    - name: subscription-service
+      url: http://host.docker.internal:9003
+      connect_timeout: 60000
+      write_timeout: 60000
+      read_timeout: 60000
+      retries: 3
 
-  # Kill Bill Billing Engine
-  - name: killbill-service
-    url: http://host.docker.internal:8080
-    connect_timeout: 60000
-    write_timeout: 60000
-    read_timeout: 60000
-    retries: 3
+    # Kill Bill Billing Engine
+    - name: killbill-service
+      url: http://host.docker.internal:8080
+      connect_timeout: 60000
+      write_timeout: 60000
+      read_timeout: 60000
+      retries: 3
 
-  # Supabase Edge Functions
-  - name: supabase-functions
-    url: http://host.docker.internal:54321/functions/v1
-    connect_timeout: 60000
-    write_timeout: 60000
-    read_timeout: 60000
-    retries: 3
+    # Supabase Edge Functions
+    - name: supabase-functions
+      url: http://host.docker.internal:54321/functions/v1
+      connect_timeout: 60000
+      write_timeout: 60000
+      read_timeout: 60000
+      retries: 3
 
-  # RabbitMQ Management API
-  - name: rabbitmq-management
-    url: http://host.docker.internal:15672
-    connect_timeout: 30000
-    write_timeout: 30000
-    read_timeout: 30000
+    # RabbitMQ Management API
+    - name: rabbitmq-management
+      url: http://host.docker.internal:15672
+      connect_timeout: 30000
+      write_timeout: 30000
+      read_timeout: 30000
 
 # =============================================================================
 # ROUTES - URL path to service mapping
 # =============================================================================
 routes:
-  # Account Service Routes
-  - name: account-service-route
-    service: account-service
-    paths:
-      - /api/accounts
-    strip_path: false
-    preserve_host: true
+    # Account Service Routes
+    - name: account-service-route
+      service: account-service
+      paths:
+          - /api/accounts
+      strip_path: false
+      preserve_host: true
 
-  # Invoice Service Routes
-  - name: invoice-service-route
-    service: invoice-service
-    paths:
-      - /api/invoices
-    strip_path: false
-    preserve_host: true
+    # Invoice Service Routes
+    - name: invoice-service-route
+      service: invoice-service
+      paths:
+          - /api/invoices
+      strip_path: false
+      preserve_host: true
 
-  # Subscription Service Routes
-  - name: subscription-service-route
-    service: subscription-service
-    paths:
-      - /api/subscriptions
-    strip_path: false
-    preserve_host: true
+    # Subscription Service Routes
+    - name: subscription-service-route
+      service: subscription-service
+      paths:
+          - /api/subscriptions
+      strip_path: false
+      preserve_host: true
 
-  # Kill Bill Routes
-  - name: killbill-route
-    service: killbill-service
-    paths:
-      - /api/billing
-    strip_path: true
-    preserve_host: false
+    # Kill Bill Routes
+    - name: killbill-route
+      service: killbill-service
+      paths:
+          - /api/billing
+      strip_path: true
+      preserve_host: false
 
-  # Supabase Edge Functions Routes (Kuala API)
-  - name: kuala-api-route
-    service: supabase-functions
-    paths:
-      - /api/v1
-    strip_path: true
-    preserve_host: false
-    methods:
-      - GET
-      - POST
-      - PUT
-      - PATCH
-      - DELETE
-      - OPTIONS
+    # Supabase Edge Functions Routes (Kuala API)
+    - name: kuala-api-route
+      service: supabase-functions
+      paths:
+          - /api/v1
+      strip_path: true
+      preserve_host: false
+      methods:
+          - GET
+          - POST
+          - PUT
+          - PATCH
+          - DELETE
+          - OPTIONS
 
-  # RabbitMQ Management (admin only)
-  - name: rabbitmq-management-route
-    service: rabbitmq-management
-    paths:
-      - /admin/rabbitmq
-    strip_path: true
-    preserve_host: false
+    # RabbitMQ Management (admin only)
+    - name: rabbitmq-management-route
+      service: rabbitmq-management
+      paths:
+          - /admin/rabbitmq
+      strip_path: true
+      preserve_host: false
 
 # =============================================================================
 # PLUGINS - Global plugins
 # =============================================================================
 plugins:
-  # CORS Plugin - Global
-  - name: cors
-    config:
-      origins:
-        - "*"
-      methods:
-        - GET
-        - POST
-        - PUT
-        - PATCH
-        - DELETE
-        - OPTIONS
-      headers:
-        - Accept
-        - Accept-Version
-        - Content-Length
-        - Content-MD5
-        - Content-Type
-        - Date
-        - Authorization
-        - X-Requested-With
-        - X-Request-Id
-        - X-Correlation-Id
-        - apikey
-      exposed_headers:
-        - X-Request-Id
-        - X-Correlation-Id
-      credentials: true
-      max_age: 3600
-      preflight_continue: false
+    # CORS Plugin - Global
+    - name: cors
+      config:
+          origins:
+              - "*"
+          methods:
+              - GET
+              - POST
+              - PUT
+              - PATCH
+              - DELETE
+              - OPTIONS
+          headers:
+              - Accept
+              - Accept-Version
+              - Content-Length
+              - Content-MD5
+              - Content-Type
+              - Date
+              - Authorization
+              - X-Requested-With
+              - X-Request-Id
+              - X-Correlation-Id
+              - apikey
+          exposed_headers:
+              - X-Request-Id
+              - X-Correlation-Id
+          credentials: true
+          max_age: 3600
+          preflight_continue: false
 
-  # Request ID Plugin - Global
-  - name: correlation-id
-    config:
-      header_name: X-Correlation-Id
-      generator: uuid#counter
-      echo_downstream: true
+    # Request ID Plugin - Global
+    - name: correlation-id
+      config:
+          header_name: X-Correlation-Id
+          generator: uuid#counter
+          echo_downstream: true
 
-  # Rate Limiting - Global (100 requests per minute)
-  - name: rate-limiting
-    config:
-      minute: 100
-      policy: local
-      fault_tolerant: true
-      hide_client_headers: false
+    # Rate Limiting - Global (100 requests per minute)
+    - name: rate-limiting
+      config:
+          minute: 100
+          policy: local
+          fault_tolerant: true
+          hide_client_headers: false
 
-  # Request/Response Logging
-  - name: file-log
-    config:
-      path: /dev/stdout
-      reopen: false
+    # Request/Response Logging
+    - name: file-log
+      config:
+          path: /dev/stdout
+          reopen: false
 
 # =============================================================================
 # CONSUMERS - API consumers (for future JWT/Key auth)
 # =============================================================================
 consumers:
-  # Internal services consumer
-  - username: internal-service
-    custom_id: internal-service-001
+    # Internal services consumer
+    - username: internal-service
+      custom_id: internal-service-001
 
-  # External API consumer
-  - username: external-api
-    custom_id: external-api-001
+    # External API consumer
+    - username: external-api
+      custom_id: external-api-001
 
 # =============================================================================
 # UPSTREAMS - Load balancing configuration (for future scaling)
 # =============================================================================
 upstreams:
-  - name: account-service-upstream
-    targets:
-      - target: host.docker.internal:9001
-        weight: 100
-    healthchecks:
-      active:
-        healthy:
-          interval: 30
-          successes: 2
-        unhealthy:
-          interval: 5
-          http_failures: 3
+    - name: account-service-upstream
+      targets:
+          - target: host.docker.internal:9001
+            weight: 100
+      healthchecks:
+          active:
+              healthy:
+                  interval: 30
+                  successes: 2
+              unhealthy:
+                  interval: 5
+                  http_failures: 3
 
-  - name: invoice-service-upstream
-    targets:
-      - target: host.docker.internal:9002
-        weight: 100
-    healthchecks:
-      active:
-        healthy:
-          interval: 30
-          successes: 2
-        unhealthy:
-          interval: 5
-          http_failures: 3
+    - name: invoice-service-upstream
+      targets:
+          - target: host.docker.internal:9002
+            weight: 100
+      healthchecks:
+          active:
+              healthy:
+                  interval: 30
+                  successes: 2
+              unhealthy:
+                  interval: 5
+                  http_failures: 3
 
-  - name: subscription-service-upstream
-    targets:
-      - target: host.docker.internal:9003
-        weight: 100
-    healthchecks:
-      active:
-        healthy:
-          interval: 30
-          successes: 2
-        unhealthy:
-          interval: 5
-          http_failures: 3
+    - name: subscription-service-upstream
+      targets:
+          - target: host.docker.internal:9003
+            weight: 100
+      healthchecks:
+          active:
+              healthy:
+                  interval: 30
+                  successes: 2
+              unhealthy:
+                  interval: 5
+                  http_failures: 3

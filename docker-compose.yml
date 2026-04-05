@@ -10,191 +10,198 @@
 
 services:
 
-  # ============================================================================
-  # INFRASTRUCTURE: Message Broker
-  # Management UI: http://localhost:15672 (guest/guest)
-  # ============================================================================
-  rabbitmq:
-    image: rabbitmq:3-management
-    container_name: rabbitmq
-    hostname: rabbitmq
-    ports:
-      - "5672:5672"    # AMQP
-      - "15672:15672"  # Management UI
-    environment:
-      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER:-guest}
-      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASS:-guest}
-    volumes:
-      - rabbitmq_data:/var/lib/rabbitmq
-    healthcheck:
-      test: ["CMD", "rabbitmq-diagnostics", "ping"]
-      interval: 10s
-      timeout: 5s
-      retries: 10
-      start_period: 30s
-    restart: unless-stopped
+    # ============================================================================
+    # INFRASTRUCTURE: Message Broker
+    # Management UI: http://localhost:15672 (guest/guest)
+    # ============================================================================
+    rabbitmq:
+        image: rabbitmq:3-management
+        container_name: rabbitmq
+        hostname: rabbitmq
+        ports:
+            - "5672:5672" # AMQP
+            - "15672:15672" # Management UI
+        environment:
+            RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER:-guest}
+            RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASS:-guest}
+        volumes:
+            - rabbitmq_data:/var/lib/rabbitmq
+        healthcheck:
+            test: ["CMD", "rabbitmq-diagnostics", "ping"]
+            interval: 10s
+            timeout: 5s
+            retries: 10
+            start_period: 30s
+        restart: unless-stopped
 
-  # ============================================================================
-  # INFRASTRUCTURE: Kill Bill Database (MariaDB)
-  # Note: Kill Bill requires MariaDB, not standard Postgres
-  # ============================================================================
-  db:
-    container_name: mariadb-kuala
-    image: killbill/mariadb:0.24
-    volumes:
-      - killbill_db:/var/lib/mysql
-    expose:
-      - "3306"
-    environment:
-      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-killbillroot}
-    healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-p${MYSQL_ROOT_PASSWORD:-killbillroot}"]
-      interval: 5s
-      timeout: 3s
-      retries: 10
-    restart: unless-stopped
+    # ============================================================================
+    # INFRASTRUCTURE: Kill Bill Database (MariaDB)
+    # Note: Kill Bill requires MariaDB, not standard Postgres
+    # ============================================================================
+    db:
+        container_name: mariadb-kuala
+        image: killbill/mariadb:0.24
+        volumes:
+            - killbill_db:/var/lib/mysql
+        expose:
+            - "3306"
+        environment:
+            MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-killbillroot}
+        healthcheck:
+            test: [
+                "CMD",
+                "mysqladmin",
+                "ping",
+                "-h",
+                "localhost",
+                "-p${MYSQL_ROOT_PASSWORD:-killbillroot}",
+            ]
+            interval: 5s
+            timeout: 3s
+            retries: 10
+        restart: unless-stopped
 
-  # ============================================================================
-  # INFRASTRUCTURE: Kill Bill Billing Engine
-  # API: http://localhost:8080
-  # ============================================================================
-  killbill:
-    container_name: killbill
-    image: killbill/killbill:0.24.10
-    ports:
-      - "8080:8080"
-    environment:
-      - KILLBILL_DAO_URL=jdbc:mysql://db:3306/killbill
-      - KILLBILL_DAO_USER=root
-      - KILLBILL_DAO_PASSWORD=${MYSQL_ROOT_PASSWORD:-killbillroot}
-      - KILLBILL_CATALOG_URI=file:///var/lib/killbill/catalog/SpyCarBasic.xml
-      - KILLBILL_SECURITY_SHIRO_RESOURCE_PATH=classpath:shiro.ini
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8080/1.0/healthcheck"]
-      interval: 15s
-      timeout: 5s
-      retries: 20
-      start_period: 90s
-    depends_on:
-      db:
-        condition: service_healthy
-    restart: unless-stopped
+    # ============================================================================
+    # INFRASTRUCTURE: Kill Bill Billing Engine
+    # API: http://localhost:8080
+    # ============================================================================
+    killbill:
+        container_name: killbill
+        image: killbill/killbill:0.24.10
+        ports:
+            - "8080:8080"
+        environment:
+            - KILLBILL_DAO_URL=jdbc:mysql://db:3306/killbill
+            - KILLBILL_DAO_USER=root
+            - KILLBILL_DAO_PASSWORD=${MYSQL_ROOT_PASSWORD:-killbillroot}
+            - KILLBILL_CATALOG_URI=file:///var/lib/killbill/catalog/SpyCarBasic.xml
+            - KILLBILL_SECURITY_SHIRO_RESOURCE_PATH=classpath:shiro.ini
+        healthcheck:
+            test: ["CMD", "curl", "-f", "http://localhost:8080/1.0/healthcheck"]
+            interval: 15s
+            timeout: 5s
+            retries: 20
+            start_period: 90s
+        depends_on:
+            db:
+                condition: service_healthy
+        restart: unless-stopped
 
-  # ============================================================================
-  # INFRASTRUCTURE: PostgreSQL (for Supabase local dev, optional)
-  # Connect local Supabase CLI to this instance if not using hosted Supabase
-  # ============================================================================
-  postgres:
-    image: postgres:15
-    container_name: postgres-kuala
-    ports:
-      - "5432:5432"
-    environment:
-      POSTGRES_USER: ${POSTGRES_USER:-postgres}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
-      POSTGRES_DB: ${POSTGRES_DB:-kuala}
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres}"]
-      interval: 5s
-      timeout: 3s
-      retries: 10
-    restart: unless-stopped
-    profiles:
-      - supabase  # Only starts with: docker compose --profile supabase up
+    # ============================================================================
+    # INFRASTRUCTURE: PostgreSQL (for Supabase local dev, optional)
+    # Connect local Supabase CLI to this instance if not using hosted Supabase
+    # ============================================================================
+    postgres:
+        image: postgres:15
+        container_name: postgres-kuala
+        ports:
+            - "5432:5432"
+        environment:
+            POSTGRES_USER: ${POSTGRES_USER:-postgres}
+            POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+            POSTGRES_DB: ${POSTGRES_DB:-kuala}
+        volumes:
+            - postgres_data:/var/lib/postgresql/data
+        healthcheck:
+            test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres}"]
+            interval: 5s
+            timeout: 3s
+            retries: 10
+        restart: unless-stopped
+        profiles:
+            - supabase # Only starts with: docker compose --profile supabase up
 
-  # ============================================================================
-  # APPLICATION: Account Service
-  # Handles Kill Bill account creation (listens on subscription-requested queue)
-  # Health: http://localhost:9001
-  # ============================================================================
-  account-service:
-    build:
-      context: .
-      dockerfile: services/account-service/Dockerfile
-    container_name: account-service
-    ports:
-      - "9001:8001"
-    env_file:
-      - .env
-    environment:
-      - RABBITMQ_URL=amqp://${RABBITMQ_USER:-guest}:${RABBITMQ_PASS:-guest}@rabbitmq:5672
-      - KILLBILL_BASE_URL=http://killbill:8080
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8001"]
-      interval: 15s
-      timeout: 5s
-      retries: 5
-      start_period: 30s
-    depends_on:
-      rabbitmq:
-        condition: service_healthy
-      killbill:
-        condition: service_healthy
-    restart: unless-stopped
+    # ============================================================================
+    # APPLICATION: Account Service
+    # Handles Kill Bill account creation (listens on subscription-requested queue)
+    # Health: http://localhost:9001
+    # ============================================================================
+    account-service:
+        build:
+            context: .
+            dockerfile: services/account-service/Dockerfile
+        container_name: account-service
+        ports:
+            - "9001:8001"
+        env_file:
+            - .env
+        environment:
+            - RABBITMQ_URL=amqp://${RABBITMQ_USER:-guest}:${RABBITMQ_PASS:-guest}@rabbitmq:5672
+            - KILLBILL_BASE_URL=http://killbill:8080
+        healthcheck:
+            test: ["CMD", "curl", "-f", "http://localhost:8001"]
+            interval: 15s
+            timeout: 5s
+            retries: 5
+            start_period: 30s
+        depends_on:
+            rabbitmq:
+                condition: service_healthy
+            killbill:
+                condition: service_healthy
+        restart: unless-stopped
 
-  # ============================================================================
-  # APPLICATION: Subscription Service
-  # Handles Kill Bill subscription creation (listens on account.ready queue)
-  # Health: http://localhost:9003
-  # ============================================================================
-  subscription-service:
-    build:
-      context: .
-      dockerfile: services/subscription-service/Dockerfile
-    container_name: subscription-service
-    ports:
-      - "9003:8003"
-    env_file:
-      - .env
-    environment:
-      - RABBITMQ_URL=amqp://${RABBITMQ_USER:-guest}:${RABBITMQ_PASS:-guest}@rabbitmq:5672
-      - KILLBILL_BASE_URL=http://killbill:8080
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8003"]
-      interval: 15s
-      timeout: 5s
-      retries: 5
-      start_period: 30s
-    depends_on:
-      rabbitmq:
-        condition: service_healthy
-      killbill:
-        condition: service_healthy
-    restart: unless-stopped
+    # ============================================================================
+    # APPLICATION: Subscription Service
+    # Handles Kill Bill subscription creation (listens on account.ready queue)
+    # Health: http://localhost:9003
+    # ============================================================================
+    subscription-service:
+        build:
+            context: .
+            dockerfile: services/subscription-service/Dockerfile
+        container_name: subscription-service
+        ports:
+            - "9003:8003"
+        env_file:
+            - .env
+        environment:
+            - RABBITMQ_URL=amqp://${RABBITMQ_USER:-guest}:${RABBITMQ_PASS:-guest}@rabbitmq:5672
+            - KILLBILL_BASE_URL=http://killbill:8080
+        healthcheck:
+            test: ["CMD", "curl", "-f", "http://localhost:8003"]
+            interval: 15s
+            timeout: 5s
+            retries: 5
+            start_period: 30s
+        depends_on:
+            rabbitmq:
+                condition: service_healthy
+            killbill:
+                condition: service_healthy
+        restart: unless-stopped
 
-  # ============================================================================
-  # APPLICATION: Invoice Service
-  # Handles Kill Bill invoice generation (listens on subscription-created queue)
-  # Health: http://localhost:9002
-  # ============================================================================
-  invoice-service:
-    build:
-      context: .
-      dockerfile: services/invoice-service/Dockerfile
-    container_name: invoice-service
-    ports:
-      - "9002:8002"
-    env_file:
-      - .env
-    environment:
-      - RABBITMQ_URL=amqp://${RABBITMQ_USER:-guest}:${RABBITMQ_PASS:-guest}@rabbitmq:5672
-      - KILLBILL_BASE_URL=http://killbill:8080
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8002"]
-      interval: 15s
-      timeout: 5s
-      retries: 5
-      start_period: 30s
-    depends_on:
-      rabbitmq:
-        condition: service_healthy
-      killbill:
-        condition: service_healthy
-    restart: unless-stopped
+    # ============================================================================
+    # APPLICATION: Invoice Service
+    # Handles Kill Bill invoice generation (listens on subscription-created queue)
+    # Health: http://localhost:9002
+    # ============================================================================
+    invoice-service:
+        build:
+            context: .
+            dockerfile: services/invoice-service/Dockerfile
+        container_name: invoice-service
+        ports:
+            - "9002:8002"
+        env_file:
+            - .env
+        environment:
+            - RABBITMQ_URL=amqp://${RABBITMQ_USER:-guest}:${RABBITMQ_PASS:-guest}@rabbitmq:5672
+            - KILLBILL_BASE_URL=http://killbill:8080
+        healthcheck:
+            test: ["CMD", "curl", "-f", "http://localhost:8002"]
+            interval: 15s
+            timeout: 5s
+            retries: 5
+            start_period: 30s
+        depends_on:
+            rabbitmq:
+                condition: service_healthy
+            killbill:
+                condition: service_healthy
+        restart: unless-stopped
 
 volumes:
-  rabbitmq_data:
-  killbill_db:
-  postgres_data:
+    rabbitmq_data:
+    killbill_db:
+    postgres_data:

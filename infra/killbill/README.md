@@ -1,6 +1,7 @@
 # Kuala Kill Bill Configuration
 
-This directory contains the Docker Compose setup for running Kill Bill and related services.
+This directory contains the Docker Compose setup for running Kill Bill and
+related services.
 
 ## Prerequisites
 
@@ -103,7 +104,8 @@ MYSQL_PORT=3306
 
 ## Shiro Authentication
 
-The `shiro.ini` file is automatically generated from `shiro.ini.template` using environment variables:
+The `shiro.ini` file is automatically generated from `shiro.ini.template` using
+environment variables:
 
 ```bash
 # In .env file
@@ -111,7 +113,9 @@ ADMIN_USER=admin
 ADMIN_PASSWORD=password
 ```
 
-The admin credentials are dynamically injected at container startup, so you can easily change them by modifying the `.env` file without editing the Shiro configuration directly.
+The admin credentials are dynamically injected at container startup, so you can
+easily change them by modifying the `.env` file without editing the Shiro
+configuration directly.
 
 ### Customizing Users
 
@@ -136,7 +140,8 @@ ${ADMIN_USER} = ${ADMIN_PASSWORD}, root
 otheruser = otherpassword, root
 ```
 
-**Note:** The template uses `${ADMIN_USER}` and `${ADMIN_PASSWORD}` which are replaced at runtime.
+**Note:** The template uses `${ADMIN_USER}` and `${ADMIN_PASSWORD}` which are
+replaced at runtime.
 
 ## Manual Scripts
 
@@ -184,7 +189,8 @@ docker compose up -d init-tenant init-catalog
 
 ## Security Notes
 
-⚠️ **Important:** Change the default password in `shiro.ini` before deploying to production!
+⚠️ **Important:** Change the default password in `shiro.ini` before deploying to
+production!
 
 For production deployments:
 

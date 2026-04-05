@@ -1,6 +1,7 @@
 # Postman Mocking Setup Guide for Kuala API
 
-This guide explains how to set up a Postman mock server using the OpenAPI specification for the Kuala API.
+This guide explains how to set up a Postman mock server using the OpenAPI
+specification for the Kuala API.
 
 ## Prerequisites
 
@@ -9,7 +10,8 @@ This guide explains how to set up a Postman mock server using the OpenAPI specif
 
 ## Step 1: Update OpenAPI Specification URLs
 
-⚠️ **IMPORTANT**: Before importing the OpenAPI spec into Postman, you must update the placeholder URLs in the specification file.
+⚠️ **IMPORTANT**: Before importing the OpenAPI spec into Postman, you must
+update the placeholder URLs in the specification file.
 
 ### Required Changes in `spec/openapi.yml`
 
@@ -29,7 +31,8 @@ example: "https://your-api-domain.com/identity/realms/lebensraum/protocol/openid
 
 #### 2. Update HTML Button Href (Line ~455)
 
-Find this line in the `/identity/realms/{realms}/protocol/openid-connect/auth` endpoint:
+Find this line in the `/identity/realms/{realms}/protocol/openid-connect/auth`
+endpoint:
 
 ```html
 <a href="changethis/auth/v1/callback" class="auth-button"></a>
@@ -55,10 +58,9 @@ example: "https://kuala-api-staging.seribasa.digital/identity/realms/lebensraum/
 ```html
 <!-- Before -->
 <a href="changethis/auth/v1/callback" class="auth-button">
-  <!-- After (replace with your actual frontend domain) -->
-  <a href="https://app.yourcompany.com/auth/callback" class="auth-button">
-    <a href="https://yourapp.com/callback" class="auth-button"></a></a
-></a>
+	<!-- After (replace with your actual frontend domain) -->
+	<a href="https://app.yourcompany.com/auth/callback" class="auth-button">
+		<a href="https://yourapp.com/callback" class="auth-button"></a></a></a>
 ```
 
 ### Quick Find & Replace
@@ -67,7 +69,8 @@ example: "https://kuala-api-staging.seribasa.digital/identity/realms/lebensraum/
 2. Search for: `changethis`
 3. Replace with appropriate URLs:
    - For API endpoints: Your API base URL (e.g., `https://api.yourcompany.com`)
-   - For frontend callbacks: Your frontend URL (e.g., `https://app.yourcompany.com`)
+   - For frontend callbacks: Your frontend URL (e.g.,
+     `https://app.yourcompany.com`)
 
 ## Step 2: Import OpenAPI Specification
 
@@ -103,7 +106,8 @@ After import, you should see:
 ## Step 4: Create Mock Server
 
 1. **Right-click** on the "Kuala API" collection
-2. Select **"Mock collection"**. If no, hover to more options and select **"Mock collection"**.
+2. Select **"Mock collection"**. If no, hover to more options and select **"Mock
+   collection"**.
 3. Configure mock server settings:
    - **Mock Server Name**: `Kuala API Mock`
    - **Environment**: Select or create new environment
@@ -160,42 +164,42 @@ GET {{baseUrl}}/plans?interval=month
 
 ```json
 {
-  "plans": [
-    {
-      "id": "free",
-      "name": "Free Plan",
-      "tier": "free",
-      "features": [
-        "Generic Apps",
-        "Patient Appointment",
-        "Clinic Virtual Assistant"
-      ],
-      "price": {
-        "amount": 0,
-        "currency": "USD",
-        "interval": "month"
-      },
-      "selectable": true
-    },
-    {
-      "id": "basic",
-      "name": "Basic Plan",
-      "tier": "basic",
-      "features": [
-        "Generic Apps",
-        "Patient Appointment",
-        "Clinic Virtual Assistant",
-        "Published Apps",
-        "Landing Page"
-      ],
-      "price": {
-        "amount": 49.99,
-        "currency": "USD",
-        "interval": "month"
-      },
-      "selectable": true
-    }
-  ]
+	"plans": [
+		{
+			"id": "free",
+			"name": "Free Plan",
+			"tier": "free",
+			"features": [
+				"Generic Apps",
+				"Patient Appointment",
+				"Clinic Virtual Assistant"
+			],
+			"price": {
+				"amount": 0,
+				"currency": "USD",
+				"interval": "month"
+			},
+			"selectable": true
+		},
+		{
+			"id": "basic",
+			"name": "Basic Plan",
+			"tier": "basic",
+			"features": [
+				"Generic Apps",
+				"Patient Appointment",
+				"Clinic Virtual Assistant",
+				"Published Apps",
+				"Landing Page"
+			],
+			"price": {
+				"amount": 49.99,
+				"currency": "USD",
+				"interval": "month"
+			},
+			"selectable": true
+		}
+	]
 }
 ```
 
@@ -260,9 +264,9 @@ const data = await response.json();
 
 ```javascript
 const config = {
-  development: "https://[mock-id].mock.pstmn.io",
-  staging: "https://kuala-api-staging.seribasa.digital",
-  production: "https://kuala-api.seribasa.digital",
+	development: "https://[mock-id].mock.pstmn.io",
+	staging: "https://kuala-api-staging.seribasa.digital",
+	production: "https://kuala-api.seribasa.digital",
 };
 ```
 
@@ -307,7 +311,7 @@ const config = {
 
 ### URLs Still Show "changethis"
 
-**Problem**: Mock responses or examples still contain "changethis" placeholders  
+**Problem**: Mock responses or examples still contain "changethis" placeholders\
 **Solution**:
 
 1. Ensure you updated the OpenAPI spec before importing

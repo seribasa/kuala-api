@@ -17,23 +17,23 @@ curl -i http://localhost:8001
 
 ## Service Routes
 
-| Route | Service | Internal Port | Description |
-|-------|---------|---------------|-------------|
-| `/api/accounts/*` | account-service | 9001 | Account management |
-| `/api/invoices/*` | invoice-service | 9002 | Invoice operations |
-| `/api/subscriptions/*` | subscription-service | 9003 | Subscription management |
-| `/api/billing/*` | killbill | 8080 | Kill Bill passthrough |
-| `/api/v1/*` | supabase-functions | 54321 | Edge Functions API |
-| `/admin/rabbitmq/*` | rabbitmq-mgmt | 15672 | RabbitMQ Management |
+| Route                  | Service              | Internal Port | Description             |
+| ---------------------- | -------------------- | ------------- | ----------------------- |
+| `/api/accounts/*`      | account-service      | 9001          | Account management      |
+| `/api/invoices/*`      | invoice-service      | 9002          | Invoice operations      |
+| `/api/subscriptions/*` | subscription-service | 9003          | Subscription management |
+| `/api/billing/*`       | killbill             | 8080          | Kill Bill passthrough   |
+| `/api/v1/*`            | supabase-functions   | 54321         | Edge Functions API      |
+| `/admin/rabbitmq/*`    | rabbitmq-mgmt        | 15672         | RabbitMQ Management     |
 
 ## Ports
 
-| Port | Protocol | Description |
-|------|----------|-------------|
-| 8000 | HTTP | Proxy (main entry point) |
-| 8443 | HTTPS | Proxy (SSL) |
-| 8001 | HTTP | Admin API |
-| 8444 | HTTPS | Admin API (SSL) |
+| Port | Protocol | Description              |
+| ---- | -------- | ------------------------ |
+| 8000 | HTTP     | Proxy (main entry point) |
+| 8443 | HTTPS    | Proxy (SSL)              |
+| 8001 | HTTP     | Admin API                |
+| 8444 | HTTPS    | Admin API (SSL)          |
 
 ## Enabled Plugins
 
@@ -47,6 +47,7 @@ curl -i http://localhost:8001
 KONG runs in **DB-less mode** using declarative configuration (`kong.yaml`).
 
 To update routes or plugins:
+
 1. Edit `kong.yaml`
 2. Restart KONG: `docker compose restart kong`
 
