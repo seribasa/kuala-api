@@ -244,9 +244,24 @@ test_create_subscription_new_user() {
     local sub_response=$(curl -s "${FUNCTIONS_URL}/subscriptions" \
       -H "Authorization: Bearer ${access_token}")
     
-    local sub_status=$(echo "$sub_response" | jq -r '.status // .data.activeSubscription.status // empty')
-    local plan_id=$(echo "$sub_response" | jq -r '.planId // .data.activeSubscription.planName // empty')
-    
+    # API returns: {subscriptions: [{state: "ACTIVE", planName: "basic-monthly", ...}]}
+    # Also support legacy: {data: {activeSubscription: {status: "active", planName: "..."}}}
+    local sub_state=$(echo "$sub_response" | jq -r '
+      .subscriptions[0].state //
+      .data.activeSubscription.status //
+      .status //
+      empty
+    ')
+    local plan_id=$(echo "$sub_response" | jq -r '
+      .subscriptions[0].planName //
+      .data.activeSubscription.planName //
+      .planId //
+      empty
+    ')
+
+    # Normalize: KillBill returns "ACTIVE" (uppercase), legacy may return "active"
+    local sub_status=$(echo "$sub_state" | tr '[:upper:]' '[:lower:]')
+
     assert_equals "active" "$sub_status" "Subscription status is 'active'"
     assert_equals "$TEST_PLAN_ID" "$plan_id" "Subscription plan matches"
   fi

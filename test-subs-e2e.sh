@@ -141,8 +141,8 @@ STATUS_RESPONSE=$(curl -s "${FUNCTIONS_URL}/subscriptions/status/${CORRELATION_I
 echo "Response:"
 echo "$STATUS_RESPONSE" | jq '.'
 echo ""
-FINAL_STATUS=$(echo "$STATUS_RESPONSE" | jq -r '.data.status // empty')
-CURRENT_STATE=$(echo "$STATUS_RESPONSE" | jq -r '.data.current_state // empty')
+FINAL_STATUS=$(echo "$STATUS_RESPONSE" | jq -r '.data.status // .status // empty')
+CURRENT_STATE=$(echo "$STATUS_RESPONSE" | jq -r '.data.current_state // .current_state // empty')
 echo "📊 Final Status: $FINAL_STATUS"
 echo "🔄 Current State: $CURRENT_STATE"
 echo ""
@@ -157,14 +157,20 @@ SUBSCRIPTIONS_RESPONSE=$(curl -s "${FUNCTIONS_URL}/subscriptions" \
 echo "Response:"
 echo "$SUBSCRIPTIONS_RESPONSE" | jq '.'
 echo ""
-# Check if subscription exists (handle multiple response formats)
-# Could be .data.activeSubscription or direct object with .id and .status
-HAS_SUBSCRIPTION=$(echo "$SUBSCRIPTIONS_RESPONSE" | jq -r 'if .data.activeSubscription != null then "true" elif (.id != null and .status == "active") then "true" else "false" end')
+# Check if subscription exists
+# API returns: {subscriptions: [{state: "ACTIVE", ...}]}
+# or legacy: {data: {activeSubscription: {...}}}
+HAS_SUBSCRIPTION=$(echo "$SUBSCRIPTIONS_RESPONSE" | jq -r '
+  if (.subscriptions | length) > 0 and (.subscriptions[] | select(.state == "ACTIVE")) then "true"
+  elif .data.activeSubscription != null then "true"
+  elif (.id != null and (.status == "active" or .state == "ACTIVE")) then "true"
+  else "false" end
+')
 
 if [ "$HAS_SUBSCRIPTION" = "true" ]; then
-  # Try both formats
-  SUB_ID=$(echo "$SUBSCRIPTIONS_RESPONSE" | jq -r '.data.activeSubscription.subscriptionId // .id // .billing.subscriptionId // "unknown"')
-  PLAN_NAME=$(echo "$SUBSCRIPTIONS_RESPONSE" | jq -r '.data.activeSubscription.planName // .planId // "unknown"')
+  # Support both response formats
+  SUB_ID=$(echo "$SUBSCRIPTIONS_RESPONSE" | jq -r '.subscriptions[0].id // .data.activeSubscription.subscriptionId // .id // "unknown"')
+  PLAN_NAME=$(echo "$SUBSCRIPTIONS_RESPONSE" | jq -r '.subscriptions[0].planName // .data.activeSubscription.planName // .planId // "unknown"')
   echo "✅ Subscription created successfully!"
   echo "   📋 Subscription ID: $SUB_ID"
   echo "   📦 Plan: $PLAN_NAME"

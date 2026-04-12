@@ -1,6 +1,7 @@
 # Error Handling Architecture
 
-This document describes the comprehensive error handling system for the event-driven subscription flow.
+This document describes the comprehensive error handling system for the
+event-driven subscription flow.
 
 ## Table of Contents
 
@@ -18,7 +19,8 @@ This document describes the comprehensive error handling system for the event-dr
 
 ## Overview
 
-The subscription flow uses an event-driven architecture with the following components:
+The subscription flow uses an event-driven architecture with the following
+components:
 
 ```BASH
 ┌─────────────┐     ┌──────────────┐     ┌─────────────────┐     ┌────────────────┐     ┌─────────────────┐
@@ -36,9 +38,12 @@ The subscription flow uses an event-driven architecture with the following compo
 
 ### Error Handling Principles
 
-1. **Fail Fast, Retry Smart**: Classify errors immediately and only retry transient failures
-2. **State Tracking**: All state transitions are recorded for debugging and recovery
-3. **Idempotency**: All handlers can safely process the same event multiple times
+1. **Fail Fast, Retry Smart**: Classify errors immediately and only retry
+   transient failures
+2. **State Tracking**: All state transitions are recorded for debugging and
+   recovery
+3. **Idempotency**: All handlers can safely process the same event multiple
+   times
 4. **Compensation**: Failed operations can be rolled back when needed
 5. **Dead Letter Queue**: Permanently failed messages are preserved for analysis
 
@@ -60,28 +65,28 @@ Errors are classified into three categories:
 
 ```typescript
 const ErrorCodes = {
-  // Validation errors (PERMANENT)
-  MISSING_PLAN_ID: "MISSING_PLAN_ID",
-  INVALID_USER_ID: "INVALID_USER_ID",
-  INVALID_EVENT_STRUCTURE: "INVALID_EVENT_STRUCTURE",
+	// Validation errors (PERMANENT)
+	MISSING_PLAN_ID: "MISSING_PLAN_ID",
+	INVALID_USER_ID: "INVALID_USER_ID",
+	INVALID_EVENT_STRUCTURE: "INVALID_EVENT_STRUCTURE",
 
-  // Duplicate/conflict errors (PERMANENT)
-  DUPLICATE_SUBSCRIPTION: "DUPLICATE_SUBSCRIPTION",
-  PENDING_SUBSCRIPTION_REQUEST: "PENDING_SUBSCRIPTION_REQUEST",
+	// Duplicate/conflict errors (PERMANENT)
+	DUPLICATE_SUBSCRIPTION: "DUPLICATE_SUBSCRIPTION",
+	PENDING_SUBSCRIPTION_REQUEST: "PENDING_SUBSCRIPTION_REQUEST",
 
-  // External service errors (TRANSIENT)
-  KILLBILL_CONNECTION_ERROR: "KILLBILL_CONNECTION_ERROR",
-  KILLBILL_TIMEOUT: "KILLBILL_TIMEOUT",
-  RABBITMQ_CONNECTION_ERROR: "RABBITMQ_CONNECTION_ERROR",
-  RABBITMQ_PUBLISH_ERROR: "RABBITMQ_PUBLISH_ERROR",
+	// External service errors (TRANSIENT)
+	KILLBILL_CONNECTION_ERROR: "KILLBILL_CONNECTION_ERROR",
+	KILLBILL_TIMEOUT: "KILLBILL_TIMEOUT",
+	RABBITMQ_CONNECTION_ERROR: "RABBITMQ_CONNECTION_ERROR",
+	RABBITMQ_PUBLISH_ERROR: "RABBITMQ_PUBLISH_ERROR",
 
-  // State management errors
-  STATE_TRANSITION_FAILED: "STATE_TRANSITION_FAILED",
-  INVALID_STATE_TRANSITION: "INVALID_STATE_TRANSITION",
+	// State management errors
+	STATE_TRANSITION_FAILED: "STATE_TRANSITION_FAILED",
+	INVALID_STATE_TRANSITION: "INVALID_STATE_TRANSITION",
 
-  // Processing errors
-  HANDLER_TIMEOUT: "HANDLER_TIMEOUT",
-  MAX_RETRIES_EXCEEDED: "MAX_RETRIES_EXCEEDED",
+	// Processing errors
+	HANDLER_TIMEOUT: "HANDLER_TIMEOUT",
+	MAX_RETRIES_EXCEEDED: "MAX_RETRIES_EXCEEDED",
 };
 ```
 
@@ -122,11 +127,11 @@ Transient errors are retried with exponential backoff:
 
 ```typescript
 const retryConfig = {
-  maxRetries: 3,
-  baseDelayMs: 1000,
-  maxDelayMs: 30000,
-  backoffMultiplier: 2,
-  useJitter: true,
+	maxRetries: 3,
+	baseDelayMs: 1000,
+	maxDelayMs: 30000,
+	backoffMultiplier: 2,
+	useJitter: true,
 };
 
 // Delay calculation:
@@ -143,11 +148,14 @@ import { withRetry } from "../_shared/errors/index.ts";
 
 // Wrap any async operation with retry
 const result = await withRetry(() => killBillService.createAccount(userId), {
-  maxRetries: 3,
-  baseDelayMs: 1000,
-  onRetry: (error, attempt, delay) => {
-    logger.warn(`Retrying operation (attempt ${attempt})`, { delay, error });
-  },
+	maxRetries: 3,
+	baseDelayMs: 1000,
+	onRetry: (error, attempt, delay) => {
+		logger.warn(`Retrying operation (attempt ${attempt})`, {
+			delay,
+			error,
+		});
+	},
 });
 ```
 
@@ -156,7 +164,8 @@ const result = await withRetry(() => killBillService.createAccount(userId), {
 RabbitMQ messages are retried at the consumer level:
 
 1. Handler processes message
-2. If transient error, message is republished with incremented `x-retry-count` header
+2. If transient error, message is republished with incremented `x-retry-count`
+   header
 3. After max retries, message is NACKed and routed to DLQ
 
 ---
@@ -254,15 +263,15 @@ The subscription request follows this state machine:
 
 ```typescript
 const VALID_STATE_TRANSITIONS = {
-  "": ["requested"],
-  requested: ["account_ready", "failed", "cancelled"],
-  account_ready: ["creating_subscription", "failed", "cancelled"],
-  creating_subscription: ["subscription_created", "failed", "cancelled"],
-  subscription_created: ["generating_invoice", "failed", "cancelled"],
-  generating_invoice: ["completed", "failed", "cancelled"],
-  completed: [],
-  failed: ["requested"], // Allow retry
-  cancelled: [],
+	"": ["requested"],
+	requested: ["account_ready", "failed", "cancelled"],
+	account_ready: ["creating_subscription", "failed", "cancelled"],
+	creating_subscription: ["subscription_created", "failed", "cancelled"],
+	subscription_created: ["generating_invoice", "failed", "cancelled"],
+	generating_invoice: ["completed", "failed", "cancelled"],
+	completed: [],
+	failed: ["requested"], // Allow retry
+	cancelled: [],
 };
 ```
 
@@ -277,7 +286,7 @@ const history = await subscriptionStateManager.getHistory(correlationId);
 
 // Check for pending requests
 const hasPending = await subscriptionStateManager.hasPendingSubscriptionRequest(
-  userId
+	userId,
 );
 ```
 
@@ -332,9 +341,9 @@ Events include unique identifiers for deduplication:
 
 ```typescript
 interface DomainEvent {
-  eventId: string; // Unique event ID (UUID)
-  correlationId: string; // Tracks entire flow
-  timestamp: string; // ISO8601 timestamp
+	eventId: string; // Unique event ID (UUID)
+	correlationId: string; // Tracks entire flow
+	timestamp: string; // ISO8601 timestamp
 }
 ```
 
@@ -342,7 +351,8 @@ interface DomainEvent {
 
 ## Compensation Actions
 
-When a subscription flow fails after partial completion, compensation actions can roll back changes:
+When a subscription flow fails after partial completion, compensation actions
+can roll back changes:
 
 ### Available Compensations
 
@@ -356,28 +366,28 @@ When a subscription flow fails after partial completion, compensation actions ca
 
 ```typescript
 import {
-  executeCompensation,
-  buildCompensationContext,
+	buildCompensationContext,
+	executeCompensation,
 } from "../_shared/errors/index.ts";
 
 // Build context from failed state
 const context = buildCompensationContext(
-  correlationId,
-  "subscription_created",
-  "Invoice generation failed",
-  { subscriptionId, accountId, userId }
+	correlationId,
+	"subscription_created",
+	"Invoice generation failed",
+	{ subscriptionId, accountId, userId },
 );
 
 // Execute compensation
 const result = await executeCompensation(context, {
-  markAsCancelled: true,
-  reason: "Automated compensation after invoice failure",
+	markAsCancelled: true,
+	reason: "Automated compensation after invoice failure",
 });
 
 if (result.success) {
-  logger.info("Compensation completed successfully");
+	logger.info("Compensation completed successfully");
 } else {
-  logger.error("Compensation failed", { error: result.error });
+	logger.error("Compensation failed", { error: result.error });
 }
 ```
 
@@ -422,8 +432,8 @@ All logs include `correlationId` for tracing:
 
 ```typescript
 logger.info(handlerName, "Processing event", {
-  correlationId: event.correlationId,
-  userId: event.userId,
+	correlationId: event.correlationId,
+	userId: event.userId,
 });
 ```
 
@@ -450,10 +460,10 @@ Search logs with: `correlationId=<uuid>`
 
 ```json
 {
-  "code": "PENDING_SUBSCRIPTION_REQUEST",
-  "message": "You have a pending subscription request in state: account_ready",
-  "correlation_id": "550e8400-e29b-41d4-a716-446655440000",
-  "details": "Optional additional error details"
+	"code": "PENDING_SUBSCRIPTION_REQUEST",
+	"message": "You have a pending subscription request in state: account_ready",
+	"correlation_id": "550e8400-e29b-41d4-a716-446655440000",
+	"details": "Optional additional error details"
 }
 ```
 

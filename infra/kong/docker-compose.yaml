@@ -1,38 +1,38 @@
 services:
-  kong:
-    container_name: kong-kuala
-    image: kong:3.5
-    environment:
-      # DB-less mode with declarative configuration
-      KONG_DATABASE: "off"
-      KONG_DECLARATIVE_CONFIG: /kong/kong.yaml
-      # Proxy settings
-      KONG_PROXY_LISTEN: "0.0.0.0:8000, 0.0.0.0:8443 ssl"
-      KONG_ADMIN_LISTEN: "0.0.0.0:8001, 0.0.0.0:8444 ssl"
-      # Logging
-      KONG_PROXY_ACCESS_LOG: /dev/stdout
-      KONG_ADMIN_ACCESS_LOG: /dev/stdout
-      KONG_PROXY_ERROR_LOG: /dev/stderr
-      KONG_ADMIN_ERROR_LOG: /dev/stderr
-      # Performance
-      KONG_NGINX_WORKER_PROCESSES: "2"
-    ports:
-      - "8000:8000"   # Proxy HTTP
-      - "8443:8443"   # Proxy HTTPS
-      - "8001:8001"   # Admin API HTTP
-      - "8444:8444"   # Admin API HTTPS
-    volumes:
-      - ./kong.yaml:/kong/kong.yaml:ro
-    healthcheck:
-      test: ["CMD", "kong", "health"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-    networks:
-      - kuala-network
-    restart: unless-stopped
+    kong:
+        container_name: kong-kuala
+        image: kong:3.5
+        environment:
+            # DB-less mode with declarative configuration
+            KONG_DATABASE: "off"
+            KONG_DECLARATIVE_CONFIG: /kong/kong.yaml
+            # Proxy settings
+            KONG_PROXY_LISTEN: "0.0.0.0:8000, 0.0.0.0:8443 ssl"
+            KONG_ADMIN_LISTEN: "0.0.0.0:8001, 0.0.0.0:8444 ssl"
+            # Logging
+            KONG_PROXY_ACCESS_LOG: /dev/stdout
+            KONG_ADMIN_ACCESS_LOG: /dev/stdout
+            KONG_PROXY_ERROR_LOG: /dev/stderr
+            KONG_ADMIN_ERROR_LOG: /dev/stderr
+            # Performance
+            KONG_NGINX_WORKER_PROCESSES: "2"
+        ports:
+            - "8000:8000" # Proxy HTTP
+            - "8443:8443" # Proxy HTTPS
+            - "8001:8001" # Admin API HTTP
+            - "8444:8444" # Admin API HTTPS
+        volumes:
+            - ./kong.yaml:/kong/kong.yaml:ro
+        healthcheck:
+            test: ["CMD", "kong", "health"]
+            interval: 10s
+            timeout: 5s
+            retries: 5
+        networks:
+            - kuala-network
+        restart: unless-stopped
 
 networks:
-  kuala-network:
-    driver: bridge
-    name: kuala-network
+    kuala-network:
+        driver: bridge
+        name: kuala-network

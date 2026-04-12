@@ -1,30 +1,89 @@
 services:
-  account-service:
-    image: denoland/deno:alpine
-    container_name: account-service
-    ports:
-      - "9001:8001"
-    volumes:
-      - ..:/workspace
-    working_dir: /workspace/services/account-service
-    command: deno run --allow-all --config=/workspace/deno.json --env-file=/workspace/.env index.ts
-    
-  invoice-service:
-    image: denoland/deno:alpine
-    container_name: invoice-service
-    ports:
-      - "9002:8002"
-    volumes:
-      - ..:/workspace
-    working_dir: /workspace/services/invoice-service
-    command: deno run --allow-all --config=/workspace/deno.json --env-file=/workspace/.env index.ts
-    
-  subscription-service:
-    image: denoland/deno:alpine
-    container_name: subscription-service
-    ports:
-      - "9003:8003"
-    volumes:
-      - ..:/workspace
-    working_dir: /workspace/services/subscription-service
-    command: deno run --allow-all --config=/workspace/deno.json --env-file=/workspace/.env index.ts
+    account-service:
+        build:
+            context: ../
+            dockerfile: services/account-service/Dockerfile
+        container_name: account-service
+        ports:
+            - "9001:8001"
+        env_file:
+            - ./account-service/.env
+        environment:
+            - RABBITMQ_URL=amqp://guest:guest@rabbitmq:5672
+        healthcheck:
+            test: ["CMD", "curl", "-f", "http://localhost:8001"]
+            interval: 15s
+            timeout: 5s
+            retries: 5
+            start_period: 30s
+        depends_on:
+            rabbitmq:
+                condition: service_healthy
+        restart: unless-stopped
+
+    invoice-service:
+        build:
+            context: ../
+            dockerfile: services/invoice-service/Dockerfile
+        container_name: invoice-service
+        ports:
+            - "9002:8002"
+        env_file:
+            - ./invoice-service/.env
+        environment:
+            - RABBITMQ_URL=amqp://guest:guest@rabbitmq:5672
+        healthcheck:
+            test: ["CMD", "curl", "-f", "http://localhost:8002"]
+            interval: 15s
+            timeout: 5s
+            retries: 5
+            start_period: 30s
+        depends_on:
+            rabbitmq:
+                condition: service_healthy
+        restart: unless-stopped
+
+    subscription-service:
+        build:
+            context: ../
+            dockerfile: services/subscription-service/Dockerfile
+        container_name: subscription-service
+        ports:
+            - "9003:8003"
+        env_file:
+            - ./subscription-service/.env
+        environment:
+            - RABBITMQ_URL=amqp://guest:guest@rabbitmq:5672
+        healthcheck:
+            test: ["CMD", "curl", "-f", "http://localhost:8003"]
+            interval: 15s
+            timeout: 5s
+            retries: 5
+            start_period: 30s
+        depends_on:
+            rabbitmq:
+                condition: service_healthy
+        restart: unless-stopped
+
+    rabbitmq:
+        image: rabbitmq:3-management
+        container_name: rabbitmq
+        hostname: rabbitmq
+        ports:
+            - "5672:5672"
+            - "15672:15672"
+        environment:
+            RABBITMQ_DEFAULT_USER: guest
+            RABBITMQ_DEFAULT_PASS: guest
+        volumes:
+            - rabbitmq_data:/var/lib/rabbitmq
+        healthcheck:
+            test: ["CMD", "rabbitmq-diagnostics", "ping"]
+            interval: 10s
+            timeout: 5s
+            retries: 10
+            start_period: 30s
+        restart: unless-stopped
+
+volumes:
+    rabbitmq_data:
