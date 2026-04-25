@@ -51,7 +51,6 @@ jobs:
             # Tag push: use tag name
             TAG=${GITHUB_REF#refs/tags/}
             TAGS="${IMAGE_NAME}:${TAG}"
-            TAGS="${TAGS},${IMAGE_NAME}:latest"
           else
             # Branch push: use branch name and short commit SHA
             BRANCH=${GITHUB_REF#refs/heads/}
@@ -62,6 +61,10 @@ jobs:
           
           echo "tags=${TAGS}" >> $GITHUB_OUTPUT
           echo "image_name=${IMAGE_NAME}" >> $GITHUB_OUTPUT
+
+      - name: Get commit timestamp
+        id: commit_time
+        run: echo "timestamp=$(git show -s --format=%cI $GITHUB_SHA)" >> $GITHUB_OUTPUT
 
       - name: Build and push Docker image
         uses: docker/build-push-action@v5
@@ -75,7 +78,7 @@ jobs:
           labels: |
             org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
             org.opencontainers.image.revision=${{ github.sha }}
-            org.opencontainers.image.created=${{ github.event.head_commit.timestamp }}
+            org.opencontainers.image.created=${{ steps.commit_time.outputs.timestamp }}
 
       - name: Print image info
         run: |
