@@ -4,9 +4,6 @@
 
 FROM dhi.io/deno:2
 
-# Install curl for health check
-# RUN apt-get update && apt-get install -y --no-install-recommends curl && rm -rf /var/lib/apt/lists/*
-
 WORKDIR /app
 
 # Copy workspace configuration
