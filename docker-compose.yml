@@ -129,7 +129,12 @@ services:
             - RABBITMQ_URL=amqp://${RABBITMQ_USER:-guest}:${RABBITMQ_PASS:-guest}@rabbitmq:5672
             - KILLBILL_BASE_URL=http://killbill:8080
         healthcheck:
-            test: ["CMD", "curl", "-f", "http://localhost:8001"]
+            test: [
+                "CMD",
+                "deno",
+                "eval",
+                "const r = await fetch('http://localhost:8001'); if(!r.ok) Deno.exit(1);",
+            ]
             interval: 15s
             timeout: 5s
             retries: 5
@@ -159,7 +164,12 @@ services:
             - RABBITMQ_URL=amqp://${RABBITMQ_USER:-guest}:${RABBITMQ_PASS:-guest}@rabbitmq:5672
             - KILLBILL_BASE_URL=http://killbill:8080
         healthcheck:
-            test: ["CMD", "curl", "-f", "http://localhost:8003"]
+            test: [
+                "CMD",
+                "deno",
+                "eval",
+                "const r = await fetch('http://localhost:8003'); if(!r.ok) Deno.exit(1);",
+            ]
             interval: 15s
             timeout: 5s
             retries: 5
@@ -189,7 +199,12 @@ services:
             - RABBITMQ_URL=amqp://${RABBITMQ_USER:-guest}:${RABBITMQ_PASS:-guest}@rabbitmq:5672
             - KILLBILL_BASE_URL=http://killbill:8080
         healthcheck:
-            test: ["CMD", "curl", "-f", "http://localhost:8002"]
+            test: [
+                "CMD",
+                "deno",
+                "eval",
+                "const r = await fetch('http://localhost:8002'); if(!r.ok) Deno.exit(1);",
+            ]
             interval: 15s
             timeout: 5s
             retries: 5
