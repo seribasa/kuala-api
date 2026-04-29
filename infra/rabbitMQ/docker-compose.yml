@@ -11,6 +11,9 @@ services:
         configs:
             - source: rabbitmq-plugins
               target: /etc/rabbitmq/enabled_plugins
+            # Bypass RabbitMQ user authentication for Guest, Remove in Production
+            - source: rabbitmq-conf
+              target: /etc/rabbitmq/rabbitmq.conf
         volumes:
             - rabbitmq_data:/var/lib/rabbitmq
         healthcheck:
@@ -25,6 +28,8 @@ services:
 configs:
     rabbitmq-plugins:
         content: "[rabbitmq_management]."
-
+    # Bypass RabbitMQ user authentication for Guest, Remove in Production
+    rabbitmq-conf:
+        content: "loopback_users.guest = false"
 volumes:
     rabbitmq_data:
