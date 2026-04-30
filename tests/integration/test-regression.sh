@@ -204,6 +204,17 @@ check_prerequisites() {
   else
     log_warning "AUTH_BASE_URL: $auth_url"
   fi
+
+  # Initialize Kill Bill Tenant
+  log_info "Initializing Kill Bill tenant and catalog..."
+  local kb_api_key=$(grep "^KILLBILL_API_KEY=" .env 2>/dev/null | cut -d= -f2)
+  local kb_api_secret=$(grep "^KILLBILL_API_SECRET=" .env 2>/dev/null | cut -d= -f2)
+  kb_api_key=${kb_api_key:-demo}
+  kb_api_secret=${kb_api_secret:-demosecret}
+  
+  ./infra/killbill/init-tenant.sh -k "$kb_api_key" -s "$kb_api_secret" >/dev/null 2>&1 || log_warning "Tenant init may have failed"
+  ./infra/killbill/init-plans-catalog.sh --api-key "$kb_api_key" --api-secret "$kb_api_secret" >/dev/null 2>&1 || log_warning "Catalog init may have failed"
+  log_success "Kill Bill initialization completed"
 }
 
 # =============================================================================
