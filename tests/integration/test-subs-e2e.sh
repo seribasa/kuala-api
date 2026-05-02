@@ -10,7 +10,21 @@ echo ""
 SUPABASE_URL="http://localhost:54321"
 FUNCTIONS_URL="${SUPABASE_URL}/functions/v1/kuala"
 AUTH_URL="${SUPABASE_URL}/auth/v1"
-ANON_KEY="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJyb2xlIjoiYW5vbiIsImlzcyI6InN1cGFiYXNlIiwiaWF0IjoxNzU2NTA0ODAwLCJleHAiOjE5MTQyNzEyMDB9.zbstohWXIZRgD0aE4UVeh3xZRGq4fDOZ7cUzFBV26SU"
+ANON_KEY="sb_publishable_ACJWlzQHlZjBrEguHvfOxg_3BJgxAaH"
+
+echo "================================================================================================"
+echo "🛠️  STEP 0: Initialize Kill Bill"
+echo "================================================================================================"
+KB_API_KEY=$(grep "^KILLBILL_API_KEY=" .env 2>/dev/null | cut -d= -f2)
+KB_API_SECRET=$(grep "^KILLBILL_API_SECRET=" .env 2>/dev/null | cut -d= -f2)
+KB_API_KEY=${KB_API_KEY:-demo}
+KB_API_SECRET=${KB_API_SECRET:-demosecret}
+
+./infra/killbill/init-tenant.sh -k "$KB_API_KEY" -s "$KB_API_SECRET" >/dev/null 2>&1 || echo "⚠️  Tenant init may have failed"
+./infra/killbill/init-plans-catalog.sh --api-key "$KB_API_KEY" --api-secret "$KB_API_SECRET" >/dev/null 2>&1 || echo "⚠️  Catalog init may have failed"
+echo "✅ Kill Bill initialized"
+echo ""
+
 # Read token from previous user creation or create new one
 if [ -f /tmp/test-user-response.json ]; then
   REFRESH_TOKEN=$(cat /tmp/test-user-response.json | jq -r '.refresh_token // empty')
