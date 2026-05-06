@@ -1,8 +1,16 @@
 # dotenvx
+# Track example environment files
+!.env.example
+!.env.development.example
+!.env.staging.example
+!.env.production.example
+
+# Ignore actual environment files
 .env
-.env.keys
 .env.local
 .env.*.local
+
+# Build artifacts
 coverage
 node_modules
 .DS_Store

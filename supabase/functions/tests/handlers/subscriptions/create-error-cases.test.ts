@@ -41,6 +41,10 @@ class MockResponse {
 	text() {
 		return Promise.resolve(JSON.stringify(this.body));
 	}
+
+	clone() {
+		return new MockResponse(this.body, this.statusCode, this.isOk);
+	}
 }
 
 // Helper function to create mock context

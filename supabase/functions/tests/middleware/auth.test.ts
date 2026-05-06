@@ -6,6 +6,7 @@ import { authMiddleware, getUser } from "../../kuala/middleware/auth.ts";
 
 // Mock fetch response
 class MockResponse {
+	headers = new Headers();
 	constructor(
 		private body: unknown,
 		private statusCode: number,
@@ -26,6 +27,10 @@ class MockResponse {
 
 	text() {
 		return Promise.resolve(JSON.stringify(this.body));
+	}
+
+	clone() {
+		return new MockResponse(this.body, this.statusCode, this.isOk);
 	}
 }
 
@@ -343,32 +348,11 @@ Deno.test("authMiddleware - should handle empty user response", async () => {
 	}
 });
 
-Deno.test("authMiddleware - should use request URL when AUTH_BASE_URL is missing", async () => {
-	const mockUser = {
-		id: "user123",
-		email: "test@example.com",
-		aud: "authenticated",
-		role: "authenticated",
-	};
-
+Deno.test("authMiddleware - should return 401 when AUTH_BASE_URL is missing", async () => {
 	const envStub = stub(Deno.env, "get", (key: string) => {
-		// Missing AUTH_BASE_URL, should use request URL
 		if (key === "AUTH_SUPABASE_ANON_KEY") return "test_key";
 		return undefined;
 	});
-
-	const fetchStub = stub(
-		globalThis,
-		"fetch",
-		(url) => {
-			// Verify that the URL is constructed from request URL
-			const requestUrl = url as string;
-			assertEquals(requestUrl.includes("api.example.com"), true);
-			return Promise.resolve(
-				new MockResponse(mockUser, 200) as unknown as Response,
-			);
-		},
-	);
 
 	const mockContext = createMockContext("Bearer valid_token");
 	let nextCalled = false;
@@ -377,14 +361,12 @@ Deno.test("authMiddleware - should use request URL when AUTH_BASE_URL is missing
 	};
 
 	try {
-		await authMiddleware(mockContext, next);
+		const response = await authMiddleware(mockContext, next);
 
-		assertEquals(nextCalled, true);
-		const user = mockContext.get("user");
-		assertEquals(user.id, "user123");
-		assertEquals(user.email, "test@example.com");
+		assertEquals(nextCalled, false);
+		assertEquals((response as any).status, 401);
+		assertEquals((response as any).data.code, "UNAUTHORIZED");
 	} finally {
 		envStub.restore();
-		fetchStub.restore();
 	}
 });

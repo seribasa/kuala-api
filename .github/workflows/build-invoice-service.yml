@@ -1,0 +1,86 @@
+name: Build and Push Invoice Service Docker Image
+
+on:
+  push:
+    branches:
+      - main
+      - develop
+    tags:
+      - 'v*'
+    paths:
+      - 'services/invoice-service/**'
+      - 'supabase/functions/_shared/**'
+      - 'deno.json'
+      - 'deno.lock'
+      - '.github/workflows/build-invoice-service.yml'
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Generate image metadata
+        id: meta
+        run: |
+          IMAGE_NAME="ghcr.io/${{ github.repository_owner }}/invoice-service"
+          TAGS=""
+          
+          if [[ $GITHUB_REF == refs/tags/* ]]; then
+            TAG=${GITHUB_REF#refs/tags/}
+            TAGS="${IMAGE_NAME}:${TAG}"
+            TAGS="${TAGS},${IMAGE_NAME}:latest"
+          else
+            BRANCH=${GITHUB_REF#refs/heads/}
+            SHORT_SHA=${GITHUB_SHA:0:7}
+            TAGS="${IMAGE_NAME}:${BRANCH}"
+            TAGS="${TAGS},${IMAGE_NAME}:${BRANCH}-${SHORT_SHA}"
+          fi
+          
+          echo "tags=${TAGS}" >> $GITHUB_OUTPUT
+          echo "image_name=${IMAGE_NAME}" >> $GITHUB_OUTPUT
+
+      - name: Get commit timestamp
+        id: commit_time
+        run: echo "timestamp=$(git show -s --format=%cI $GITHUB_SHA)" >> $GITHUB_OUTPUT
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ./services/invoice-service/Dockerfile
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          labels: |
+            org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
+            org.opencontainers.image.revision=${{ github.sha }}
+            org.opencontainers.image.created=${{ steps.commit_time.outputs.timestamp }}
+
+      - name: Print image info
+        run: |
+          echo "✅ Docker image built and pushed successfully!"
+          echo "Image: ${{ steps.meta.outputs.image_name }}"
+          echo "Tags: ${{ steps.meta.outputs.tags }}"

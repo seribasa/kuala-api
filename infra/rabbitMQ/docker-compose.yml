@@ -1,0 +1,35 @@
+services:
+    rabbitmq:
+        image: dhi.io/rabbitmq:4.2
+        hostname: rabbitmq
+        ports:
+            - "5672:5672" # AMQP
+            - "15672:15672" # Management UI
+        environment:
+            RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER:-guest}
+            RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASS:-guest}
+        configs:
+            - source: rabbitmq-plugins
+              target: /etc/rabbitmq/enabled_plugins
+            # Bypass RabbitMQ user authentication for Guest, Remove in Production
+            - source: rabbitmq-conf
+              target: /etc/rabbitmq/rabbitmq.conf
+        volumes:
+            - rabbitmq_data:/var/lib/rabbitmq
+        healthcheck:
+            test: ["CMD", "rabbitmq-diagnostics", "ping"]
+            interval: 10s
+            timeout: 5s
+            retries: 10
+            start_period: 30s
+        restart: unless-stopped
+
+
+configs:
+    rabbitmq-plugins:
+        content: "[rabbitmq_management]."
+    # Bypass RabbitMQ user authentication for Guest, Remove in Production
+    rabbitmq-conf:
+        content: "loopback_users.guest = false"
+volumes:
+    rabbitmq_data:

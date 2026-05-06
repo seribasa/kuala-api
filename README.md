@@ -14,7 +14,8 @@ Kuala API is a comprehensive backend service that provides:
 
 - **🔐 OAuth Authentication** - Seamless login with Keycloak via Supabase
 - **📋 Subscription Plans** - Flexible tier-based subscription management
-- **💳 Payment Processing** - Integrated billing and invoicing with Kill Bill and Bayeu Payment Gateway
+- **💳 Payment Processing** - Integrated billing and invoicing with Kill Bill
+  and Bayeu Payment Gateway
 - **🚀 Supabase Functions** - Serverless deployment with edge functions
 - **📝 OpenAPI Spec** - Complete API documentation and type safety
 
@@ -40,7 +41,8 @@ Kuala API is a comprehensive backend service that provides:
 
 - [Deno](https://deno.land/) (v1.37+)
 - [Supabase CLI](https://supabase.com/docs/guides/cli) (v1.0+)
-- [Docker](https://www.docker.com/get-started) (for local Supabase, Kill Bill, Keycloak)
+- [Docker](https://www.docker.com/get-started) (for local Supabase, Kill Bill,
+  Keycloak)
 - [Git](https://git-scm.com/)
 
 ### Installation
@@ -73,7 +75,8 @@ Kuala API is a comprehensive backend service that provides:
 
 ### Environment Configuration
 
-Copy `.env.example` to `.env` and configure. * see `.env.example` for required variables.
+Copy `.env.example` to `.env` and configure. * see `.env.example` for required
+variables.
 
 ## 📚 API Documentation
 
@@ -136,7 +139,8 @@ sequenceDiagram
 
 #### 1. Start OAuth Flow
 
-How to generate `code_challenge` and `code_verifier` see this [helpers.ts](https://github.com/supabase/auth-js/blob/1cbd43ec638a26ac59ae3908219927885be55ecb/src/lib/helpers.ts).
+How to generate `code_challenge` and `code_verifier` see this
+[helpers.ts](https://github.com/supabase/auth-js/blob/1cbd43ec638a26ac59ae3908219927885be55ecb/src/lib/helpers.ts).
 
 ```bash
 curl 'https://kuala-api-staging.seribasa.digital/v1/auth/authorize?redirect_to=https%3A%2F%2Fenakes-app.peltops.com&code_challenge=%3Cyour_code_challenge%3E' \
@@ -296,8 +300,8 @@ Kill Bill. The catalog includes:
 - Add-on features and included products
 
 You can customize the catalog file location with `--catalog-file` or override
-Kill Bill connection settings. Run `./infra/killbill/init-plans-catalog.sh --help`
-for all options.
+Kill Bill connection settings. Run
+`./infra/killbill/init-plans-catalog.sh --help` for all options.
 
 ## 📋 Subscription Plans
 
@@ -389,9 +393,10 @@ standalone application:
 
 2. **Use the provided standalone server entry point**
 
-    The repository ships with `infra/self-hosted/server.ts`:
+   The repository ships with `infra/self-hosted/server.ts`:
 
-    Copy it to your preferred location if you want to deploy from a different directory.
+   Copy it to your preferred location if you want to deploy from a different
+   directory.
 
 3. **Set up environment variables**
 
@@ -402,22 +407,22 @@ standalone application:
 
 4. **Run the server**
 
-    ```bash
-    # Development with auto-reload (watches supabase/functions and infra/self-hosted)
-    cd supabase/functions && deno task dev
+   ```bash
+   # Development with auto-reload (watches supabase/functions and infra/self-hosted)
+   cd supabase/functions && deno task dev
 
-    # Production / one-off run
-    cd supabase/functions && deno task start
+   # Production / one-off run
+   cd supabase/functions && deno task start
 
-    # Or run manually
-    deno run --allow-net --allow-env --config=deno.json --env-file=../../.env ../../infra/self-hosted/server.ts
+   # Or run manually
+   deno run --allow-net --allow-env --config=deno.json --env-file=../../.env ../../infra/self-hosted/server.ts
 
-    # Production with PM2
-    pm2 start "deno run --allow-net --allow-env --config=deno.json --env-file=../../.env ../../infra/self-hosted/server.ts" --name kuala-api
+   # Production with PM2
+   pm2 start "deno run --allow-net --allow-env --config=deno.json --env-file=../../.env ../../infra/self-hosted/server.ts" --name kuala-api
 
-    # Or with systemd service
-    sudo systemctl start kuala-api
-    ```
+   # Or with systemd service
+   sudo systemctl start kuala-api
+   ```
 
 5. **Nginx reverse proxy configuration**
 
@@ -461,15 +466,15 @@ deployctl deploy --project=kuala-api ./supabase/functions/kuala/index.ts
 
    ```json
    {
-     "functions": {
-       "api/kuala.ts": {
-         "runtime": "vercel-deno@0.8.1"
-       }
-     },
-     "routes": [
-       { "src": "/api/(.*)", "dest": "/api/kuala.ts" },
-       { "src": "/(.*)", "dest": "/api/kuala.ts" }
-     ]
+   	"functions": {
+   		"api/kuala.ts": {
+   			"runtime": "vercel-deno@0.8.1"
+   		}
+   	},
+   	"routes": [
+   		{ "src": "/api/(.*)", "dest": "/api/kuala.ts" },
+   		{ "src": "/(.*)", "dest": "/api/kuala.ts" }
+   	]
    }
    ```
 
@@ -518,19 +523,19 @@ deployctl deploy --project=kuala-api ./supabase/functions/kuala/index.ts
    import handler from "../../supabase/functions/kuala/index.ts";
 
    export const handler: Handler = async (event, context) => {
-     const request = new Request(event.rawUrl, {
-       method: event.httpMethod,
-       headers: event.headers,
-       body: event.body,
-     });
+   	const request = new Request(event.rawUrl, {
+   		method: event.httpMethod,
+   		headers: event.headers,
+   		body: event.body,
+   	});
 
-     const response = await handler(request);
+   	const response = await handler(request);
 
-     return {
-       statusCode: response.status,
-       headers: Object.fromEntries(response.headers.entries()),
-       body: await response.text(),
-     };
+   	return {
+   		statusCode: response.status,
+   		headers: Object.fromEntries(response.headers.entries()),
+   		body: await response.text(),
+   	};
    };
    ```
 
@@ -654,8 +659,8 @@ for details.
 
 ## 📄 License
 
-This project is licensed under the Apache License - see the [LICENSE](LICENSE) file
-for details.
+This project is licensed under the Apache License - see the [LICENSE](LICENSE)
+file for details.
 
 ## 🆘 Support
 
@@ -667,7 +672,8 @@ for details.
 ## 🔗 Related Projects
 
 - [Supabase](https://supabase.com/) - Backend-as-a-Service platform
-- [Keycloak](https://www.keycloak.org/) - Open-source identity and access management
+- [Keycloak](https://www.keycloak.org/) - Open-source identity and access
+  management
 - [Kill Bill](https://killbill.io/) - Open-source billing platform
 - [Deno](https://deno.land/) - Modern JavaScript/TypeScript runtime
 - [Hono](https://hono.dev/) - Lightweight web framework

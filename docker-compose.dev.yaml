@@ -1,0 +1,5 @@
+include:
+    - infra/keycloak/docker-compose.yaml
+    - infra/killbill/docker-compose.yaml
+    - infra/rabbitmq/docker-compose.yml
+    - services/docker-compose.yaml
