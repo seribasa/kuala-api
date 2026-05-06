@@ -1,7 +1,7 @@
 services:
     kong:
         container_name: kong-kuala
-        image: kong:3.5
+        image: kong:3.9
         environment:
             # DB-less mode with declarative configuration
             KONG_DATABASE: "off"
