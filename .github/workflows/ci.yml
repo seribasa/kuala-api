@@ -106,7 +106,7 @@ jobs:
                   CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
 
             - name: Test Reporter
-              uses: dorny/test-reporter@v1
+              uses: dorny/test-reporter@v3
               if: success()
               with:
                   name: Deno Tests
