@@ -10,3 +10,12 @@ services:
             - ./openapi.yml:/app/openapi.yml
         ports:
             - "8080:8080"
+    swagger-ui:
+        image: swaggerapi/swagger-ui
+        container_name: swagger-ui
+        environment:
+            SWAGGER_JSON: "/app/openapi.yml"
+        volumes:
+            - ./openapi.yml:/app/openapi.yml
+        ports:
+            - "8081:8080"
