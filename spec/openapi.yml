@@ -12,7 +12,7 @@ info:
         - Prices are shown monthly by default; toggle `interval=year` to show yearly pricing.
 
 servers:
-    - url: https://kuala-api-staging.seribasa.digital
+    - url: https://kuala-api-staging.seribasa.digital/v1/kuala
       description: Kuala Staging
 
 tags:
