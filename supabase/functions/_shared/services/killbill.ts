@@ -550,33 +550,35 @@ export class KillBillService {
 		audit?: "NONE" | "MINIMAL" | "FULL",
 	): Promise<KillBillInvoice[]> {
 		const handlerName = "killbill-service";
-		const uri = new URL(this.baseUrl);
-		uri.pathname = `/1.0/kb/accounts/${accountId}/invoices`;
+		const searchParams = new URLSearchParams();
 		if (withMigrationInvoices) {
-			uri.searchParams.append("withMigrationInvoices", "true");
+			searchParams.append("withMigrationInvoices", "true");
 		}
 		if (unpaidInvoicesOnly) {
-			uri.searchParams.append("unpaidInvoicesOnly", "true");
+			searchParams.append("unpaidInvoicesOnly", "true");
 		}
 		if (includeVoidedInvoices) {
-			uri.searchParams.append("includeVoidedInvoices", "true");
+			searchParams.append("includeVoidedInvoices", "true");
 		}
 		if (includeInvoiceComponents) {
-			uri.searchParams.append("includeInvoiceComponents", "true");
+			searchParams.append("includeInvoiceComponents", "true");
 		}
 		if (startDate) {
-			uri.searchParams.append("startDate", startDate);
+			searchParams.append("startDate", startDate);
 		}
 		if (endDate) {
-			uri.searchParams.append("endDate", endDate);
+			searchParams.append("endDate", endDate);
 		}
 		if (invoicesFilter && invoicesFilter.length > 0) {
-			uri.searchParams.append("invoicesFilter", invoicesFilter.join(","));
+			searchParams.append("invoicesFilter", invoicesFilter.join(","));
 		}
 		if (audit) {
-			uri.searchParams.append("audit", audit);
+			searchParams.append("audit", audit);
 		}
-		const url = uri.toString();
+		const qs = searchParams.toString();
+		const url = `${this.baseUrl}/1.0/kb/accounts/${accountId}/invoices${
+			qs ? "?" + qs : ""
+		}`;
 
 		logger.info(handlerName, "Getting account invoices", {
 			url,
@@ -609,15 +611,18 @@ export class KillBillService {
 		limit = 100,
 	): Promise<KillBillInvoice[]> {
 		const handlerName = "killbill-service";
-		const uri = new URL(`${this.baseUrl}/1.0/kb/invoices/pagination`);
-		uri.searchParams.append("offset", offset.toString());
-		uri.searchParams.append("limit", limit.toString());
+		const searchParams = new URLSearchParams();
+		searchParams.append("offset", offset.toString());
+		searchParams.append("limit", limit.toString());
+
+		const url =
+			`${this.baseUrl}/1.0/kb/invoices/pagination?${searchParams.toString()}`;
 
 		logger.info(handlerName, "Listing invoices", {
-			url: uri.toString(),
+			url,
 		});
 
-		const response = await fetch(uri.toString(), {
+		const response = await fetch(url, {
 			method: "GET",
 			headers: this.getHeaders(),
 		});
@@ -650,18 +655,19 @@ export class KillBillService {
 			.replace(/%3D/g, "=")
 			.replace(/%26/g, "&"); // Allow basic advanced search params if user provides them
 
-		const uri = new URL(
-			`${this.baseUrl}/1.0/kb/invoices/search/${encodedSearchKey}`,
-		);
-		uri.searchParams.append("offset", offset.toString());
-		uri.searchParams.append("limit", limit.toString());
+		const searchParams = new URLSearchParams();
+		searchParams.append("offset", offset.toString());
+		searchParams.append("limit", limit.toString());
+
+		const url =
+			`${this.baseUrl}/1.0/kb/invoices/search/${encodedSearchKey}?${searchParams.toString()}`;
 
 		logger.info(handlerName, "Searching invoices", {
-			url: uri.toString(),
+			url,
 			searchKey,
 		});
 
-		const response = await fetch(uri.toString(), {
+		const response = await fetch(url, {
 			method: "GET",
 			headers: this.getHeaders(),
 		});
