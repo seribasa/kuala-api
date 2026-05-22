@@ -698,4 +698,52 @@ describe("KillBillService", () => {
 			);
 		});
 	});
+	describe("getInvoiceHtml", () => {
+		it("success", async () => {
+			fetchStub.restore();
+			fetchStub = stub(
+				globalThis,
+				"fetch",
+				returnsNext([
+					Promise.resolve(
+						new Response("<html>test</html>", {
+							status: 200,
+						}),
+					),
+				]),
+			);
+			const res = await killBillService.getInvoiceHtml("inv1");
+			assertEquals(res, "<html>test</html>");
+		});
+		it("404", async () => {
+			fetchStub.restore();
+			fetchStub = stub(
+				globalThis,
+				"fetch",
+				returnsNext([
+					Promise.resolve(new Response(null, { status: 404 })),
+				]),
+			);
+			await assertRejects(
+				() => killBillService.getInvoiceHtml("inv1"),
+				Error,
+				"INVOICE_NOT_FOUND",
+			);
+		});
+		it("error", async () => {
+			fetchStub.restore();
+			fetchStub = stub(
+				globalThis,
+				"fetch",
+				returnsNext([
+					Promise.resolve(new Response(null, { status: 500 })),
+				]),
+			);
+			await assertRejects(
+				() => killBillService.getInvoiceHtml("inv1"),
+				Error,
+				"Failed to get invoice HTML: 500",
+			);
+		});
+	});
 });

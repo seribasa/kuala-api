@@ -10,6 +10,7 @@
     "npm:@supabase/supabase-js@^2.87.1": "2.87.1",
     "npm:@types/node@*": "24.2.0",
     "npm:pdf-lib@*": "1.17.1",
+    "npm:pdf-lib@^1.17.1": "1.17.1",
     "npm:rabbitmq-client@^5.0.8": "5.0.8"
   },
   "jsr": {
@@ -187,6 +188,7 @@
       "jsr:@std/assert@^1.0.12",
       "jsr:@std/testing@^1.0.12",
       "npm:@supabase/supabase-js@^2.87.1",
+      "npm:pdf-lib@^1.17.1",
       "npm:rabbitmq-client@^5.0.8"
     ]
   }
