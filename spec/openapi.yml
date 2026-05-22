@@ -891,7 +891,41 @@ paths:
                       default: 100
                 - in: query
                   name: searchKey
-                  description: Search for an invoice by a specified search string. If provided, the search endpoint is used instead of pagination. Advanced search by fields or balance is supported (e.g. `_q=1&status=DRAFT`).
+                  description: |
+                      Search for an invoice by a specified search string. Search operation can be of two types as follows:
+
+                      **Basic:**
+                      If the search string is a number, it is compared to the invoiceNumber attribute. An exact match is required. Otherwise, it is compared to the following attributes: invoiceId, accountId, or currency. The operation returns all invoice records in which the search string matches all or part of any one of these attributes.
+
+                      **Advanced:**
+                      Advanced search is of two types: Search by fields and Search by balance.
+
+                      Search by field allows filtering on the specified fields. The prefix marker `_q=1` needs to be specified at the beginning of the search key to indicate this is an advanced query.
+
+                      Search by balance allows filtering based on balance. In addition to the prefix marker `_q=1`, a balance query pattern (`balance=`) needs to be specified.
+
+                      Note that you can either filter by fields or filter by balance, it is not currently possible to do both.
+
+                      The search key should be in the following format: `<field>[<operator>]=value`. Here:
+
+                      * `field`: The name of the field you want to filter by. Possible values are:
+                        `id`, `account_id`, `invoice_date`, `target_date`, `currency`, `status`, `migrated`, `parent_invoice`, `grp_id`, `created_by`, `created_date`, `updated_by`, `updated_date`, `balance` (applicable only for search by balance)
+                      * `<operator>`: The comparison operator. This is optional and defaults to the equal to (`=`) operator if not specified. Possible values are:
+                        `and`, `eq`, `gte`, `gt`, `like`, `lte`, `lt`, `neq`, `or`
+                      * `value`: The value to be used for filtering.
+
+                      Some search by field search key examples:
+                      * `_q=1&status=DRAFT` - Returns invoices in DRAFT status.
+                      * `_q=1&status=DRAFT&currency[eq]=USD` - Returns invoices in DRAFT status where currency is USD.
+
+                      Some search by balance search key examples:
+                      * `_q=1&balance[eq]=200` - Returns invoices with balance=200.
+                      * `_q=1&balance[gt]100` - Returns invoices with balance greater than 100.
+
+                      Note: The symbols `[`, `]`, `%` need to be URL encoded while using cURL/Postman as follows:
+                      * `[` -> `%5B`
+                      * `]` -> `%5D`
+                      * `%` -> `%25`
                   required: false
                   schema:
                       type: string
