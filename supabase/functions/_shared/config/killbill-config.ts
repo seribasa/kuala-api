@@ -9,7 +9,7 @@ type KillBillConfig = {
 
 function killBillConfig(): KillBillConfig {
 	return {
-		baseUrl: Deno.env.get("KILLBILL_BASE_URL") || "",
+		baseUrl: Deno.env.get("KILLBILL_BASE_URL") || "http://localhost:8080",
 		apiKey: Deno.env.get("KILLBILL_API_KEY") || "",
 		apiSecret: Deno.env.get("KILLBILL_API_SECRET") || "",
 		username: Deno.env.get("KILLBILL_USERNAME") || "",
