@@ -865,6 +865,58 @@ paths:
                             schema: { $ref: "#/components/schemas/Error" }
 
     /invoices:
+        get:
+            tags: [Invoices]
+            summary: List and search invoices
+            description: |
+                Retrieve a list of all invoice records for this tenant or search for a specific invoice.
+                Note that these endpoints return shallow objects and thus the value 0 is returned for the amount, creditAdj, refundAdj and balance fields. In order to retrieve the actual data for these fields, additional endpoints (like retrieve invoice by id) would need to be invoked.
+            operationId: listInvoices
+            security:
+                - bearerAuth: []
+            parameters:
+                - in: query
+                  name: offset
+                  description: Starting index for items listed
+                  required: false
+                  schema:
+                      type: integer
+                      default: 0
+                - in: query
+                  name: limit
+                  description: Maximum number of items to be listed
+                  required: false
+                  schema:
+                      type: integer
+                      default: 100
+                - in: query
+                  name: searchKey
+                  description: Search for an invoice by a specified search string. If provided, the search endpoint is used instead of pagination. Advanced search by fields or balance is supported (e.g. `_q=1&status=DRAFT`).
+                  required: false
+                  schema:
+                      type: string
+            responses:
+                "200":
+                    description: List of invoices
+                    content:
+                        application/json:
+                            schema:
+                                type: object
+                                properties:
+                                    invoices:
+                                        type: array
+                                        items:
+                                            $ref: "#/components/schemas/Invoice"
+                "401":
+                    description: Unauthorized
+                    content:
+                        application/json:
+                            schema: { $ref: "#/components/schemas/Error" }
+                "500":
+                    description: Internal server error
+                    content:
+                        application/json:
+                            schema: { $ref: "#/components/schemas/Error" }
         post:
             tags: [Invoices]
             summary: Generate invoice for a subscription (if not auto-generated)
