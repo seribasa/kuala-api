@@ -14,8 +14,6 @@ import {
 import { handleCreateEventDrivenSubscription } from "./handlers/subscriptions/create-event-driven.ts";
 import { handleGetSubscriptionStatus } from "./handlers/subscriptions/status.ts";
 import {
-	handleCreateInvoice,
-	handleDownloadInvoicePdf,
 	handleGetInvoiceById,
 	handleListInvoices,
 } from "./handlers/invoices/index.ts";
@@ -54,10 +52,8 @@ app.get(
 	authMiddleware,
 	handleGetSubscriptionById,
 );
-app.post("/invoices", authMiddleware, handleCreateInvoice);
 app.get("/invoices", authMiddleware, handleListInvoices);
 app.get("/invoices/:invoiceId", authMiddleware, handleGetInvoiceById);
-app.get("/invoices/:invoiceId/pdf", authMiddleware, handleDownloadInvoicePdf);
 
 // HANDLE 404
 const errorResponse: ErrorResponse = {
