@@ -917,7 +917,10 @@ paths:
                 Fetch an invoice and render it as PDF.
                 Internally calls the Kill Bill API:
                 `GET /1.0/kb/invoices/{invoiceId}/html`
-                then converts the result into a PDF file.
+                then converts the result into a PDF file using pdf-lib.
+                The generated PDF is cached in Supabase Storage.
+                If the file already exists in storage, it bypasses generation.
+                Returns a 303 Redirect to a short-lived signed URL for the PDF file.
             operationId: downloadInvoicePdf
             parameters:
                 - name: invoiceId
@@ -927,17 +930,18 @@ paths:
                       type: string
                   description: The ID of the invoice.
             responses:
-                "200":
-                    description: PDF file of the invoice
-                    content:
-                        application/pdf:
+                "303":
+                    description: Redirect to a signed URL for the generated PDF file
+                    headers:
+                        Location:
+                            description: Signed URL for the PDF
                             schema:
                                 type: string
-                                format: binary
+                                format: uri
                 "404":
                     description: Invoice not found
                 "500":
-                    description: Failed to generate PDF
+                    description: Failed to generate PDF or upload to storage
     /invoices/{invoiceId}/pay:
         post:
             tags: [Invoices]
