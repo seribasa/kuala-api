@@ -2,6 +2,7 @@ import { assertEquals } from "@std/assert";
 import { stub } from "@std/testing/mock";
 import { Context } from "@hono/hono";
 import { handleDownloadInvoicePdf } from "../../../kuala/handlers/invoices/download-pdf.ts";
+import { supabase } from "../../../_shared/supabase.ts";
 
 // Type definitions for test responses
 interface JsonResponse {
@@ -64,6 +65,11 @@ function createMockContext(
 			data: Record<string, unknown>,
 			status?: number,
 		) => ({ data, status } as JsonResponse),
+		redirect: (url: string, status = 302) => ({
+			url,
+			status,
+			isRedirect: true,
+		} as unknown as Response),
 		get: (key: string) => contextData.get(key),
 		set: (key: string, value: unknown) => contextData.set(key, value),
 	} as unknown as Context;
@@ -227,7 +233,7 @@ Deno.test("handleDownloadInvoicePdf - should return 404 when Kill Bill throws IN
 	}
 });
 
-Deno.test("handleDownloadInvoicePdf - should return PDF response successfully", async () => {
+Deno.test("handleDownloadInvoicePdf - should return redirect to signed URL when PDF is newly generated", async () => {
 	const mockUser = {
 		id: "user123",
 		email: "test@example.com",
@@ -257,6 +263,17 @@ Deno.test("handleDownloadInvoicePdf - should return PDF response successfully", 
 		"<html><body><h1>Invoice</h1><p>Amount: $100</p></body></html>";
 
 	const envStub = setupEnvStub();
+
+	const storageStub = stub(supabase.storage, "from", () =>
+		({
+			list: () => Promise.resolve({ data: [] }), // Not found
+			upload: () => Promise.resolve({ error: null }),
+			createSignedUrl: () =>
+				Promise.resolve({
+					data: { signedUrl: "https://example.com/signed-url" },
+					error: null,
+				}),
+		}) as unknown as ReturnType<typeof supabase.storage.from>);
 
 	let callCount = 0;
 	const fetchStub = stub(
@@ -312,20 +329,112 @@ Deno.test("handleDownloadInvoicePdf - should return PDF response successfully", 
 
 		const response = await handleDownloadInvoicePdf(
 			mockContext,
-		) as unknown as Response;
+		) as unknown as Response & { url: string };
 
-		assertEquals(response.status, 200);
-		assertEquals(response.headers.get("Content-Type"), "application/pdf");
-		assertEquals(
-			response.headers.get("Content-Disposition"),
-			'attachment; filename="invoice-inv123.pdf"',
-		);
-
-		const buffer = await response.arrayBuffer();
-		assertEquals(buffer.byteLength > 0, true);
+		assertEquals(response.status, 303);
+		assertEquals(response.url, "https://example.com/signed-url");
 	} finally {
 		envStub.restore();
 		fetchStub.restore();
+		storageStub.restore();
+	}
+});
+
+Deno.test("handleDownloadInvoicePdf - should return redirect to signed URL directly when PDF already exists", async () => {
+	const mockUser = {
+		id: "user123",
+		email: "test@example.com",
+	};
+
+	const mockInvoice = {
+		invoiceId: "inv123",
+		accountId: "acc123",
+		amount: 100,
+		status: "COMMITTED",
+	};
+
+	const mockUserAccount = {
+		accountId: "acc123",
+		externalKey: "user123",
+		currency: "USD",
+	};
+
+	const envStub = setupEnvStub();
+
+	const storageStub = stub(supabase.storage, "from", () =>
+		({
+			list: () =>
+				Promise.resolve({ data: [{ name: "invoice-inv123.pdf" }] }), // Found in storage!
+			upload: () => Promise.reject(new Error("Should not upload")),
+			createSignedUrl: () =>
+				Promise.resolve({
+					data: {
+						signedUrl: "https://example.com/signed-url-existing",
+					},
+					error: null,
+				}),
+		}) as unknown as ReturnType<typeof supabase.storage.from>);
+
+	let callCount = 0;
+	const fetchStub = stub(
+		globalThis,
+		"fetch",
+		(url: string | URL | Request) => {
+			callCount++;
+			const urlString = typeof url === "string"
+				? url
+				: url instanceof URL
+				? url.toString()
+				: url.url;
+
+			// It should NOT call HTML generation endpoint
+			if (urlString.includes("/1.0/kb/invoices/inv123/html")) {
+				return Promise.reject(
+					new Error("Should not fetch HTML if cached"),
+				);
+			}
+
+			if (urlString.includes("/1.0/kb/invoices/inv123")) {
+				return Promise.resolve(
+					new MockResponse(
+						mockInvoice,
+						200,
+					) as unknown as Response,
+				);
+			}
+
+			if (urlString.includes("externalKey=user123")) {
+				return Promise.resolve(
+					new MockResponse(
+						mockUserAccount,
+						200,
+					) as unknown as Response,
+				);
+			}
+
+			return Promise.resolve(
+				new MockResponse(
+					{ error: "Unexpected call" },
+					500,
+					false,
+				) as unknown as Response,
+			);
+		},
+	);
+
+	try {
+		const mockContext = createMockContext("inv123", mockUser);
+
+		const response = await handleDownloadInvoicePdf(
+			mockContext,
+		) as unknown as Response & { url: string };
+
+		assertEquals(response.status, 303);
+		assertEquals(response.url, "https://example.com/signed-url-existing");
+	} finally {
+		envStub.restore();
+		fetchStub.restore();
+		storageStub.restore();
 	}
 });
 

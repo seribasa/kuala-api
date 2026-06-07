@@ -1,9 +1,10 @@
 import { Context } from "@hono/hono";
 import { ErrorResponse } from "../../../_shared/types/response.ts";
-import { authLogger } from "../../middleware/logger.ts";
+import { authLogger, logger } from "../../middleware/logger.ts";
 import { getUser } from "../../middleware/auth.ts";
 import { killBillService } from "@shared/services/killbill.ts";
 import { PDFDocument, StandardFonts } from "pdf-lib";
+import { supabase } from "@shared/supabase.ts";
 
 /**
  * Download invoice as PDF
@@ -62,53 +63,100 @@ export const handleDownloadInvoicePdf = async (c: Context) => {
 			return c.json(errorResponse, 404);
 		}
 
-		// Get the HTML content
-		const htmlContent = await killBillService.getInvoiceHtml(invoiceId);
+		const bucketName = "invoices";
+		const fileName = `invoice-${invoiceId}.pdf`;
 
-		// Generate PDF
-		const pdfDoc = await PDFDocument.create();
-		const page = pdfDoc.addPage([595.28, 841.89]); // A4 size
-		const font = await pdfDoc.embedFont(StandardFonts.Courier);
+		// Check if file exists in Supabase Storage
+		const { data: existingFiles } = await supabase.storage.from(bucketName)
+			.list("", {
+				search: fileName,
+			});
 
-		const padding = 40;
-		const { width, height } = page.getSize();
-		const usableWidth = width - 2 * padding;
+		let pdfExists = false;
+		if (existingFiles && existingFiles.length > 0) {
+			pdfExists = existingFiles.some((file) => file.name === fileName);
+		}
 
-		page.drawText("Invoice: " + invoiceId, {
-			x: padding,
-			y: height - padding,
-			size: 16,
-			font,
-		});
+		if (!pdfExists) {
+			logger.info(
+				handlerName,
+				"PDF not found in storage. Generating new PDF.",
+			);
 
-		// Clean up HTML a bit for text rendering
-		const cleanText = htmlContent
-			.replace(/<[^>]+>/g, " ") // Strip HTML tags
-			.replace(/\s+/g, " ") // Collapse whitespace
-			.trim()
-			.substring(0, 4000); // Limit length to avoid page overflow for basic dump
+			// Get the HTML content
+			const htmlContent = await killBillService.getInvoiceHtml(invoiceId);
 
-		page.drawText(cleanText, {
-			x: padding,
-			y: height - padding - 40,
-			size: 10,
-			font,
-			maxWidth: usableWidth,
-			lineHeight: 14,
-		});
+			// Generate PDF
+			const pdfDoc = await PDFDocument.create();
+			const page = pdfDoc.addPage([595.28, 841.89]); // A4 size
+			const font = await pdfDoc.embedFont(StandardFonts.Courier);
 
-		const pdfBytes = await pdfDoc.save();
+			const padding = 40;
+			const { width, height } = page.getSize();
+			const usableWidth = width - 2 * padding;
 
-		authLogger.success(handlerName, "PDF generated successfully");
+			page.drawText("Invoice: " + invoiceId, {
+				x: padding,
+				y: height - padding,
+				size: 16,
+				font,
+			});
 
-		return new Response(pdfBytes as unknown as BodyInit, {
-			status: 200,
-			headers: {
-				"Content-Type": "application/pdf",
-				"Content-Disposition":
-					`attachment; filename="invoice-${invoiceId}.pdf"`,
-			},
-		});
+			// Clean up HTML a bit for text rendering
+			const cleanText = htmlContent
+				.replace(/<[^>]+>/g, " ") // Strip HTML tags
+				.replace(/\s+/g, " ") // Collapse whitespace
+				.trim()
+				.substring(0, 4000); // Limit length to avoid page overflow for basic dump
+
+			page.drawText(cleanText, {
+				x: padding,
+				y: height - padding - 40,
+				size: 10,
+				font,
+				maxWidth: usableWidth,
+				lineHeight: 14,
+			});
+
+			const pdfBytes = await pdfDoc.save();
+
+			// Upload to Supabase Storage
+			const { error: uploadError } = await supabase.storage.from(
+				bucketName,
+			).upload(fileName, pdfBytes, {
+				contentType: "application/pdf",
+				upsert: true,
+			});
+
+			if (uploadError) {
+				throw new Error(
+					"Failed to upload PDF to storage: " + uploadError.message,
+				);
+			}
+
+			authLogger.success(
+				handlerName,
+				"PDF generated and uploaded successfully",
+			);
+		} else {
+			logger.info(
+				handlerName,
+				"PDF found in storage. Skipping generation.",
+			);
+		}
+
+		// Generate signed URL valid for 60 seconds
+		const { data: signedUrlData, error: signedUrlError } = await supabase
+			.storage.from(bucketName).createSignedUrl(fileName, 60);
+
+		if (signedUrlError || !signedUrlData) {
+			throw new Error("Failed to generate signed URL");
+		}
+
+		authLogger.success(handlerName, "Redirecting to signed URL");
+
+		// Redirect to the signed URL
+		return c.redirect(signedUrlData.signedUrl, 303);
 	} catch (error) {
 		authLogger.exception(handlerName, error as Error);
 
