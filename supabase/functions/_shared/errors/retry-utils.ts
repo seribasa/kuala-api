@@ -340,7 +340,7 @@ export async function withTimeout<T>(
 	timeoutMs: number,
 	errorMessage = "Operation timed out",
 ): Promise<T> {
-	let timer: number | undefined;
+	let timer: ReturnType<typeof setTimeout> | undefined;
 	const timeoutPromise = new Promise<never>((_, reject) => {
 		timer = setTimeout(() => reject(new Error(errorMessage)), timeoutMs);
 	});

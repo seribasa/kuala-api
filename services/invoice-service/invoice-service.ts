@@ -130,7 +130,6 @@ export class InvoiceService {
 			}
 
 			// 3. Check if invoice already exists for current period
-			// TODO: check again the period logic
 			const invoices = await killBillService.getAccountInvoices(
 				account.accountId,
 			);

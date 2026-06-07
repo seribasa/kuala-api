@@ -698,4 +698,71 @@ describe("KillBillService", () => {
 			);
 		});
 	});
+	describe("listInvoices", () => {
+		it("success", async () => {
+			fetchStub.restore();
+			fetchStub = stub(
+				globalThis,
+				"fetch",
+				returnsNext([
+					Promise.resolve(
+						new Response(JSON.stringify([{ invoiceId: "1" }]), {
+							status: 200,
+						}),
+					),
+				]),
+			);
+			const res = await killBillService.listInvoices(0, 100);
+			assertEquals(res[0].invoiceId, "1");
+		});
+		it("error", async () => {
+			fetchStub.restore();
+			fetchStub = stub(
+				globalThis,
+				"fetch",
+				returnsNext([
+					Promise.resolve(new Response(null, { status: 500 })),
+				]),
+			);
+			await assertRejects(
+				() => killBillService.listInvoices(0, 100),
+				Error,
+				"Failed to list invoices: 500",
+			);
+		});
+	});
+
+	describe("searchInvoices", () => {
+		it("success", async () => {
+			fetchStub.restore();
+			fetchStub = stub(
+				globalThis,
+				"fetch",
+				returnsNext([
+					Promise.resolve(
+						new Response(JSON.stringify([{ invoiceId: "1" }]), {
+							status: 200,
+						}),
+					),
+				]),
+			);
+			const res = await killBillService.searchInvoices("key", 0, 100);
+			assertEquals(res[0].invoiceId, "1");
+		});
+		it("error", async () => {
+			fetchStub.restore();
+			fetchStub = stub(
+				globalThis,
+				"fetch",
+				returnsNext([
+					Promise.resolve(new Response(null, { status: 500 })),
+				]),
+			);
+			await assertRejects(
+				() => killBillService.searchInvoices("key", 0, 100),
+				Error,
+				"Failed to search invoices: 500",
+			);
+		});
+	});
 });
