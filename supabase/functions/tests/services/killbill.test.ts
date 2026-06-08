@@ -97,6 +97,20 @@ describe("KillBillService", () => {
 			assertEquals(res, null);
 		});
 
+		it("handles string error and returns null", async () => {
+			fetchStub.restore();
+			fetchStub = stub(
+				globalThis,
+				"fetch",
+				returnsNext([
+					Promise.reject("String error"),
+				]),
+			);
+
+			const res = await killBillService.getAccountByExternalKey("u2");
+			assertEquals(res, null);
+		});
+
 		it("throws if create failure", async () => {
 			fetchStub.restore();
 			fetchStub = stub(
@@ -242,6 +256,21 @@ describe("KillBillService", () => {
 				"Failed to get account subscriptions: 500",
 			);
 		});
+
+		it("returns null on 404", async () => {
+			fetchStub.restore();
+			fetchStub = stub(
+				globalThis,
+				"fetch",
+				returnsNext([
+					Promise.resolve(new Response(null, { status: 404 })),
+				]),
+			);
+			const res = await killBillService.getSubscriptionByExternalId(
+				"sub-1",
+			);
+			assertEquals(res, null);
+		});
 	});
 
 	describe("hasActiveSubscription", () => {
@@ -252,6 +281,32 @@ describe("KillBillService", () => {
 				"fetch",
 				returnsNext([
 					Promise.reject(new Error("Net err")),
+				]),
+			);
+			const req = await killBillService.hasActiveSubscription("sub-1");
+			assertEquals(req.hasActive, false);
+		});
+
+		it("false on fetch string error", async () => {
+			fetchStub.restore();
+			fetchStub = stub(
+				globalThis,
+				"fetch",
+				returnsNext([
+					Promise.reject("Net err string"),
+				]),
+			);
+			const req = await killBillService.hasActiveSubscription("sub-1");
+			assertEquals(req.hasActive, false);
+		});
+
+		it("returns hasActive false when no subscription found", async () => {
+			fetchStub.restore();
+			fetchStub = stub(
+				globalThis,
+				"fetch",
+				returnsNext([
+					Promise.resolve(new Response(null, { status: 404 })),
 				]),
 			);
 			const req = await killBillService.hasActiveSubscription("sub-1");
