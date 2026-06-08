@@ -521,3 +521,166 @@ Deno.test("handleDownloadInvoicePdf - should handle network errors gracefully", 
 		fetchStub.restore();
 	}
 });
+
+Deno.test("handleDownloadInvoicePdf - should handle storage upload errors gracefully", async () => {
+	const mockUser = {
+		id: "user123",
+		email: "test@example.com",
+	};
+
+	const mockInvoice = {
+		invoiceId: "inv123",
+		accountId: "acc123",
+		amount: 100,
+		status: "COMMITTED",
+	};
+
+	const mockUserAccount = {
+		accountId: "acc123",
+		externalKey: "user123",
+		currency: "USD",
+	};
+
+	const envStub = setupEnvStub();
+
+	const storageStub = stub(supabase.storage, "from", () =>
+		({
+			list: () => Promise.resolve({ data: [] }), // Not found in storage
+			upload: () =>
+				Promise.resolve({ error: new Error("Upload failed") }),
+			createSignedUrl: () =>
+				Promise.resolve({ data: { signedUrl: "" }, error: null }),
+		}) as unknown as ReturnType<typeof supabase.storage.from>);
+
+	const fetchStub = stub(
+		globalThis,
+		"fetch",
+		(url: string | URL | Request) => {
+			const urlString = typeof url === "string"
+				? url
+				: url instanceof URL
+				? url.toString()
+				: url.url;
+			if (urlString.includes("/1.0/kb/invoices/inv123/html")) {
+				return Promise.resolve(
+					new MockResponse(
+						"<html>Invoice</html>",
+						200,
+					) as unknown as Response,
+				);
+			}
+			if (urlString.includes("/1.0/kb/invoices/inv123")) {
+				return Promise.resolve(
+					new MockResponse(mockInvoice, 200) as unknown as Response,
+				);
+			}
+			if (urlString.includes("externalKey=user123")) {
+				return Promise.resolve(
+					new MockResponse(
+						mockUserAccount,
+						200,
+					) as unknown as Response,
+				);
+			}
+			return Promise.resolve(
+				new MockResponse(
+					{ error: "Unexpected call" },
+					500,
+					false,
+				) as unknown as Response,
+			);
+		},
+	);
+
+	try {
+		const mockContext = createMockContext("inv123", mockUser);
+		const response = await handleDownloadInvoicePdf(
+			mockContext,
+		) as unknown as JsonResponse;
+		assertEquals(response.status, 500);
+		assertEquals(response.data.code, "INTERNAL_ERROR");
+	} finally {
+		envStub.restore();
+		fetchStub.restore();
+		storageStub.restore();
+	}
+});
+
+Deno.test("handleDownloadInvoicePdf - should handle signed url generation errors gracefully", async () => {
+	const mockUser = {
+		id: "user123",
+		email: "test@example.com",
+	};
+
+	const mockInvoice = {
+		invoiceId: "inv123",
+		accountId: "acc123",
+		amount: 100,
+		status: "COMMITTED",
+	};
+
+	const mockUserAccount = {
+		accountId: "acc123",
+		externalKey: "user123",
+		currency: "USD",
+	};
+
+	const envStub = setupEnvStub();
+
+	const storageStub = stub(supabase.storage, "from", () =>
+		({
+			list: () =>
+				Promise.resolve({ data: [{ name: "invoice-inv123.pdf" }] }), // Found in storage
+			upload: () => Promise.reject(new Error("Should not upload")),
+			createSignedUrl: () =>
+				Promise.resolve({
+					data: null,
+					error: new Error("Signed URL failed"),
+				}),
+		}) as unknown as ReturnType<typeof supabase.storage.from>);
+
+	const fetchStub = stub(
+		globalThis,
+		"fetch",
+		(url: string | URL | Request) => {
+			const urlString = typeof url === "string"
+				? url
+				: url instanceof URL
+				? url.toString()
+				: url.url;
+			if (urlString.includes("/1.0/kb/invoices/inv123")) {
+				return Promise.resolve(
+					new MockResponse(mockInvoice, 200) as unknown as Response,
+				);
+			}
+			if (urlString.includes("externalKey=user123")) {
+				return Promise.resolve(
+					new MockResponse(
+						mockUserAccount,
+						200,
+					) as unknown as Response,
+				);
+			}
+			return Promise.resolve(
+				new MockResponse(
+					{ error: "Unexpected call" },
+					500,
+					false,
+				) as unknown as Response,
+			);
+		},
+	);
+
+	try {
+		const mockContext = createMockContext("inv123", mockUser);
+		const response = await handleDownloadInvoicePdf(
+			mockContext,
+		) as unknown as JsonResponse;
+		assertEquals(response.status, 500);
+		assertEquals(response.data.code, "INTERNAL_ERROR");
+	} finally {
+		envStub.restore();
+		fetchStub.restore();
+		storageStub.restore();
+	}
+});
