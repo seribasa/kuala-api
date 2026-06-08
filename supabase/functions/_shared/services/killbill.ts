@@ -604,6 +604,86 @@ export class KillBillService {
 	}
 
 	/**
+	 * List invoices across the tenant
+	 */
+	async listInvoices(
+		offset = 0,
+		limit = 100,
+	): Promise<KillBillInvoice[]> {
+		const handlerName = "killbill-service";
+		const searchParams = new URLSearchParams();
+		searchParams.append("offset", offset.toString());
+		searchParams.append("limit", limit.toString());
+
+		const url =
+			`${this.baseUrl}/1.0/kb/invoices/pagination?${searchParams.toString()}`;
+
+		logger.info(handlerName, "Listing invoices", {
+			url,
+		});
+
+		const response = await fetch(url, {
+			method: "GET",
+			headers: this.getHeaders(),
+		});
+
+		if (!response.ok) {
+			logger.error(handlerName, "Failed to list invoices", {
+				status: response.status,
+				statusText: response.statusText,
+			});
+			throw new Error(`Failed to list invoices: ${response.status}`);
+		}
+
+		return await response.json();
+	}
+
+	/**
+	 * Search invoices across the tenant
+	 */
+	async searchInvoices(
+		searchKey: string,
+		offset = 0,
+		limit = 100,
+	): Promise<KillBillInvoice[]> {
+		const handlerName = "killbill-service";
+		// searchKey needs to be URL encoded if it contains [ ] etc.
+		// However, fetch's URL will encode the path segment appropriately.
+		// But if it's advanced search _q=1&..., putting it in path might be tricky.
+		// Actually, Kill Bill search API is /search/{searchKey} where searchKey is a path variable.
+		const encodedSearchKey = encodeURIComponent(searchKey)
+			.replace(/%3D/g, "=")
+			.replace(/%26/g, "&"); // Allow basic advanced search params if user provides them
+
+		const searchParams = new URLSearchParams();
+		searchParams.append("offset", offset.toString());
+		searchParams.append("limit", limit.toString());
+
+		const url =
+			`${this.baseUrl}/1.0/kb/invoices/search/${encodedSearchKey}?${searchParams.toString()}`;
+
+		logger.info(handlerName, "Searching invoices", {
+			url,
+			searchKey,
+		});
+
+		const response = await fetch(url, {
+			method: "GET",
+			headers: this.getHeaders(),
+		});
+
+		if (!response.ok) {
+			logger.error(handlerName, "Failed to search invoices", {
+				status: response.status,
+				statusText: response.statusText,
+			});
+			throw new Error(`Failed to search invoices: ${response.status}`);
+		}
+
+		return await response.json();
+	}
+
+	/**
 	 * Get invoice by ID
 	 */
 	async getInvoiceById(invoiceId: string): Promise<KillBillInvoice> {

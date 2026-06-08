@@ -90,7 +90,7 @@ export class RabbitMQClient {
 	private connectionRetries = 0;
 	private reconnectDelay = 1000; // Start with 1 second
 	private maxReconnectDelay = 30000; // Max 30 seconds
-	private reconnectTimeout: number | null = null;
+	private reconnectTimeout: ReturnType<typeof setTimeout> | null = null;
 	// Store consumer configurations for auto-resume after reconnection
 	private consumerConfigs: Array<{
 		queueName: string;
@@ -494,7 +494,7 @@ export class RabbitMQClient {
 						);
 
 						// Process the event with timeout
-						let timeoutId: number;
+						let timeoutId: ReturnType<typeof setTimeout>;
 						const timeoutPromise = new Promise<never>(
 							(_, reject) => {
 								timeoutId = setTimeout(

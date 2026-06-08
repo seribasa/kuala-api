@@ -23,27 +23,35 @@
 		"lcov": "deno coverage --lcov coverage/ > coverage.lcov",
 		"lint": "deno lint"
 	},
-	"lint": {
-		"include": [
-			"services/**/*.{ts,tsx}",
-			"supabase/functions/**/*.{ts,tsx}",
-			"infra/self-hosted/**/*.{ts,tsx}"
-		]
-	},
-	"test": {
-		"include": [
-			"services/**/*.{ts,tsx}",
-			"supabase/functions/**/*.{ts,tsx}",
-			"infra/self-hosted/**/*.{ts,tsx}"
-		]
-	},
 	"fmt": {
 		"useTabs": true,
 		"indentWidth": 4,
 		"include": [
-			"services/**/*.{ts,tsx}",
-			"supabase/functions/**/*.{ts,tsx}",
-			"infra/self-hosted/**/*.{ts,tsx}"
-		]
+			"services/",
+			"supabase/functions/",
+			"infra/self-hosted/"
+		],
+		"exclude": ["**/node_modules/**", "**/dist/**", "**/coverage/**"]
+	},
+	"lint": {
+		"include": [
+			"services/",
+			"supabase/functions/",
+			"infra/self-hosted/"
+		],
+		"exclude": ["**/node_modules/**", "**/dist/**", "**/coverage/**"],
+		"rules": {
+			"tags": ["recommended"],
+			"include": ["ban-untagged-todo"],
+			"exclude": ["no-unused-vars"]
+		}
+	},
+	"test": {
+		"include": [
+			"services/",
+			"supabase/functions/",
+			"infra/self-hosted/"
+		],
+		"exclude": ["**/node_modules/**", "**/dist/**", "**/coverage/**"]
 	}
 }

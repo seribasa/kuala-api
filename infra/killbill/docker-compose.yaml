@@ -3,7 +3,7 @@ volumes:
 services:
     killbill:
         container_name: killbill-kuala
-        image: killbill/killbill:0.24.10
+        image: killbill/killbill:0.24.17
         ports:
             - "${KILLBILL_PORT}:8080"
         volumes:
@@ -29,7 +29,7 @@ services:
                 condition: service_healthy
     kaui:
         container_name: kaui-kuala
-        image: killbill/kaui:3.0.9
+        image: killbill/kaui:3.0.23
         ports:
             - "${KAUI_PORT}:8080"
         environment:
