@@ -29,7 +29,7 @@ services:
                 condition: service_healthy
     kaui:
         container_name: kaui-kuala
-        image: killbill/kaui:3.0.23
+        image: killbill/kaui:4.0.16
         ports:
             - "${KAUI_PORT}:8080"
         environment:
