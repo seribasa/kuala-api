@@ -13,6 +13,12 @@ import {
 } from "./handlers/subscriptions/index.ts";
 import { handleCreateEventDrivenSubscription } from "./handlers/subscriptions/create-event-driven.ts";
 import { handleGetSubscriptionStatus } from "./handlers/subscriptions/status.ts";
+import {
+	handleCreateInvoice,
+	handleDownloadInvoicePdf,
+	handleGetInvoiceById,
+	handleListInvoices,
+} from "./handlers/invoices/index.ts";
 import { ErrorResponse } from "../_shared/types/response.ts";
 import { customLogger } from "./middleware/logger.ts";
 import { corsMiddleware } from "./middleware/cors.ts";
@@ -48,6 +54,10 @@ app.get(
 	authMiddleware,
 	handleGetSubscriptionById,
 );
+app.get("/invoices/:invoiceId/pdf", authMiddleware, handleDownloadInvoicePdf);
+app.get("/invoices", authMiddleware, handleListInvoices);
+app.get("/invoices/:invoiceId", authMiddleware, handleGetInvoiceById);
+app.post("/invoices", authMiddleware, handleCreateInvoice);
 
 // HANDLE 404
 const errorResponse: ErrorResponse = {

@@ -73,7 +73,7 @@ services:
     # ============================================================================
     killbill:
         container_name: killbill
-        image: killbill/killbill:0.24.10
+        image: killbill/killbill:0.24.17
         ports:
             - "8080:8080"
         environment:

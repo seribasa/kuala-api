@@ -24,16 +24,16 @@ jobs:
 
             - name: Lint code
               run: |
-                  cd supabase/functions
                   deno lint
 
             - name: Format check
               run: |
-                  cd supabase/functions
-                  deno fmt --check "**/*.ts"
+                  deno fmt --check
+                  deno fmt --check
                   if [ $? -ne 0 ]; then
                     echo "Fixing format issues..."
-                    deno fmt "**/*.ts"
+                    deno fmt
+                    deno fmt
                     git config --local user.email "github-actions[bot]@users.noreply.github.com"
                     git config --local user.name "github-actions[bot]"
                     git add .

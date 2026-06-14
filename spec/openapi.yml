@@ -865,6 +865,92 @@ paths:
                             schema: { $ref: "#/components/schemas/Error" }
 
     /invoices:
+        get:
+            tags: [Invoices]
+            summary: List and search invoices
+            description: |
+                Retrieve a list of all invoice records for this tenant or search for a specific invoice.
+                Note that these endpoints return shallow objects and thus the value 0 is returned for the amount, creditAdj, refundAdj and balance fields. In order to retrieve the actual data for these fields, additional endpoints (like retrieve invoice by id) would need to be invoked.
+            operationId: listInvoices
+            security:
+                - bearerAuth: []
+            parameters:
+                - in: query
+                  name: offset
+                  description: Starting index for items listed
+                  required: false
+                  schema:
+                      type: integer
+                      default: 0
+                - in: query
+                  name: limit
+                  description: Maximum number of items to be listed
+                  required: false
+                  schema:
+                      type: integer
+                      default: 100
+                - in: query
+                  name: searchKey
+                  description: |
+                      Search for an invoice by a specified search string. Search operation can be of two types as follows:
+
+                      **Basic:**
+                      If the search string is a number, it is compared to the invoiceNumber attribute. An exact match is required. Otherwise, it is compared to the following attributes: invoiceId, accountId, or currency. The operation returns all invoice records in which the search string matches all or part of any one of these attributes.
+
+                      **Advanced:**
+                      Advanced search is of two types: Search by fields and Search by balance.
+
+                      Search by field allows filtering on the specified fields. The prefix marker `_q=1` needs to be specified at the beginning of the search key to indicate this is an advanced query.
+
+                      Search by balance allows filtering based on balance. In addition to the prefix marker `_q=1`, a balance query pattern (`balance=`) needs to be specified.
+
+                      Note that you can either filter by fields or filter by balance, it is not currently possible to do both.
+
+                      The search key should be in the following format: `<field>[<operator>]=value`. Here:
+
+                      * `field`: The name of the field you want to filter by. Possible values are:
+                        `id`, `account_id`, `invoice_date`, `target_date`, `currency`, `status`, `migrated`, `parent_invoice`, `grp_id`, `created_by`, `created_date`, `updated_by`, `updated_date`, `balance` (applicable only for search by balance)
+                      * `<operator>`: The comparison operator. This is optional and defaults to the equal to (`=`) operator if not specified. Possible values are:
+                        `and`, `eq`, `gte`, `gt`, `like`, `lte`, `lt`, `neq`, `or`
+                      * `value`: The value to be used for filtering.
+
+                      Some search by field search key examples:
+                      * `_q=1&status=DRAFT` - Returns invoices in DRAFT status.
+                      * `_q=1&status=DRAFT&currency[eq]=USD` - Returns invoices in DRAFT status where currency is USD.
+
+                      Some search by balance search key examples:
+                      * `_q=1&balance[eq]=200` - Returns invoices with balance=200.
+                      * `_q=1&balance[gt]100` - Returns invoices with balance greater than 100.
+
+                      Note: The symbols `[`, `]`, `%` need to be URL encoded while using cURL/Postman as follows:
+                      * `[` -> `%5B`
+                      * `]` -> `%5D`
+                      * `%` -> `%25`
+                  required: false
+                  schema:
+                      type: string
+            responses:
+                "200":
+                    description: List of invoices
+                    content:
+                        application/json:
+                            schema:
+                                type: object
+                                properties:
+                                    invoices:
+                                        type: array
+                                        items:
+                                            $ref: "#/components/schemas/Invoice"
+                "401":
+                    description: Unauthorized
+                    content:
+                        application/json:
+                            schema: { $ref: "#/components/schemas/Error" }
+                "500":
+                    description: Internal server error
+                    content:
+                        application/json:
+                            schema: { $ref: "#/components/schemas/Error" }
         post:
             tags: [Invoices]
             summary: Generate invoice for a subscription (if not auto-generated)
@@ -917,7 +1003,10 @@ paths:
                 Fetch an invoice and render it as PDF.
                 Internally calls the Kill Bill API:
                 `GET /1.0/kb/invoices/{invoiceId}/html`
-                then converts the result into a PDF file.
+                then converts the result into a PDF file using pdf-lib.
+                The generated PDF is cached in Supabase Storage.
+                If the file already exists in storage, it bypasses generation.
+                Returns a 303 Redirect to a short-lived signed URL for the PDF file.
             operationId: downloadInvoicePdf
             parameters:
                 - name: invoiceId
@@ -927,17 +1016,18 @@ paths:
                       type: string
                   description: The ID of the invoice.
             responses:
-                "200":
-                    description: PDF file of the invoice
-                    content:
-                        application/pdf:
+                "303":
+                    description: Redirect to a signed URL for the generated PDF file
+                    headers:
+                        Location:
+                            description: Signed URL for the PDF
                             schema:
                                 type: string
-                                format: binary
+                                format: uri
                 "404":
                     description: Invoice not found
                 "500":
-                    description: Failed to generate PDF
+                    description: Failed to generate PDF or upload to storage
     /invoices/{invoiceId}/pay:
         post:
             tags: [Invoices]
