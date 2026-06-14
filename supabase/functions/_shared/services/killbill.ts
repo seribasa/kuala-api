@@ -715,6 +715,40 @@ export class KillBillService {
 	}
 
 	/**
+	 * Get invoice HTML by ID
+	 */
+	async getInvoiceHtml(invoiceId: string): Promise<string> {
+		const handlerName = "killbill-service";
+		const url = `${this.baseUrl}/1.0/kb/invoices/${invoiceId}/html`;
+
+		logger.info(handlerName, "Getting invoice HTML by ID", {
+			url,
+			invoiceId: invoiceId.substring(0, 8) + "...",
+		});
+
+		const response = await fetch(url, {
+			method: "GET",
+			headers: {
+				...this.getHeaders(),
+				"Accept": "text/html",
+			},
+		});
+
+		if (!response.ok) {
+			if (response.status === 404) {
+				throw new Error("INVOICE_NOT_FOUND");
+			}
+			logger.error(handlerName, "Failed to get invoice HTML", {
+				status: response.status,
+				statusText: response.statusText,
+			});
+			throw new Error(`Failed to get invoice HTML: ${response.status}`);
+		}
+
+		return await response.text();
+	}
+
+	/**
 	 * Trigger invoice run for account
 	 */
 	async triggerInvoiceRun(

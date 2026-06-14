@@ -15,6 +15,7 @@ import { handleCreateEventDrivenSubscription } from "./handlers/subscriptions/cr
 import { handleGetSubscriptionStatus } from "./handlers/subscriptions/status.ts";
 import {
 	handleCreateInvoice,
+	handleDownloadInvoicePdf,
 	handleGetInvoiceById,
 	handleListInvoices,
 } from "./handlers/invoices/index.ts";
@@ -53,6 +54,7 @@ app.get(
 	authMiddleware,
 	handleGetSubscriptionById,
 );
+app.get("/invoices/:invoiceId/pdf", authMiddleware, handleDownloadInvoicePdf);
 app.get("/invoices", authMiddleware, handleListInvoices);
 app.get("/invoices/:invoiceId", authMiddleware, handleGetInvoiceById);
 app.post("/invoices", authMiddleware, handleCreateInvoice);
