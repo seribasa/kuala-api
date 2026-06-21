@@ -15,7 +15,7 @@ jobs:
         runs-on: ubuntu-latest
         steps:
             - name: Checkout code
-              uses: actions/checkout@v6
+              uses: actions/checkout@v7
 
             - name: Setup Deno
               uses: denoland/setup-deno@v2
@@ -48,7 +48,7 @@ jobs:
         needs: lint
         steps:
             - name: Checkout code
-              uses: actions/checkout@v6
+              uses: actions/checkout@v7
 
             - name: Setup Deno
               uses: denoland/setup-deno@v2
@@ -95,7 +95,7 @@ jobs:
                   deno coverage coverage/ --lcov --output=coverage.lcov
 
             - name: Upload coverage to Codecov
-              uses: codecov/codecov-action@v6
+              uses: codecov/codecov-action@v7
               with:
                   file: supabase/functions/coverage.lcov
                   directory: supabase/functions/
@@ -120,7 +120,7 @@ jobs:
         needs: [lint, test]
         steps:
             - name: Checkout code
-              uses: actions/checkout@v6
+              uses: actions/checkout@v7
 
             - name: Setup Deno
               uses: denoland/setup-deno@v2
@@ -148,7 +148,7 @@ jobs:
         needs: lint
         steps:
             - name: Checkout code
-              uses: actions/checkout@v6
+              uses: actions/checkout@v7
 
             - name: Setup Deno
               uses: denoland/setup-deno@v2
@@ -183,7 +183,7 @@ jobs:
         if: github.event_name == 'pull_request'
         steps:
             - name: Checkout code
-              uses: actions/checkout@v6
+              uses: actions/checkout@v7
 
             - name: Setup Deno
               uses: denoland/setup-deno@v2
@@ -207,7 +207,7 @@ jobs:
         if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop'
         steps:
             - name: Checkout code
-              uses: actions/checkout@v6
+              uses: actions/checkout@v7
 
             - name: Setup Deno
               uses: denoland/setup-deno@v2
