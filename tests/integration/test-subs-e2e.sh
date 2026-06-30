@@ -203,8 +203,7 @@ echo "📊 Final state: $CURRENT_STATE"
 echo "📦 Subscription created: $HAS_SUBSCRIPTION"
 echo ""
 if [ "$HAS_SUBSCRIPTION" = "true" ]; then
-  echo "🎉 END-TO-END TEST PASSED!"
-  exit 0
+  echo "🎉 END-TO-END TEST PASSED! Proceeding to Payment Flow..."
 elif [ "$CURRENT_STATE" = "failed" ]; then
   echo "❌ END-TO-END TEST FAILED - Subscription in failed state"
   exit 1
@@ -213,3 +212,34 @@ else
   echo "   Check microservice logs for details"
   exit 1
 fi
+
+echo ""
+echo "================================================================================================"
+echo "💳 STEP 5: Triggering Payment Flow (E2E)"
+echo "================================================================================================"
+echo ""
+INVOICE_ID=$(echo "$STATUS_RESPONSE" | jq -r '.data.data.invoiceId // empty')
+
+if [ -z "$INVOICE_ID" ] || [ "$INVOICE_ID" = "unknown" ]; then
+  echo "⚠️  Could not find a valid generated invoice ID to pay."
+  echo "   If this happens, Kill Bill might not have generated one (e.g. amount is $0)."
+else
+  echo "✅ Found Invoice ID: $INVOICE_ID"
+  echo "Initiating payment to ${FUNCTIONS_URL}/invoices/${INVOICE_ID}/pay ..."
+  echo ""
+  
+  PAYMENT_RESPONSE=$(curl -s -X POST "${FUNCTIONS_URL}/invoices/${INVOICE_ID}/pay" \
+    -H "Authorization: Bearer ${ACCESS_TOKEN}")
+    
+  echo "Payment Response:"
+  echo "$PAYMENT_RESPONSE" | jq '.'
+  
+  PAYMENT_SUCCESS=$(echo "$PAYMENT_RESPONSE" | jq -r '.successful // .success // false')
+  
+  if [ "$PAYMENT_SUCCESS" = "true" ]; then
+    echo "✅ Payment successfully initiated! Webhook routing should now occur."
+  else
+    echo "⚠️  Payment API responded, but it might not be marked successful."
+  fi
+fi
+

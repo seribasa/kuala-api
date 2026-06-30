@@ -1042,19 +1042,13 @@ paths:
                   name: invoiceId
                   required: true
                   schema: { type: string }
-            requestBody:
-                required: false
-                content:
-                    application/json:
-                        schema:
-                            $ref: "#/components/schemas/PayInvoiceRequest"
             responses:
-                "201":
-                    description: Payment created
+                "200":
+                    description: Payment initiated successfully
                     content:
                         application/json:
                             schema:
-                                $ref: "#/components/schemas/Payment"
+                                $ref: "#/components/schemas/InitiatePaymentResponse"
                 "402":
                     description: Payment required / failed
                     content:
@@ -1518,21 +1512,27 @@ components:
                 amount: { type: number }
             required: [description, amount]
 
-        PayInvoiceRequest:
+        InitiatePaymentResponse:
             type: object
             properties:
-                paymentMethodToken:
-                    type: string
-                    description: Use a specific PM; if omitted, use default on Kill Bill account.
-                capture:
+                is_successful:
                     type: boolean
-                    default: true
-                externalPayment:
-                    type: boolean
-                    default: false
-                    description: Mark as externally paid in Kill Bill (administrative).
-            additionalProperties: false
-
+                    example: true
+                data:
+                    type: object
+                    properties:
+                        order_id:
+                            type: string
+                            format: uuid
+                        gateway:
+                            type: string
+                            example: stripe
+                        token:
+                            type: string
+                            description: Payment token or client secret
+                    required: [order_id, gateway, token]
+            required: [is_successful, data]
+            
         Payment:
             type: object
             properties:

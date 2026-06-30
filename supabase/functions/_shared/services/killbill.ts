@@ -760,10 +760,34 @@ export class KillBillService {
 
 		// Get invoice ID from Location header
 		const location = response.headers.get("Location");
-		const invoiceId = location?.split("/").pop() || "unknown";
+		if (location) {
+			const cleanLocation = location.endsWith("/")
+				? location.slice(0, -1)
+				: location;
+			const invoiceId = cleanLocation.split("/").pop() || "unknown";
+			logger.info(handlerName, "Invoice run completed successfully", {
+				invoiceId: invoiceId.substring(0, 8) + "...",
+			});
+			return invoiceId;
+		}
+
+		// Fallback to response body if no Location header
+		const responseData = await response.json().catch(() => null);
+		let invoiceId = "unknown";
+
+		if (responseData && responseData.invoiceId) {
+			invoiceId = responseData.invoiceId;
+		} else if (
+			responseData && Array.isArray(responseData) &&
+			responseData.length > 0 && responseData[0].invoiceId
+		) {
+			invoiceId = responseData[0].invoiceId;
+		}
 
 		logger.info(handlerName, "Invoice run completed successfully", {
-			invoiceId: invoiceId.substring(0, 8) + "...",
+			invoiceId: invoiceId !== "unknown"
+				? invoiceId.substring(0, 8) + "..."
+				: "unknown",
 		});
 
 		return invoiceId;
@@ -800,6 +824,62 @@ export class KillBillService {
 		}
 
 		logger.info(handlerName, "Voided invoice successfully", {
+			invoiceId: invoiceId.substring(0, 8) + "...",
+		});
+	}
+
+	/**
+	 * Pay an invoice externally
+	 * @param invoiceId string
+	 * @param amount number
+	 * @return void
+	 */
+	async payInvoiceExternal(invoiceId: string, amount: number): Promise<void> {
+		const handlerName = "killbill-service";
+
+		// Fetch the invoice first to get the accountId, which is required by Kill Bill
+		const invoice = await this.getInvoiceById(invoiceId);
+		if (!invoice || !invoice.accountId) {
+			throw new Error(
+				`Invoice ${invoiceId} not found or missing accountId`,
+			);
+		}
+
+		const url =
+			`${this.baseUrl}/1.0/kb/invoices/${invoiceId}/payments?externalPayment=true`;
+
+		logger.info(handlerName, "Paying invoice externally", {
+			url,
+			invoiceId: invoiceId.substring(0, 8) + "...",
+			amount,
+			accountId: invoice.accountId,
+		});
+
+		const response = await fetch(url, {
+			method: "POST",
+			headers: {
+				...this.getHeaders(),
+				"X-Killbill-CreatedBy": "kuala-api-webhook",
+				"X-Killbill-Reason": "External Payment Success from Gateway",
+			},
+			body: JSON.stringify({
+				accountId: invoice.accountId,
+				purchasedAmount: amount,
+			}),
+		});
+
+		if (!response.ok) {
+			const errorText = await response.text();
+			logger.error(handlerName, "Failed to pay invoice externally", {
+				status: response.status,
+				error: errorText,
+			});
+			throw new Error(
+				`Failed to pay invoice externally: ${response.status} - ${errorText}`,
+			);
+		}
+
+		logger.info(handlerName, "Paid invoice externally successfully", {
 			invoiceId: invoiceId.substring(0, 8) + "...",
 		});
 	}

@@ -3,6 +3,7 @@ import { ErrorResponse } from "../../../_shared/types/response.ts";
 import { authLogger } from "../../middleware/logger.ts";
 import { getUser } from "../../middleware/auth.ts";
 import { killBillService } from "@shared/services/killbill.ts";
+import { mapInvoiceStatus } from "./mapper.ts";
 
 /**
  * List and search invoices
@@ -78,11 +79,13 @@ export const handleListInvoices = async (c: Context) => {
 			invoices = allInvoices.slice(offset, offset + limit);
 		}
 
+		const mappedInvoices = invoices.map(mapInvoiceStatus);
+
 		authLogger.success(handlerName, "Invoices retrieved successfully", {
-			count: invoices.length,
+			count: mappedInvoices.length,
 		});
 
-		return c.json({ invoices });
+		return c.json({ invoices: mappedInvoices });
 	} catch (error) {
 		authLogger.exception(handlerName, error as Error);
 

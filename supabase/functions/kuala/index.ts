@@ -18,6 +18,8 @@ import {
 	handleGetInvoiceById,
 	handleListInvoices,
 } from "./handlers/invoices/index.ts";
+import { handlePayInvoice } from "./handlers/invoices/pay.ts";
+import { handleBayeuWebhook } from "./handlers/webhooks/bayeu.ts";
 import { ErrorResponse } from "../_shared/types/response.ts";
 import { customLogger } from "./middleware/logger.ts";
 import { corsMiddleware } from "./middleware/cors.ts";
@@ -55,7 +57,9 @@ app.get(
 );
 app.get("/invoices", authMiddleware, handleListInvoices);
 app.get("/invoices/:invoiceId", authMiddleware, handleGetInvoiceById);
+app.post("/invoices/:id/pay", authMiddleware, handlePayInvoice);
 app.post("/invoices", authMiddleware, handleCreateInvoice);
+app.post("/webhooks/bayeu", handleBayeuWebhook);
 
 // HANDLE 404
 const errorResponse: ErrorResponse = {
