@@ -868,7 +868,10 @@ export class KillBillService {
 	 * @param amount number
 	 * @return void
 	 */
-	async payInvoiceExternal(invoiceId: string, amount: number): Promise<void> {
+	async payInvoiceExternal(
+		invoiceId: string,
+		amount?: number,
+	): Promise<void> {
 		const handlerName = "killbill-service";
 
 		// Fetch the invoice first to get the accountId, which is required by Kill Bill
@@ -879,13 +882,23 @@ export class KillBillService {
 			);
 		}
 
+		const paymentAmount = amount ?? invoice.balance;
+
+		if (paymentAmount <= 0) {
+			logger.info(
+				handlerName,
+				`Invoice ${invoiceId} has no balance to pay.`,
+			);
+			return;
+		}
+
 		const url =
 			`${this.baseUrl}/1.0/kb/invoices/${invoiceId}/payments?externalPayment=true`;
 
 		logger.info(handlerName, "Paying invoice externally", {
 			url,
 			invoiceId: invoiceId.substring(0, 8) + "...",
-			amount,
+			amount: paymentAmount,
 			accountId: invoice.accountId,
 		});
 
@@ -898,7 +911,7 @@ export class KillBillService {
 			},
 			body: JSON.stringify({
 				accountId: invoice.accountId,
-				purchasedAmount: amount,
+				purchasedAmount: paymentAmount,
 			}),
 		});
 

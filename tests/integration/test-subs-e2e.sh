@@ -218,13 +218,41 @@ echo "==========================================================================
 echo "💳 STEP 5: Triggering Payment Flow (E2E)"
 echo "================================================================================================"
 echo ""
-INVOICE_ID=$(echo "$STATUS_RESPONSE" | jq -r '.data.data.invoiceId // empty')
 
-if [ -z "$INVOICE_ID" ] || [ "$INVOICE_ID" = "unknown" ]; then
-  echo "⚠️  Could not find a valid generated invoice ID to pay."
-  echo "   If this happens, Kill Bill might not have generated one (e.g. amount is $0)."
+echo "⏳ Waiting for Invoice Generation (up to 30 seconds)..."
+for i in {1..15}; do
+  LATEST_STATUS=$(curl -s "${FUNCTIONS_URL}/subscriptions/status/${CORRELATION_ID}" -H "Authorization: Bearer ${ACCESS_TOKEN}")
+  INVOICE_ID=$(echo "$LATEST_STATUS" | jq -r '.data.data.invoiceId // empty')
+  if [ -n "$INVOICE_ID" ] && [ "$INVOICE_ID" != "null" ]; then
+    break
+  fi
+  sleep 2
+done
+
+if [ -z "$INVOICE_ID" ] || [ "$INVOICE_ID" = "unknown" ] || [ "$INVOICE_ID" = "null" ]; then
+  echo "⚠️  Could not find a valid generated invoice ID organically."
+  echo "   Attempting to force-generate an invoice in Kill Bill for next month..."
+  ACCOUNT_ID=$(curl -s -u admin:password -H 'X-Killbill-ApiKey: demo' -H 'X-Killbill-ApiSecret: demosecret' "http://localhost:8080/1.0/kb/accounts?externalKey=${USER_ID}" | jq -r '.accountId')
+  
+  if [ -n "$ACCOUNT_ID" ] && [ "$ACCOUNT_ID" != "null" ]; then
+    # Generate future date (works on macOS and Linux)
+    FUTURE_DATE=$(date -v+2m +%Y-%m-%d 2>/dev/null || date -d "+2 months" +%Y-%m-%d)
+    curl -s -X POST -u admin:password -H 'X-Killbill-ApiKey: demo' -H 'X-Killbill-ApiSecret: demosecret' -H 'X-Killbill-CreatedBy: admin' "http://localhost:8080/1.0/kb/invoices?accountId=${ACCOUNT_ID}&targetDate=${FUTURE_DATE}" > /dev/null
+    
+    # Get the latest unpaid invoice
+    INVOICE_ID=$(curl -s -u admin:password -H 'X-Killbill-ApiKey: demo' -H 'X-Killbill-ApiSecret: demosecret' "http://localhost:8080/1.0/kb/accounts/${ACCOUNT_ID}/invoices?unpaidInvoicesOnly=true" | jq -r '.[0].invoiceId // empty')
+    
+    if [ -n "$INVOICE_ID" ] && [ "$INVOICE_ID" != "null" ]; then
+       echo "✅ Force-generated Invoice ID: $INVOICE_ID"
+    fi
+  fi
+fi
+
+if [ -z "$INVOICE_ID" ] || [ "$INVOICE_ID" = "unknown" ] || [ "$INVOICE_ID" = "null" ]; then
+  echo "❌ Failed to generate any invoice for payment testing. Exiting."
+  exit 1
 else
-  echo "✅ Found Invoice ID: $INVOICE_ID"
+  echo "✅ Using Invoice ID: $INVOICE_ID"
   echo "Initiating payment to ${FUNCTIONS_URL}/invoices/${INVOICE_ID}/pay ..."
   echo ""
   
@@ -243,3 +271,70 @@ else
   fi
 fi
 
+
+echo ""
+echo "================================================================================================"
+echo "🔔 STEP 6: Simulating Stripe Webhooks"
+echo "================================================================================================"
+echo ""
+
+ORDER_ID=$(echo "$PAYMENT_RESPONSE" | jq -r '.data.order_id // empty')
+INTENT_ID=$(echo "$PAYMENT_RESPONSE" | jq -r '.data.token // empty' | cut -d'_' -f1-2)
+BAYEU_WEBHOOK_URL="http://localhost:54331/functions/v1/payments/webhook/stripe"
+
+if [ -z "$ORDER_ID" ] || [ -z "$INTENT_ID" ]; then
+  echo "❌ Could not extract order_id or intent_id from payment response."
+  exit 1
+fi
+
+echo "Order ID: $ORDER_ID"
+echo "Intent ID: $INTENT_ID"
+echo ""
+
+STRIPE_WEBHOOK_SECRET_KEY="test_stripe_webhook_secret_key"
+BAYEU_WEBHOOK_URL="http://localhost:54331/functions/v1/payments/webhook/stripe"
+
+echo "1. Sending payment_intent.created..."
+deno run -A ./tests/integration/simulate-stripe-webhook.ts \
+  --order-id "$ORDER_ID" \
+  --intent-id "$INTENT_ID" \
+  --type "payment_intent.created" \
+  --secret "$STRIPE_WEBHOOK_SECRET_KEY" \
+  --url "$BAYEU_WEBHOOK_URL"
+
+echo ""
+echo "2. Sending payment_intent.succeeded..."
+deno run -A ./tests/integration/simulate-stripe-webhook.ts \
+  --order-id "$ORDER_ID" \
+  --intent-id "$INTENT_ID" \
+  --type "payment_intent.succeeded" \
+  --secret "$STRIPE_WEBHOOK_SECRET_KEY" \
+  --url "$BAYEU_WEBHOOK_URL"
+
+echo ""
+echo "⏳ Waiting for Outpost and Kuala API to process the webhook (5 seconds)..."
+sleep 5
+
+echo ""
+echo "================================================================================================"
+echo "🔍 STEP 7: Checking Kill Bill Invoice Status"
+echo "================================================================================================"
+echo ""
+
+echo "Endpoint: GET ${FUNCTIONS_URL}/invoices/${INVOICE_ID}"
+INVOICE_RESPONSE=$(curl -s "${FUNCTIONS_URL}/invoices/${INVOICE_ID}" \
+  -H "Authorization: Bearer ${ACCESS_TOKEN}")
+
+echo "Response:"
+echo "$INVOICE_RESPONSE" | jq '.'
+
+INVOICE_STATUS=$(echo "$INVOICE_RESPONSE" | jq -r '.status // empty')
+INVOICE_BALANCE=$(echo "$INVOICE_RESPONSE" | jq -r '.balance // empty')
+
+echo ""
+if [ "$INVOICE_STATUS" = "paid" ]; then
+  echo "🎉 SUCCESS! Invoice is PAID (Balance: $INVOICE_BALANCE)"
+else
+  echo "❌ FAILED! Invoice status is $INVOICE_STATUS (Balance: $INVOICE_BALANCE)"
+  exit 1
+fi
