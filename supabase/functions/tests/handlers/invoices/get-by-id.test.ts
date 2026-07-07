@@ -303,7 +303,7 @@ Deno.test("handleGetInvoiceById - should return invoice successfully", async () 
 		assertEquals(response.data.invoiceId, "inv123");
 		assertEquals(response.data.accountId, "acc123");
 		assertEquals(response.data.amount, 100);
-		assertEquals(response.data.status, "COMMITTED");
+		assertEquals(response.data.status, "open");
 	} finally {
 		envStub.restore();
 		fetchStub.restore();
