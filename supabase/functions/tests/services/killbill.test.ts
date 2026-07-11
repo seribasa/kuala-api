@@ -83,6 +83,19 @@ describe("KillBillService", () => {
 	});
 
 	describe("getAccountByExternalKey", () => {
+		it("returns null on 404", async () => {
+			fetchStub.restore();
+			fetchStub = stub(
+				globalThis,
+				"fetch",
+				returnsNext([
+					Promise.resolve(new Response(null, { status: 404 })),
+				]),
+			);
+			const res = await killBillService.getAccountByExternalKey("u1");
+			assertEquals(res, null);
+		});
+
 		it("handles fetch failure", async () => {
 			fetchStub.restore();
 			fetchStub = stub(
@@ -763,6 +776,103 @@ describe("KillBillService", () => {
 				Error,
 				"Failed to search invoices: 500",
 			);
+		});
+	});
+
+	describe("payInvoiceExternal", () => {
+		it("throws if invoice missing accountId", async () => {
+			fetchStub.restore();
+			fetchStub = stub(
+				globalThis,
+				"fetch",
+				returnsNext([
+					Promise.resolve(
+						new Response(JSON.stringify({ invoiceId: "1" }), {
+							status: 200,
+						}),
+					),
+				]),
+			);
+			await assertRejects(
+				() => killBillService.payInvoiceExternal("inv-1"),
+				Error,
+				"Invoice inv-1 not found or missing accountId",
+			);
+		});
+
+		it("returns without paying if balance <= 0", async () => {
+			fetchStub.restore();
+			fetchStub = stub(
+				globalThis,
+				"fetch",
+				returnsNext([
+					Promise.resolve(
+						new Response(
+							JSON.stringify({
+								invoiceId: "1",
+								accountId: "acc-1",
+								balance: 0,
+							}),
+							{
+								status: 200,
+							},
+						),
+					),
+				]),
+			);
+			await killBillService.payInvoiceExternal("inv-1");
+		});
+
+		it("throws on error from external payment", async () => {
+			fetchStub.restore();
+			fetchStub = stub(
+				globalThis,
+				"fetch",
+				returnsNext([
+					Promise.resolve(
+						new Response(
+							JSON.stringify({
+								invoiceId: "1",
+								accountId: "acc-1",
+								balance: 100,
+							}),
+							{
+								status: 200,
+							},
+						),
+					),
+					Promise.resolve(new Response("err", { status: 400 })),
+				]),
+			);
+			await assertRejects(
+				() => killBillService.payInvoiceExternal("inv-1", 100),
+				Error,
+				"Failed to pay invoice externally: 400 - err",
+			);
+		});
+
+		it("success", async () => {
+			fetchStub.restore();
+			fetchStub = stub(
+				globalThis,
+				"fetch",
+				returnsNext([
+					Promise.resolve(
+						new Response(
+							JSON.stringify({
+								invoiceId: "1",
+								accountId: "acc-1",
+								balance: 100,
+							}),
+							{
+								status: 200,
+							},
+						),
+					),
+					Promise.resolve(new Response(null, { status: 200 })),
+				]),
+			);
+			await killBillService.payInvoiceExternal("inv-1", 100);
 		});
 	});
 });
