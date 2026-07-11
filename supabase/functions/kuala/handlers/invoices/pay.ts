@@ -73,6 +73,7 @@ export const handlePayInvoice = async (c: Context) => {
 		}
 
 		const bayeuUrl = Deno.env.get("BAYEU_API_URL");
+		const webhookUrl = Deno.env.get("KUALA_WEBHOOK_URL");
 
 		logger.info(
 			handlerName,
@@ -89,6 +90,7 @@ export const handlePayInvoice = async (c: Context) => {
 				currency,
 				gateway,
 				tenant_id: "kuala-api",
+				webhook_url: webhookUrl,
 				metadata: {
 					invoice_id: invoiceId,
 				},
