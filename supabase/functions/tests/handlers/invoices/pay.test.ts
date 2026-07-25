@@ -130,6 +130,7 @@ Deno.test("handlePayInvoice - returns 400 if invoice balance is zero", async () 
 
 Deno.test("handlePayInvoice - returns 500 if bayeu initiate fails", async () => {
 	Deno.env.set("BAYEU_API_URL", "http://localhost:54331");
+	Deno.env.set("BAYEU_ANON_KEY", "test-anon-key");
 	Deno.env.set("PAYMENT_GATEWAY", "stripe");
 	const getInvoiceByIdStub = stub(killBillService, "getInvoiceById", () => {
 		return Promise.resolve(
@@ -177,6 +178,7 @@ Deno.test("handlePayInvoice - returns 500 if bayeu initiate fails", async () => 
 
 Deno.test("handlePayInvoice - returns 200 on success", async () => {
 	Deno.env.set("BAYEU_API_URL", "http://localhost:54331");
+	Deno.env.set("BAYEU_ANON_KEY", "test-anon-key");
 	Deno.env.set("PAYMENT_GATEWAY", "stripe");
 	const getInvoiceByIdStub = stub(killBillService, "getInvoiceById", () => {
 		return Promise.resolve(
