@@ -546,7 +546,7 @@ export class KillBillService {
 		withMigrationInvoices?: boolean,
 		unpaidInvoicesOnly?: boolean,
 		includeVoidedInvoices?: boolean,
-		includeInvoiceComponents?: boolean,
+		includeInvoiceComponents = true,
 		invoicesFilter?: string[],
 		audit?: "NONE" | "MINIMAL" | "FULL",
 	): Promise<KillBillInvoice[]> {
