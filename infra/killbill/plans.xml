@@ -3,9 +3,9 @@
 	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
 	xsi:noNamespaceSchemaLocation="https://docs.killbill.io/latest/catalog.xsd"
 >
-	<effectiveDate>2025-09-11T00:00:00+00:00</effectiveDate>
+	<effectiveDate>2026-07-25T00:00:00+00:00</effectiveDate>
 	<catalogName>KualaCatalog</catalogName>
-	<recurringBillingMode>IN_ADVANCE</recurringBillingMode>
+	<recurringBillingMode>IN_ARREAR</recurringBillingMode>
 	<currencies>
 		<currency>USD</currency>
 		<currency>IDR</currency>

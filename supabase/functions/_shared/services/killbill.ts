@@ -120,6 +120,7 @@ export class KillBillService {
 			email: email,
 			externalKey: userId,
 			currency: this.config.defaultCurrency,
+			billCycleDayLocal: 1,
 		};
 
 		logger.info(handlerName, "Creating new Kill Bill account", {
@@ -807,6 +808,16 @@ export class KillBillService {
 
 		// Fallback to response body if no Location header
 		const responseData = await response.json().catch(() => null);
+
+		// If responseData is an empty array, it means Kill Bill did not generate a new invoice
+		if (Array.isArray(responseData) && responseData.length === 0) {
+			logger.info(
+				handlerName,
+				"No invoice to generate - account up to date",
+			);
+			return null;
+		}
+
 		let invoiceId = "unknown";
 
 		if (responseData && responseData.invoiceId) {
@@ -818,10 +829,16 @@ export class KillBillService {
 			invoiceId = responseData[0].invoiceId;
 		}
 
+		if (invoiceId === "unknown") {
+			logger.info(
+				handlerName,
+				"No invoice to generate or unable to parse invoice ID - account up to date",
+			);
+			return null;
+		}
+
 		logger.info(handlerName, "Invoice run completed successfully", {
-			invoiceId: invoiceId !== "unknown"
-				? invoiceId.substring(0, 8) + "..."
-				: "unknown",
+			invoiceId: invoiceId.substring(0, 8) + "...",
 		});
 
 		return invoiceId;
