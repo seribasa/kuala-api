@@ -3,7 +3,10 @@ import { handlePayInvoice } from "../../../kuala/handlers/invoices/pay.ts";
 import { Context } from "@hono/hono";
 import { stub } from "@std/testing/mock";
 import { killBillService } from "../../../_shared/services/killbill.ts";
-import { KillBillInvoice } from "../../../_shared/types/index.ts";
+import {
+	KillBillAccount,
+	KillBillInvoice,
+} from "../../../_shared/types/index.ts";
 
 type MockResponse = { status: number; body: unknown };
 
@@ -58,6 +61,7 @@ Deno.test("handlePayInvoice - returns 400 if invoice id missing", async () => {
 });
 
 Deno.test("handlePayInvoice - returns 500 if invoice fetch fails", async () => {
+	Deno.env.set("PAYMENT_GATEWAY", "stripe");
 	const getInvoiceByIdStub = stub(killBillService, "getInvoiceById", () => {
 		throw new Error("Failed to fetch");
 	});
@@ -83,11 +87,25 @@ Deno.test("handlePayInvoice - returns 500 if invoice fetch fails", async () => {
 });
 
 Deno.test("handlePayInvoice - returns 400 if invoice balance is zero", async () => {
+	Deno.env.set("PAYMENT_GATEWAY", "stripe");
 	const getInvoiceByIdStub = stub(killBillService, "getInvoiceById", () => {
 		return Promise.resolve(
-			{ balance: 0, currency: "USD" } as unknown as KillBillInvoice,
+			{
+				accountId: "acc-123",
+				balance: 0,
+				currency: "USD",
+			} as unknown as KillBillInvoice,
 		);
 	});
+	const getAccountStub = stub(
+		killBillService,
+		"getAccountByExternalKey",
+		() => {
+			return Promise.resolve(
+				{ accountId: "acc-123" } as unknown as KillBillAccount,
+			);
+		},
+	);
 	try {
 		const req = new Request("http://localhost/invoices/inv-123/pay", {
 			method: "POST",
@@ -106,15 +124,31 @@ Deno.test("handlePayInvoice - returns 400 if invoice balance is zero", async () 
 		assertEquals((res as unknown as MockResponse).status, 400);
 	} finally {
 		getInvoiceByIdStub.restore();
+		getAccountStub.restore();
 	}
 });
 
 Deno.test("handlePayInvoice - returns 500 if bayeu initiate fails", async () => {
+	Deno.env.set("BAYEU_API_URL", "http://localhost:54331");
+	Deno.env.set("PAYMENT_GATEWAY", "stripe");
 	const getInvoiceByIdStub = stub(killBillService, "getInvoiceById", () => {
 		return Promise.resolve(
-			{ balance: 100, currency: "USD" } as unknown as KillBillInvoice,
+			{
+				accountId: "acc-123",
+				balance: 100,
+				currency: "USD",
+			} as unknown as KillBillInvoice,
 		);
 	});
+	const getAccountStub = stub(
+		killBillService,
+		"getAccountByExternalKey",
+		() => {
+			return Promise.resolve(
+				{ accountId: "acc-123" } as unknown as KillBillAccount,
+			);
+		},
+	);
 	const fetchStub = stub(globalThis, "fetch", () => {
 		return Promise.resolve(new Response("Error", { status: 500 }));
 	});
@@ -136,16 +170,32 @@ Deno.test("handlePayInvoice - returns 500 if bayeu initiate fails", async () => 
 		assertEquals((res as unknown as MockResponse).status, 500);
 	} finally {
 		getInvoiceByIdStub.restore();
+		getAccountStub.restore();
 		fetchStub.restore();
 	}
 });
 
 Deno.test("handlePayInvoice - returns 200 on success", async () => {
+	Deno.env.set("BAYEU_API_URL", "http://localhost:54331");
+	Deno.env.set("PAYMENT_GATEWAY", "stripe");
 	const getInvoiceByIdStub = stub(killBillService, "getInvoiceById", () => {
 		return Promise.resolve(
-			{ balance: 100, currency: "USD" } as unknown as KillBillInvoice,
+			{
+				accountId: "acc-123",
+				balance: 100,
+				currency: "USD",
+			} as unknown as KillBillInvoice,
 		);
 	});
+	const getAccountStub = stub(
+		killBillService,
+		"getAccountByExternalKey",
+		() => {
+			return Promise.resolve(
+				{ accountId: "acc-123" } as unknown as KillBillAccount,
+			);
+		},
+	);
 	const fetchStub = stub(globalThis, "fetch", () => {
 		return Promise.resolve(
 			new Response(JSON.stringify({ success: true }), { status: 200 }),
@@ -169,6 +219,7 @@ Deno.test("handlePayInvoice - returns 200 on success", async () => {
 		assertEquals((res as unknown as MockResponse).status, undefined);
 	} finally {
 		getInvoiceByIdStub.restore();
+		getAccountStub.restore();
 		fetchStub.restore();
 	}
 });

@@ -42,14 +42,15 @@ export const handleBayeuWebhook = async (c: Context) => {
 		const signatureHeader = c.req.header("Hookdeck-Signature") || null;
 		const bodyText = await c.req.text();
 
-		const OUTPOST_WEBHOOK_SECRET = Deno.env.get("OUTPOST_WEBHOOK_SECRET");
-		const isTestEnv = OUTPOST_WEBHOOK_SECRET === "test_webhook_secret";
+		const skipVerification =
+			Deno.env.get("SKIP_WEBHOOK_VERIFICATION") === "true" ||
+			Deno.env.get("DENO_ENV") === "test";
 
 		const isValid = await verifyHookdeckSignature(
 			bodyText,
 			signatureHeader,
 		);
-		if (!isValid && !isTestEnv) {
+		if (!isValid && !skipVerification) {
 			logger.error(handlerName, "Invalid Hookdeck-Signature");
 			const err: ErrorResponse = {
 				code: "UNAUTHORIZED",
@@ -59,12 +60,13 @@ export const handleBayeuWebhook = async (c: Context) => {
 		}
 
 		const payload = JSON.parse(bodyText);
+		const { status, metadata, amount } = payload;
+
 		logger.info(
 			handlerName,
-			`Received payload from Outpost: ${JSON.stringify(payload)}`,
+			"Received payload from Outpost",
+			{ status, invoiceId: metadata?.invoice_id, amount },
 		);
-
-		const { status, metadata, amount } = payload;
 
 		if (status !== "success") {
 			logger.info(

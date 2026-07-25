@@ -39,6 +39,14 @@ export const handlePayInvoice = async (c: Context) => {
 		}
 
 		const gateway = Deno.env.get("PAYMENT_GATEWAY");
+		if (!gateway) {
+			logger.error(handlerName, "PAYMENT_GATEWAY is not configured");
+			const err: ErrorResponse = {
+				code: "INTERNAL_ERROR",
+				message: "Payment service configuration error",
+			};
+			return c.json(err, 500);
+		}
 		// Fetch invoice from Kill Bill
 		logger.info(
 			handlerName,
@@ -61,6 +69,20 @@ export const handlePayInvoice = async (c: Context) => {
 			return c.json(err, 500);
 		}
 
+		// Verify invoice ownership
+		const account = await killBillService.getAccountByExternalKey(user.id);
+		if (!account || invoice.accountId !== account.accountId) {
+			logger.error(
+				handlerName,
+				`Invoice ${invoiceId} does not belong to user ${user.id}`,
+			);
+			const err: ErrorResponse = {
+				code: "FORBIDDEN",
+				message: "You do not have permission to pay this invoice",
+			};
+			return c.json(err, 403);
+		}
+
 		const amount = invoice.balance;
 		const currency = invoice.currency;
 
@@ -74,6 +96,15 @@ export const handlePayInvoice = async (c: Context) => {
 
 		const bayeuUrl = Deno.env.get("BAYEU_API_URL");
 		const webhookUrl = Deno.env.get("KUALA_WEBHOOK_URL");
+
+		if (!bayeuUrl) {
+			logger.error(handlerName, "BAYEU_API_URL is not configured");
+			const err: ErrorResponse = {
+				code: "INTERNAL_ERROR",
+				message: "Payment service configuration error",
+			};
+			return c.json(err, 500);
+		}
 
 		logger.info(
 			handlerName,
