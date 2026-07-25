@@ -152,8 +152,18 @@ export class InvoiceService {
 				);
 
 				// 4. Generate invoice via Kill Bill
+				// Since we use IN_ARREAR mode, we must pass the end of the period as targetDate
+				// to force the invoice to be generated immediately. With billCycleDayLocal = 1,
+				// the first period ends on the 1st of the next month.
+				const now = new Date();
+				const nextMonth = new Date(
+					Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1),
+				);
+				const targetDate = nextMonth.toISOString().split("T")[0];
+
 				const newInvoiceId = await killBillService.triggerInvoiceRun(
 					account.accountId,
+					targetDate,
 				);
 
 				if (!newInvoiceId) {
