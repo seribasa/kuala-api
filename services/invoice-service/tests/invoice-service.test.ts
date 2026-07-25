@@ -237,7 +237,16 @@ Deno.test({
 							invoiceDate: new Date().toISOString(),
 							targetDate: new Date().toISOString(),
 							balance: 10,
-							items: [],
+							items: [{
+								invoiceItemId: "item-123",
+								invoiceId: "inv-existing",
+								accountId: "kb-acc-123",
+								itemType: "RECURRING" as "RECURRING",
+								amount: 10,
+								currency: "USD",
+								startDate: new Date().toISOString(),
+								endDate: new Date().toISOString(),
+							}],
 						}]),
 				);
 
