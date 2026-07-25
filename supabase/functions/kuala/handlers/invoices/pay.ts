@@ -106,6 +106,16 @@ export const handlePayInvoice = async (c: Context) => {
 			return c.json(err, 500);
 		}
 
+		const bayeuAnonKey = Deno.env.get("BAYEU_ANON_KEY");
+		if (!bayeuAnonKey) {
+			logger.error(handlerName, "BAYEU_ANON_KEY is not configured");
+			const err: ErrorResponse = {
+				code: "INTERNAL_ERROR",
+				message: "Payment service configuration error",
+			};
+			return c.json(err, 500);
+		}
+
 		logger.info(
 			handlerName,
 			`Initiating payment via Bayeu for invoice ${invoiceId}`,
@@ -115,6 +125,7 @@ export const handlePayInvoice = async (c: Context) => {
 			headers: {
 				"Content-Type": "application/json",
 				"Authorization": authorization,
+				"apikey": bayeuAnonKey,
 			},
 			body: JSON.stringify({
 				amount,
