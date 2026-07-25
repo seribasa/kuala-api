@@ -129,13 +129,13 @@ export class InvoiceService {
 				throw new Error(`Account not found for user: ${event.userId}`);
 			}
 
-			// 3. Check if invoice already exists for current period
+			// 3. Check if invoice already exists for current period (must contain items)
 			const invoices = await killBillService.getAccountInvoices(
 				account.accountId,
 			);
-			const invoice = invoices.find((invoice) => {
-				if (invoice.status === "VOID") return false;
-				return invoice;
+			const invoice = invoices.find((inv) => {
+				if (inv.status === "VOID") return false;
+				return inv.items && inv.items.length > 0;
 			});
 			const hasInvoiceForCurrentPeriod = !!invoice;
 
