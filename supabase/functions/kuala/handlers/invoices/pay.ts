@@ -116,6 +116,8 @@ export const handlePayInvoice = async (c: Context) => {
 			return c.json(err, 500);
 		}
 
+		const backUrl = c.req.query("back_url");
+
 		logger.info(
 			handlerName,
 			`Initiating payment via Bayeu for invoice ${invoiceId}`,
@@ -131,8 +133,9 @@ export const handlePayInvoice = async (c: Context) => {
 				amount,
 				currency,
 				gateway,
+				user_id: user?.id,
 				tenant_id: "kuala-api",
-				webhook_url: webhookUrl,
+				back_url: backUrl || undefined,
 				metadata: {
 					invoice_id: invoiceId,
 				},
