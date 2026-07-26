@@ -116,7 +116,9 @@ export const handlePayInvoice = async (c: Context) => {
 			return c.json(err, 500);
 		}
 
-		const backUrl = c.req.query("back_url");
+		const backUrl = typeof c.req.query === "function"
+			? c.req.query("back_url")
+			: undefined;
 
 		logger.info(
 			handlerName,
