@@ -155,9 +155,18 @@ export const handlePayInvoice = async (c: Context) => {
 		}
 
 		const bayeuData = await bayeuResponse.json();
+
+		if (bayeuData.is_successful && bayeuData.data?.redirect_url) {
+			logger.info(
+				handlerName,
+				`Successfully initiated payment for invoice ${invoiceId}, redirecting to ${bayeuData.data.redirect_url}`,
+			);
+			return c.redirect(bayeuData.data.redirect_url, 301);
+		}
+
 		logger.info(
 			handlerName,
-			`Successfully initiated payment for invoice ${invoiceId}`,
+			`Successfully initiated payment for invoice ${invoiceId} but no redirect URL provided`,
 		);
 		return c.json(bayeuData);
 	} catch (error) {
