@@ -709,6 +709,38 @@ paths:
                         application/json:
                             schema: { $ref: "#/components/schemas/Error" }
 
+    /subscriptions/{subscriptionId}:
+        get:
+            tags: [Subscriptions]
+            summary: Get subscription by ID
+            description: Returns details of a specific subscription.
+            operationId: getSubscriptionById
+            security:
+                - bearerAuth: []
+            parameters:
+                - in: path
+                  name: subscriptionId
+                  required: true
+                  schema:
+                      type: string
+                  description: The ID of the subscription.
+            responses:
+                "200":
+                    description: Subscription details
+                    content:
+                        application/json:
+                            schema:
+                                $ref: "#/components/schemas/Subscription"
+                "400":
+                    $ref: "#/components/responses/BadRequest"
+                "404":
+                    $ref: "#/components/responses/NotFound"
+                "409":
+                    description: User has a pending subscription request
+                    content:
+                        application/json:
+                            schema: { $ref: "#/components/schemas/Error" }
+                            
     /subscriptions/event-driven:
         post:
             tags: [Subscriptions]
@@ -1074,11 +1106,11 @@ paths:
                         application/json:
                             schema: { $ref: "#/components/schemas/Error" }
 
-    /webhooks/supabase:
+    /webhooks/bayeu:
         post:
             tags: [Webhooks]
-            summary: Supabase auth webhook (optional)
-            description: Receives user created/updated events if configured.
+            summary: Bayeu webhook receiver
+            description: Handles events like payment success or failure from Bayeu.
             requestBody:
                 required: true
                 content:
@@ -1086,21 +1118,6 @@ paths:
                         schema:
                             type: object
                             additionalProperties: true
-            responses:
-                "200":
-                    description: Acknowledged
-
-    /webhooks/killbill:
-        post:
-            tags: [Webhooks]
-            summary: Kill Bill webhook receiver
-            description: Handles events like INVOICE_CREATION, PAYMENT_SUCCESS, PAYMENT_FAILED, SUBSCRIPTION_*.
-            requestBody:
-                required: true
-                content:
-                    application/json:
-                        schema:
-                            $ref: "#/components/schemas/KillBillEvent"
             responses:
                 "200":
                     description: Acknowledged
