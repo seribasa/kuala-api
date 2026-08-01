@@ -961,7 +961,8 @@ export class KillBillService {
 		deleteIfExists = false,
 	): Promise<void> {
 		const handlerName = "killbill-service";
-		const url = `${this.baseUrl}/1.0/kb/invoices/translation/${locale}?deleteIfExists=${deleteIfExists}`;
+		const url =
+			`${this.baseUrl}/1.0/kb/invoices/translation/${locale}?deleteIfExists=${deleteIfExists}`;
 
 		logger.info(handlerName, "Uploading invoice translation", {
 			url,

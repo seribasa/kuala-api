@@ -978,4 +978,48 @@ describe("KillBillService", () => {
 			await killBillService.payInvoiceExternal("inv-1", 100);
 		});
 	});
+
+	describe("uploadInvoiceTranslation", () => {
+		it("success", async () => {
+			fetchStub.restore();
+			fetchStub = stub(
+				globalThis,
+				"fetch",
+				returnsNext([
+					Promise.resolve(new Response(null, { status: 200 })),
+				]),
+			);
+			await killBillService.uploadInvoiceTranslation(
+				"en_US",
+				"key=value",
+			);
+
+			// Verify fetch was called with correct parameters
+			assertSpyCalls(fetchStub, 1);
+			const fetchArgs = fetchStub.calls[0].args;
+			assertEquals(fetchArgs[1].method, "POST");
+			assertEquals(fetchArgs[1].body, "key=value");
+			assertEquals(fetchArgs[1].headers["Content-Type"], "text/plain");
+		});
+
+		it("error", async () => {
+			fetchStub.restore();
+			fetchStub = stub(
+				globalThis,
+				"fetch",
+				returnsNext([
+					Promise.resolve(new Response("err", { status: 400 })),
+				]),
+			);
+			await assertRejects(
+				() =>
+					killBillService.uploadInvoiceTranslation(
+						"en_US",
+						"key=value",
+					),
+				Error,
+				"Failed to upload invoice translation: 400 - err",
+			);
+		});
+	});
 });
