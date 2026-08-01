@@ -947,6 +947,51 @@ export class KillBillService {
 			invoiceId: invoiceId.substring(0, 8) + "...",
 		});
 	}
+
+	/**
+	 * Upload invoice translation for a specific locale
+	 * @param locale string (e.g. "en_US")
+	 * @param translation string (format: key=value\n...)
+	 * @param deleteIfExists boolean
+	 * @return void
+	 */
+	async uploadInvoiceTranslation(
+		locale: string,
+		translation: string,
+		deleteIfExists = false,
+	): Promise<void> {
+		const handlerName = "killbill-service";
+		const url = `${this.baseUrl}/1.0/kb/invoices/translation/${locale}?deleteIfExists=${deleteIfExists}`;
+
+		logger.info(handlerName, "Uploading invoice translation", {
+			url,
+			locale,
+		});
+
+		const response = await fetch(url, {
+			method: "POST",
+			headers: {
+				...this.getHeaders(),
+				"Content-Type": "text/plain",
+			},
+			body: translation,
+		});
+
+		if (!response.ok) {
+			const errorText = await response.text();
+			logger.error(handlerName, "Failed to upload invoice translation", {
+				status: response.status,
+				error: errorText,
+			});
+			throw new Error(
+				`Failed to upload invoice translation: ${response.status} - ${errorText}`,
+			);
+		}
+
+		logger.info(handlerName, "Uploaded invoice translation successfully", {
+			locale,
+		});
+	}
 }
 
 // Export singleton instance
