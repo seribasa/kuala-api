@@ -115,7 +115,15 @@ export const handlePayInvoice = async (c: Context) => {
 			};
 			return c.json(err, 500);
 		}
-		const { back_url: backUrlBody } = c.req.query();
+		let backUrlBody: string | undefined;
+		try {
+			const body = await c.req.json();
+			if (body && typeof body === "object" && "back_url" in body) {
+				backUrlBody = body.back_url as string;
+			}
+		} catch (e) {
+			// Ignore if body is empty or not valid JSON
+		}
 
 		let backUrl = typeof c.req.query === "function"
 			? c.req.query("back_url")

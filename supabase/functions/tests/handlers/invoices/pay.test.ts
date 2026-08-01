@@ -74,6 +74,7 @@ Deno.test("handlePayInvoice - returns 500 if invoice fetch fails", async () => {
 			req: {
 				header: (k: string) => req.headers.get(k),
 				param: (k: string) => "inv-123",
+				query: (k?: string) => k ? undefined : {},
 			},
 			get: (k: string) => ({ id: "123", email: "test@example.com" }),
 			json: (body: unknown, status?: number) => ({ body, status }),
@@ -115,6 +116,7 @@ Deno.test("handlePayInvoice - returns 400 if invoice balance is zero", async () 
 			req: {
 				header: (k: string) => req.headers.get(k),
 				param: (k: string) => "inv-123",
+				query: (k?: string) => k ? undefined : {},
 			},
 			get: (k: string) => ({ id: "123", email: "test@example.com" }),
 			json: (body: unknown, status?: number) => ({ body, status }),
@@ -162,6 +164,7 @@ Deno.test("handlePayInvoice - returns 500 if bayeu initiate fails", async () => 
 			req: {
 				header: (k: string) => req.headers.get(k),
 				param: (k: string) => "inv-123",
+				query: (k?: string) => k ? undefined : {},
 			},
 			get: (k: string) => ({ id: "123", email: "test@example.com" }),
 			json: (body: unknown, status?: number) => ({ body, status }),
@@ -212,6 +215,7 @@ Deno.test("handlePayInvoice - returns 200 on success", async () => {
 			req: {
 				header: (k: string) => req.headers.get(k),
 				param: (k: string) => "inv-123",
+				query: (k?: string) => k ? undefined : {},
 			},
 			get: (k: string) => ({ id: "123", email: "test@example.com" }),
 			json: (body: unknown, status?: number) => ({ body, status }),
@@ -236,6 +240,7 @@ Deno.test("handlePayInvoice - returns 500 if PAYMENT_GATEWAY missing", async () 
 		req: {
 			header: (k: string) => req.headers.get(k),
 			param: (k: string) => "inv-123",
+			query: (k?: string) => k ? undefined : {},
 		},
 		get: (k: string) => ({ id: "123", email: "test@example.com" }),
 		json: (body: unknown, status?: number) => ({ body, status }),
@@ -274,6 +279,7 @@ Deno.test("handlePayInvoice - returns 403 if invoice does not belong to user", a
 			req: {
 				header: (k: string) => req.headers.get(k),
 				param: (k: string) => "inv-123",
+				query: (k?: string) => k ? undefined : {},
 			},
 			get: (k: string) => ({ id: "123", email: "test@example.com" }),
 			json: (body: unknown, status?: number) => ({ body, status }),
@@ -318,6 +324,7 @@ Deno.test("handlePayInvoice - returns 500 if BAYEU_API_URL missing", async () =>
 			req: {
 				header: (k: string) => req.headers.get(k),
 				param: (k: string) => "inv-123",
+				query: (k?: string) => k ? undefined : {},
 			},
 			get: (k: string) => ({ id: "123", email: "test@example.com" }),
 			json: (body: unknown, status?: number) => ({ body, status }),
@@ -362,6 +369,7 @@ Deno.test("handlePayInvoice - returns 500 if BAYEU_ANON_KEY missing", async () =
 			req: {
 				header: (k: string) => req.headers.get(k),
 				param: (k: string) => "inv-123",
+				query: (k?: string) => k ? undefined : {},
 			},
 			get: (k: string) => ({ id: "123", email: "test@example.com" }),
 			json: (body: unknown, status?: number) => ({ body, status }),
