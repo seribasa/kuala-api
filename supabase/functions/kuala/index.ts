@@ -18,8 +18,8 @@ import {
 	handleDownloadInvoicePdf,
 	handleGetInvoiceById,
 	handleListInvoices,
+	handlePayInvoice,
 } from "./handlers/invoices/index.ts";
-import { handlePayInvoice } from "./handlers/invoices/pay.ts";
 import { handleBayeuWebhook } from "./handlers/webhooks/bayeu.ts";
 import { ErrorResponse } from "../_shared/types/response.ts";
 import { customLogger } from "./middleware/logger.ts";
