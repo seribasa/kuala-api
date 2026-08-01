@@ -23,19 +23,32 @@ async function generateMockSignature(payload: string, secret: string) {
 }
 
 Deno.test("handleBayeuWebhook - missing signature header returns 401", async () => {
-	const req = new Request("http://localhost/webhooks/bayeu", {
-		method: "POST",
-	});
-	const c = {
-		req: {
-			header: (k: string) => null,
-			text: () => Promise.resolve("{}"),
-		},
-		json: (body: any, status?: number) => ({ body, status }),
-	} as unknown as Context;
+	const originalDenoEnv = Deno.env.get("DENO_ENV");
+	const originalSkipVerification = Deno.env.get("SKIP_WEBHOOK_VERIFICATION");
+	Deno.env.delete("DENO_ENV");
+	Deno.env.delete("SKIP_WEBHOOK_VERIFICATION");
+	try {
+		const req = new Request("http://localhost/webhooks/bayeu", {
+			method: "POST",
+		});
+		const c = {
+			req: {
+				header: (k: string) => null,
+				text: () => Promise.resolve("{}"),
+			},
+			json: (body: any, status?: number) => ({ body, status }),
+		} as unknown as Context;
 
-	const res = await handleBayeuWebhook(c);
-	assertEquals((res as any).status, 401);
+		const res = await handleBayeuWebhook(c);
+		assertEquals((res as any).status, 401);
+	} finally {
+		if (originalDenoEnv !== undefined) {
+			Deno.env.set("DENO_ENV", originalDenoEnv);
+		}
+		if (originalSkipVerification !== undefined) {
+			Deno.env.set("SKIP_WEBHOOK_VERIFICATION", originalSkipVerification);
+		}
+	}
 });
 
 Deno.test("handleBayeuWebhook - ignore non payment.success events", async () => {
