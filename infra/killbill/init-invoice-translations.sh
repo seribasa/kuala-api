@@ -103,8 +103,6 @@ upload_translation() {
   local response_body=$(mktemp)
   local response_headers=$(mktemp)
 
-  local properties_content=$(cat "${properties_file}")
-
   local curl_exit=0
   local http_status=$(curl -sS -w "%{http_code}" -o "$response_body" -D "$response_headers" \
     -X POST "${KILLBILL_URL}/1.0/kb/invoices/translation/${locale}?deleteIfExists=true" \
@@ -112,9 +110,11 @@ upload_translation() {
     -H "X-Killbill-ApiKey: ${API_KEY}" \
     -H "X-Killbill-ApiSecret: ${API_SECRET}" \
     -H "Content-Type: text/plain" \
-    -H "Accept: application/json" \
+    -H "Accept: text/plain" \
     -H "X-Killbill-CreatedBy: ${CREATED_BY}" \
-    -d "${properties_content}") || curl_exit=$?
+    -H "X-Killbill-Reason: kuala-bootstrap" \
+    -H "X-Killbill-Comment: initializing invoice translations" \
+    --data-binary @"${properties_file}") || curl_exit=$?
 
   if [ "$curl_exit" -ne 0 ]; then
     echo "[ERROR] Unable to reach Kill Bill at ${KILLBILL_URL}." >&2
