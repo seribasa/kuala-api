@@ -161,7 +161,7 @@ export const handlePayInvoice = async (c: Context) => {
 				handlerName,
 				`Successfully initiated payment for invoice ${invoiceId}, redirecting to ${bayeuData.data.redirect_url}`,
 			);
-			return c.redirect(bayeuData.data.redirect_url, 301);
+			return c.redirect(bayeuData.data.redirect_url, 302);
 		}
 
 		logger.info(
