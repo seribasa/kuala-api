@@ -108,9 +108,11 @@ export const handleDownloadInvoicePdf = async (c: Context) => {
 				.replace(/<script[^>]*>[\s\S]*?<\/script>/gi, "") // Remove script blocks
 				.replace(/<\/(p|div|tr|h[1-6]|table)>/gi, "\n") // Add newline after blocks
 				.replace(/<br\s*\/?>/gi, "\n") // Replace <br> with newline
+				.replace(/<\/th>/gi, "    ") // Add spacing between table columns
 				.replace(/<\/td>/gi, "    ") // Add spacing between table columns
-				.replace(/<[^>]+>/g, " ") // Strip remaining HTML tags
+				.replace(/<[^>]+>/g, "") // Strip remaining HTML tags
 				.replace(/^[ \t]+/gm, "") // Remove leading whitespace on each line
+				.replace(/[ \t]+$/gm, "") // Remove trailing whitespace
 				.replace(/\n[ \t]*\n[ \t]*\n+/g, "\n\n") // Collapse 3+ newlines to 2
 				.trim()
 				.substring(0, 4000); // Limit length to avoid page overflow for basic dump
