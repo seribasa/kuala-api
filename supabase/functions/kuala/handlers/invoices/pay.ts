@@ -115,10 +115,16 @@ export const handlePayInvoice = async (c: Context) => {
 			};
 			return c.json(err, 500);
 		}
+		const { back_url: backUrlBody } = c.req.query();
 
-		const backUrl = typeof c.req.query === "function"
+		let backUrl = typeof c.req.query === "function"
 			? c.req.query("back_url")
 			: undefined;
+		if (
+			!backUrl && backUrlBody && typeof backUrlBody === "string"
+		) {
+			backUrl = backUrlBody;
+		}
 
 		logger.info(
 			handlerName,
