@@ -26,42 +26,53 @@ import { customLogger } from "./middleware/logger.ts";
 import { corsMiddleware } from "./middleware/cors.ts";
 import { authMiddleware } from "./middleware/auth.ts";
 
-const auth = new Hono().basePath("/auth");
-auth.get("/authorize", handleAuthorize);
-auth.post("/exchange-token", handleExchangeToken);
-auth.post("/refresh-token", handleRefreshToken);
-auth.post("/logout", handleLogout);
-auth.get("/me", handleMe);
+const publicRoutes = new Hono().basePath("/");
+publicRoutes.get("/plans", handlePlans);
+
+const authRoutes = new Hono().basePath("/auth");
+authRoutes.get("/authorize", handleAuthorize);
+authRoutes.post("/exchange-token", handleExchangeToken);
+authRoutes.post("/refresh-token", handleRefreshToken);
+authRoutes.post("/logout", handleLogout);
+authRoutes.get("/me", handleMe);
+
+const subscriptionRoutes = new Hono().basePath("/subscriptions");
+subscriptionRoutes.use(authMiddleware);
+// Deprecated endpoints for subscriptions, but still supported for backward compatibility
+subscriptionRoutes.post("/", handleCreateSubscription);
+subscriptionRoutes.post("/v2", handleCreateEventDrivenSubscription);
+// "/subscriptions/event-driven" redirect to"/subscriptions/v2"
+subscriptionRoutes.post("/event-driven", (c) => {
+	// 308 preserves the HTTP method (POST) and payload
+	return c.redirect("/v2", 308);
+});
+subscriptionRoutes.get("/", handleGetSubscription);
+subscriptionRoutes.get("/:subscriptionId", handleGetSubscriptionById);
+subscriptionRoutes.get(
+	"/status/:correlationId",
+	handleGetSubscriptionStatus,
+);
+
+const invoiceRoutes = new Hono().basePath("/invoices");
+invoiceRoutes.use(authMiddleware);
+invoiceRoutes.post("/", handleCreateInvoice);
+invoiceRoutes.get("/", handleListInvoices);
+invoiceRoutes.get("/:invoiceId/pdf", handleDownloadInvoicePdf);
+invoiceRoutes.get("/:invoiceId", handleGetInvoiceById);
+invoiceRoutes.post("/:id/pay", handlePayInvoice);
+
+const webhookRoutes = new Hono().basePath("/webhooks");
+webhookRoutes.post("/bayeu", handleBayeuWebhook);
 
 export const app = new Hono().basePath("/kuala");
 // Use custom logger that follows Hono's PrintFunc pattern
 app.use(logger(customLogger));
 app.use("*", corsMiddleware);
-app.route("/", auth);
-app.get("/plans", handlePlans);
-app.post("/subscriptions", authMiddleware, handleCreateSubscription);
-app.post(
-	"/subscriptions/event-driven",
-	authMiddleware,
-	handleCreateEventDrivenSubscription,
-);
-app.get(
-	"/subscriptions/status/:correlationId",
-	authMiddleware,
-	handleGetSubscriptionStatus,
-);
-app.get("/subscriptions", authMiddleware, handleGetSubscription);
-app.get(
-	"/subscriptions/:subscriptionId",
-	authMiddleware,
-	handleGetSubscriptionById,
-);
-app.get("/invoices/:invoiceId/pdf", authMiddleware, handleDownloadInvoicePdf);
-app.get("/invoices", authMiddleware, handleListInvoices);
-app.get("/invoices/:invoiceId", authMiddleware, handleGetInvoiceById);
-app.post("/invoices/:id/pay", authMiddleware, handlePayInvoice);
-app.post("/invoices", authMiddleware, handleCreateInvoice);
-app.post("/webhooks/bayeu", handleBayeuWebhook);
+app.route("/", publicRoutes);
+app.route("/", authRoutes);
+app.route("/", subscriptionRoutes);
+app.route("/", invoiceRoutes);
+app.route("/", webhookRoutes);
 
 // HANDLE 404
 const errorResponse: ErrorResponse = {

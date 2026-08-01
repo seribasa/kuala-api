@@ -139,3 +139,28 @@ services:
             init-tenant:
                 condition: service_completed_successfully
         restart: "no"
+    init-template:
+        container_name: init_template
+        image: curlimages/curl:8.20.0
+        volumes:
+            - ./init-invoice-templates.sh:/scripts/init-invoice-templates.sh:ro
+            - ./HtmlInvoiceTemplate.mustache:/scripts/HtmlInvoiceTemplate.mustache:ro
+        environment:
+            - KILLBILL_URL=${KILLBILL_URL}
+            - ADMIN_USER=${ADMIN_USER}
+            - ADMIN_PASSWORD=${ADMIN_PASSWORD}
+            - KILLBILL_API_KEY=${KILLBILL_API_KEY}
+            - KILLBILL_API_SECRET=${KILLBILL_API_SECRET}
+        command:
+            - sh
+            - /scripts/init-invoice-templates.sh
+            - --api-key
+            - ${KILLBILL_API_KEY}
+            - --api-secret
+            - ${KILLBILL_API_SECRET}
+            - --killbill-url
+            - ${KILLBILL_URL}
+        depends_on:
+            init-tenant:
+                condition: service_completed_successfully
+        restart: "no"
