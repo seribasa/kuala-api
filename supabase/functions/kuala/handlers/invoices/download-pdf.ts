@@ -98,12 +98,13 @@ export const handleDownloadInvoicePdf = async (c: Context) => {
 			page.drawText("Invoice: " + invoiceId, {
 				x: padding,
 				y: height - padding,
-				size: 16,
+				size: 10,
 				font,
 			});
 
 			// Clean up HTML a bit for text rendering
 			const cleanText = htmlContent
+				.replace(/\s+/g, " ") // Collapse all whitespace and newlines first
 				.replace(/<style[^>]*>[\s\S]*?<\/style>/gi, "") // Remove style blocks
 				.replace(/<script[^>]*>[\s\S]*?<\/script>/gi, "") // Remove script blocks
 				.replace(/<\/(p|div|tr|h[1-6]|table)>/gi, "\n") // Add newline after blocks
