@@ -929,6 +929,7 @@ export class KillBillService {
 			body: JSON.stringify({
 				accountId: invoice.accountId,
 				purchasedAmount: paymentAmount,
+				targetInvoiceId: invoiceId,
 			}),
 		});
 
