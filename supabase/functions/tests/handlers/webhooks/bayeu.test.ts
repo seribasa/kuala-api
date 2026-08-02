@@ -4,6 +4,7 @@ import { handleBayeuWebhook } from "../../../kuala/handlers/webhooks/bayeu.ts";
 import { Context } from "@hono/hono";
 import { stub } from "@std/testing/mock";
 import { killBillService } from "../../../_shared/services/killbill.ts";
+import { supabase } from "../../../_shared/supabase.ts";
 
 async function generateMockSignature(payload: string, secret: string) {
 	const encoder = new TextEncoder();
@@ -165,12 +166,19 @@ Deno.test("handleBayeuWebhook - returns 200 on success", async () => {
 		return Promise.resolve();
 	});
 
+	const storageFromStub = stub(supabase.storage, "from", () => {
+		return {
+			remove: () => Promise.resolve({ data: null, error: null }),
+		} as any;
+	});
+
 	try {
 		const res = await handleBayeuWebhook(c);
 		assertEquals((res as any).status, 200);
 		assertEquals((res as any).body.message, "Payment processed");
 	} finally {
 		payStub.restore();
+		storageFromStub.restore();
 		if (originalKey === undefined) {
 			Deno.env.delete("OUTPOST_WEBHOOK_SECRET");
 		} else {

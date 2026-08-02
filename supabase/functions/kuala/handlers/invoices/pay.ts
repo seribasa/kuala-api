@@ -161,6 +161,27 @@ export const handlePayInvoice = async (c: Context) => {
 		if (!bayeuResponse.ok) {
 			const bayeuErr = await bayeuResponse.text();
 			logger.error(handlerName, `Bayeu initiation failed: ${bayeuErr}`);
+
+			let parsedErr;
+			try {
+				parsedErr = JSON.parse(bayeuErr);
+			} catch (e) {
+				// Ignore parsing error
+			}
+
+			if (parsedErr && !parsedErr.is_successful && parsedErr.message) {
+				const err: ErrorResponse = {
+					code: "BAD_REQUEST",
+					message: parsedErr.message,
+				};
+				const status =
+					bayeuResponse.status >= 400 && bayeuResponse.status < 500
+						? bayeuResponse.status
+						: 400;
+				// deno-lint-ignore no-explicit-any
+				return c.json(err, status as any);
+			}
+
 			const err: ErrorResponse = {
 				code: "INTERNAL_ERROR",
 				message: "Failed to initiate payment gateway",

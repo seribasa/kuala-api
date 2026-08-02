@@ -2,6 +2,7 @@ import { Context } from "@hono/hono";
 import { logger } from "../../middleware/logger.ts";
 import { killBillService } from "../../../_shared/services/killbill.ts";
 import { ErrorResponse } from "../../../_shared/types/response.ts";
+import { supabase } from "../../../_shared/supabase.ts";
 
 /**
  * Validates Hookdeck signature using Web Crypto API
@@ -112,6 +113,35 @@ export const handleBayeuWebhook = async (c: Context) => {
 			handlerName,
 			`Successfully marked invoice ${invoiceId} as paid in Kill Bill`,
 		);
+
+		// Invalidate cached invoice PDF in Supabase Storage
+		try {
+			const fileName = `invoice-${invoiceId}.pdf`;
+			const { error: removeError } = await supabase.storage.from(
+				"invoices",
+			)
+				.remove([fileName]);
+
+			if (removeError) {
+				logger.error(
+					handlerName,
+					`Failed to remove cached invoice PDF for ${invoiceId}: ${removeError.message}`,
+				);
+			} else {
+				logger.info(
+					handlerName,
+					`Successfully invalidated cached invoice PDF for ${invoiceId}`,
+				);
+			}
+		} catch (e: unknown) {
+			logger.error(
+				handlerName,
+				`Failed to invalidate cached invoice PDF for ${invoiceId}: ${
+					e instanceof Error ? e.message : String(e)
+				}`,
+			);
+		}
+
 		return c.json({ is_successful: true, message: "Payment processed" });
 	} catch (error) {
 		logger.error(handlerName, "Internal server error handling webhook", {
