@@ -40,63 +40,92 @@ function verifyHookdeckSignature(
 		return false;
 	}
 
-	let isMatch = false;
-
-	// 1. Check Hookdeck Event Gateway format (Base64)
-	if (hookdeckSignature) {
-		const hashBase64 = crypto
-			.createHmac("sha256", OUTPOST_WEBHOOK_SECRET)
-			.update(bodyText)
-			.digest("base64");
-
-		try {
-			isMatch = crypto.timingSafeEqual(
-				Buffer.from(hookdeckSignature.trim()),
-				Buffer.from(hashBase64),
-			);
-			if (isMatch) return true;
-		} catch (err) {
-			logger.error(handlerName, "Error in timingSafeEqual (Base64)", {
-				error: String(err),
-			});
+	const possibleSecrets: Buffer[] = [Buffer.from(OUTPOST_WEBHOOK_SECRET)];
+	if (OUTPOST_WEBHOOK_SECRET.startsWith("whsec_")) {
+		const rawKey = OUTPOST_WEBHOOK_SECRET.slice(6);
+		// Standard Webhooks secrets are usually base64
+		possibleSecrets.push(Buffer.from(rawKey, "base64"));
+		// Hookdeck Outpost dashboard sometimes provides 64-character HEX strings
+		if (/^[0-9a-fA-F]+$/.test(rawKey) && rawKey.length % 2 === 0) {
+			possibleSecrets.push(Buffer.from(rawKey, "hex"));
 		}
 	}
 
-	// 2. Check Hookdeck Outpost format (Hex, prefixed with v0=)
-	if (outpostSignature) {
-		// Outpost signatures can be comma-separated: v0=hash1, v0=hash2
-		const extractedSigs = outpostSignature
-			.split(",")
-			.map((s) => s.trim())
-			.filter((s) => s.startsWith("v0="))
-			.map((s) => s.slice(3)); // remove 'v0='
+	for (const secretBytes of possibleSecrets) {
+		// 1. Check Hookdeck Event Gateway format (Base64)
+		if (hookdeckSignature) {
+			const hashBase64 = crypto
+				.createHmac("sha256", secretBytes)
+				.update(bodyText)
+				.digest("base64");
 
-		// Test both common Outpost payload configurations: just body, and timestamp.body
-		const payloadsToTest = [
-			bodyText,
-			outpostTimestamp ? `${outpostTimestamp}.${bodyText}` : null,
-		].filter(Boolean) as string[];
+			try {
+				if (
+					crypto.timingSafeEqual(
+						Buffer.from(hookdeckSignature.trim()),
+						Buffer.from(hashBase64),
+					)
+				) {
+					return true;
+				}
+			} catch (err) {
+				// Ignore
+			}
+		}
 
-		for (const payload of payloadsToTest) {
-			const hashHex = crypto
-				.createHmac("sha256", OUTPOST_WEBHOOK_SECRET)
-				.update(payload)
-				.digest("hex");
+		// 2. Check Hookdeck Outpost format (Hex, prefixed with v0=)
+		if (outpostSignature) {
+			const outpostEventId = c.req.header("x-outpost-event-id") || "";
+			const extractedSigs = outpostSignature
+				.split(",")
+				.map((s) => s.trim())
+				.filter((s) => s.startsWith("v0="))
+				.map((s) => s.slice(3));
 
-			for (const sig of extractedSigs) {
-				try {
-					if (
-						Buffer.from(sig).length ===
-							Buffer.from(hashHex).length &&
-						crypto.timingSafeEqual(
-							Buffer.from(sig),
-							Buffer.from(hashHex),
-						)
-					) {
-						return true;
+			const payloadsToTest = [
+				bodyText,
+				outpostTimestamp ? `${outpostTimestamp}.${bodyText}` : null,
+				(outpostEventId && outpostTimestamp)
+					? `${outpostEventId}.${outpostTimestamp}.${bodyText}`
+					: null,
+			].filter(Boolean) as string[];
+
+			for (const payload of payloadsToTest) {
+				const hashHex = crypto
+					.createHmac("sha256", secretBytes)
+					.update(payload)
+					.digest("hex");
+
+				const hashBase64 = crypto
+					.createHmac("sha256", secretBytes)
+					.update(payload)
+					.digest("base64");
+
+				for (const sig of extractedSigs) {
+					try {
+						if (
+							Buffer.from(sig).length ===
+								Buffer.from(hashHex).length &&
+							crypto.timingSafeEqual(
+								Buffer.from(sig),
+								Buffer.from(hashHex),
+							)
+						) {
+							return true;
+						}
+						if (
+							Buffer.from(sig).length ===
+								Buffer.from(hashBase64).length &&
+							crypto.timingSafeEqual(
+								Buffer.from(sig),
+								Buffer.from(hashBase64),
+							)
+						) {
+							return true;
+						}
+					} catch (err) {
+						// Ignore
 					}
-				} catch (err) {
-					// Ignore timingSafeEqual length mismatch errors
 				}
 			}
 		}
