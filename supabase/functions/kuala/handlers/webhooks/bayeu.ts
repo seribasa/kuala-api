@@ -7,33 +7,51 @@ import { supabase } from "../../../_shared/supabase.ts";
 /**
  * Validates Hookdeck signature using Web Crypto API
  */
-async function verifyHookdeckSignature(
+import crypto from "node:crypto";
+import { Buffer } from "node:buffer";
+
+function verifyHookdeckSignature(
 	bodyText: string,
 	signatureHeader: string | null,
-): Promise<boolean> {
+): boolean {
 	const OUTPOST_WEBHOOK_SECRET = Deno.env.get("OUTPOST_WEBHOOK_SECRET");
-	if (!OUTPOST_WEBHOOK_SECRET || !signatureHeader) return false;
+	const handlerName = "bayeu-webhook";
 
-	const encoder = new TextEncoder();
-	const key = await crypto.subtle.importKey(
-		"raw",
-		encoder.encode(OUTPOST_WEBHOOK_SECRET),
-		{ name: "HMAC", hash: "SHA-256" },
-		false,
-		["verify", "sign"],
-	);
+	if (!OUTPOST_WEBHOOK_SECRET) {
+		logger.error(
+			handlerName,
+			"OUTPOST_WEBHOOK_SECRET is not set in environment",
+		);
+		return false;
+	}
+	if (!signatureHeader) {
+		logger.error(handlerName, "signatureHeader is null or empty");
+		return false;
+	}
 
-	const signatureBuffer = await crypto.subtle.sign(
-		"HMAC",
-		key,
-		encoder.encode(bodyText),
-	);
+	const hash = crypto
+		.createHmac("sha256", OUTPOST_WEBHOOK_SECRET)
+		.update(bodyText)
+		.digest("base64");
 
-	// Convert buffer to base64
-	const signatureBase64 = btoa(
-		String.fromCharCode(...new Uint8Array(signatureBuffer)),
-	);
-	return signatureBase64 === signatureHeader;
+	try {
+		const isMatch = crypto.timingSafeEqual(
+			Buffer.from(signatureHeader.trim()),
+			Buffer.from(hash),
+		);
+		if (!isMatch) {
+			logger.error(
+				handlerName,
+				`Signature mismatch. Expected: ${hash}, Got: ${signatureHeader}`,
+			);
+		}
+		return isMatch;
+	} catch (err) {
+		logger.error(handlerName, "Error in timingSafeEqual", {
+			error: String(err),
+		});
+		return false;
+	}
 }
 
 export const handleBayeuWebhook = async (c: Context) => {
@@ -47,7 +65,7 @@ export const handleBayeuWebhook = async (c: Context) => {
 			Deno.env.get("SKIP_WEBHOOK_VERIFICATION") === "true" ||
 			Deno.env.get("DENO_ENV") === "test";
 
-		const isValid = await verifyHookdeckSignature(
+		const isValid = verifyHookdeckSignature(
 			bodyText,
 			signatureHeader,
 		);
