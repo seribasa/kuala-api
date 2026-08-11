@@ -58,7 +58,14 @@ export const handleBayeuWebhook = async (c: Context) => {
 	const handlerName = "bayeu-webhook";
 
 	try {
-		const signatureHeader = c.req.header("x-hookdeck-signature") || null;
+		const signatureHeader = c.req.header("x-hookdeck-signature") ||
+			c.req.header("hookdeck-signature") ||
+			null;
+
+		if (!signatureHeader) {
+			const headersObj = Object.fromEntries(c.req.raw.headers.entries());
+			logger.info(handlerName, "Available headers:", headersObj);
+		}
 		const bodyText = await c.req.text();
 
 		const skipVerification =
