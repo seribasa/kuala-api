@@ -12,7 +12,7 @@ import { Buffer } from "node:buffer";
 
 function verifyHookdeckSignature(
 	bodyText: string,
-	signatureHeader: string | null,
+	c: Context,
 ): boolean {
 	const OUTPOST_WEBHOOK_SECRET = Deno.env.get("OUTPOST_WEBHOOK_SECRET");
 	const handlerName = "bayeu-webhook";
@@ -24,48 +24,95 @@ function verifyHookdeckSignature(
 		);
 		return false;
 	}
-	if (!signatureHeader) {
-		logger.error(handlerName, "signatureHeader is null or empty");
-		return false;
-	}
 
-	const hash = crypto
-		.createHmac("sha256", OUTPOST_WEBHOOK_SECRET)
-		.update(bodyText)
-		.digest("base64");
+	const hookdeckSignature = c.req.header("x-hookdeck-signature") ||
+		c.req.header("hookdeck-signature");
+	const outpostSignature = c.req.header("x-outpost-signature");
+	const outpostTimestamp = c.req.header("x-outpost-timestamp") || "";
 
-	try {
-		const isMatch = crypto.timingSafeEqual(
-			Buffer.from(signatureHeader.trim()),
-			Buffer.from(hash),
+	if (!hookdeckSignature && !outpostSignature) {
+		const headersObj = Object.fromEntries(c.req.raw.headers.entries());
+		logger.error(
+			handlerName,
+			"No signature header found. Available headers:",
+			headersObj,
 		);
-		if (!isMatch) {
-			logger.error(
-				handlerName,
-				`Signature mismatch. Expected: ${hash}, Got: ${signatureHeader}`,
-			);
-		}
-		return isMatch;
-	} catch (err) {
-		logger.error(handlerName, "Error in timingSafeEqual", {
-			error: String(err),
-		});
 		return false;
 	}
+
+	let isMatch = false;
+
+	// 1. Check Hookdeck Event Gateway format (Base64)
+	if (hookdeckSignature) {
+		const hashBase64 = crypto
+			.createHmac("sha256", OUTPOST_WEBHOOK_SECRET)
+			.update(bodyText)
+			.digest("base64");
+
+		try {
+			isMatch = crypto.timingSafeEqual(
+				Buffer.from(hookdeckSignature.trim()),
+				Buffer.from(hashBase64),
+			);
+			if (isMatch) return true;
+		} catch (err) {
+			logger.error(handlerName, "Error in timingSafeEqual (Base64)", {
+				error: String(err),
+			});
+		}
+	}
+
+	// 2. Check Hookdeck Outpost format (Hex, prefixed with v0=)
+	if (outpostSignature) {
+		// Outpost signatures can be comma-separated: v0=hash1, v0=hash2
+		const extractedSigs = outpostSignature
+			.split(",")
+			.map((s) => s.trim())
+			.filter((s) => s.startsWith("v0="))
+			.map((s) => s.slice(3)); // remove 'v0='
+
+		// Test both common Outpost payload configurations: just body, and timestamp.body
+		const payloadsToTest = [
+			bodyText,
+			outpostTimestamp ? `${outpostTimestamp}.${bodyText}` : null,
+		].filter(Boolean) as string[];
+
+		for (const payload of payloadsToTest) {
+			const hashHex = crypto
+				.createHmac("sha256", OUTPOST_WEBHOOK_SECRET)
+				.update(payload)
+				.digest("hex");
+
+			for (const sig of extractedSigs) {
+				try {
+					if (
+						Buffer.from(sig).length ===
+							Buffer.from(hashHex).length &&
+						crypto.timingSafeEqual(
+							Buffer.from(sig),
+							Buffer.from(hashHex),
+						)
+					) {
+						return true;
+					}
+				} catch (err) {
+					// Ignore timingSafeEqual length mismatch errors
+				}
+			}
+		}
+	}
+
+	logger.error(
+		handlerName,
+		"Signature mismatch. None of the extracted signatures matched the computed hashes.",
+	);
+	return false;
 }
 
 export const handleBayeuWebhook = async (c: Context) => {
 	const handlerName = "bayeu-webhook";
 
 	try {
-		const signatureHeader = c.req.header("x-hookdeck-signature") ||
-			c.req.header("hookdeck-signature") ||
-			null;
-
-		if (!signatureHeader) {
-			const headersObj = Object.fromEntries(c.req.raw.headers.entries());
-			logger.info(handlerName, "Available headers:", headersObj);
-		}
 		const bodyText = await c.req.text();
 
 		const skipVerification =
@@ -74,7 +121,7 @@ export const handleBayeuWebhook = async (c: Context) => {
 
 		const isValid = verifyHookdeckSignature(
 			bodyText,
-			signatureHeader,
+			c,
 		);
 		if (!isValid && !skipVerification) {
 			logger.error(handlerName, "Invalid Hookdeck-Signature");
