@@ -40,7 +40,7 @@ export const handleBayeuWebhook = async (c: Context) => {
 	const handlerName = "bayeu-webhook";
 
 	try {
-		const signatureHeader = c.req.header("Hookdeck-Signature") || null;
+		const signatureHeader = c.req.header("x-hookdeck-signature") || null;
 		const bodyText = await c.req.text();
 
 		const skipVerification =
