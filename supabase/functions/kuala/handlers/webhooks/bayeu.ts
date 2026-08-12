@@ -131,42 +131,9 @@ function verifyHookdeckSignature(
 		}
 	}
 
-	// If we get here, no match was found. Let's build a debug object of what we calculated to see what's wrong.
-	// deno-lint-ignore no-explicit-any
-	const debugInfo: any = {
-		receivedSignature: outpostSignature || hookdeckSignature,
-		receivedTimestamp: c.req.header("x-outpost-timestamp"),
-		receivedEventId: c.req.header("x-outpost-event-id"),
-		secretLengthStr: OUTPOST_WEBHOOK_SECRET.length,
-		calculatedHashes: [] as string[],
-	};
-
-	for (const secretBytes of possibleSecrets) {
-		const outpostEventId = c.req.header("x-outpost-event-id") || "";
-		const payloadsToTest = [
-			bodyText,
-			outpostTimestamp ? `${outpostTimestamp}.${bodyText}` : null,
-			(outpostEventId && outpostTimestamp)
-				? `${outpostEventId}.${outpostTimestamp}.${bodyText}`
-				: null,
-		].filter(Boolean) as string[];
-
-		for (const payload of payloadsToTest) {
-			const hashHex = crypto.createHmac("sha256", secretBytes).update(
-				payload,
-			).digest("hex");
-			const hashBase64 = crypto.createHmac("sha256", secretBytes).update(
-				payload,
-			).digest("base64");
-			debugInfo.calculatedHashes.push(`Hex: v0=${hashHex}`);
-			debugInfo.calculatedHashes.push(`Base64: ${hashBase64}`);
-		}
-	}
-
 	logger.error(
 		handlerName,
 		"Signature mismatch. None of the extracted signatures matched the computed hashes.",
-		debugInfo,
 	);
 	return false;
 }
