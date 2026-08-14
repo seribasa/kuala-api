@@ -7,49 +7,150 @@ import { supabase } from "../../../_shared/supabase.ts";
 /**
  * Validates Hookdeck signature using Web Crypto API
  */
-async function verifyHookdeckSignature(
+import crypto from "node:crypto";
+import { Buffer } from "node:buffer";
+
+function verifyHookdeckSignature(
 	bodyText: string,
-	signatureHeader: string | null,
-): Promise<boolean> {
+	c: Context,
+): boolean {
 	const OUTPOST_WEBHOOK_SECRET = Deno.env.get("OUTPOST_WEBHOOK_SECRET");
-	if (!OUTPOST_WEBHOOK_SECRET || !signatureHeader) return false;
+	const handlerName = "bayeu-webhook";
 
-	const encoder = new TextEncoder();
-	const key = await crypto.subtle.importKey(
-		"raw",
-		encoder.encode(OUTPOST_WEBHOOK_SECRET),
-		{ name: "HMAC", hash: "SHA-256" },
-		false,
-		["verify", "sign"],
-	);
+	if (!OUTPOST_WEBHOOK_SECRET) {
+		logger.error(
+			handlerName,
+			"OUTPOST_WEBHOOK_SECRET is not set in environment",
+		);
+		return false;
+	}
 
-	const signatureBuffer = await crypto.subtle.sign(
-		"HMAC",
-		key,
-		encoder.encode(bodyText),
-	);
+	const hookdeckSignature = c.req.header("x-hookdeck-signature") ||
+		c.req.header("hookdeck-signature");
+	const outpostSignature = c.req.header("x-outpost-signature");
+	const outpostTimestamp = c.req.header("x-outpost-timestamp") || "";
 
-	// Convert buffer to base64
-	const signatureBase64 = btoa(
-		String.fromCharCode(...new Uint8Array(signatureBuffer)),
+	if (!hookdeckSignature && !outpostSignature) {
+		const headersObj = Object.fromEntries(c.req.raw.headers.entries());
+		logger.error(
+			handlerName,
+			"No signature header found. Available headers:",
+			headersObj,
+		);
+		return false;
+	}
+
+	const possibleSecrets: Buffer[] = [Buffer.from(OUTPOST_WEBHOOK_SECRET)];
+	if (OUTPOST_WEBHOOK_SECRET.startsWith("whsec_")) {
+		const rawKey = OUTPOST_WEBHOOK_SECRET.slice(6);
+		// Standard Webhooks secrets are usually base64
+		possibleSecrets.push(Buffer.from(rawKey, "base64"));
+		// Hookdeck Outpost dashboard sometimes provides 64-character HEX strings
+		if (/^[0-9a-fA-F]+$/.test(rawKey) && rawKey.length % 2 === 0) {
+			possibleSecrets.push(Buffer.from(rawKey, "hex"));
+		}
+	}
+
+	for (const secretBytes of possibleSecrets) {
+		// 1. Check Hookdeck Event Gateway format (Base64)
+		if (hookdeckSignature) {
+			const hashBase64 = crypto
+				.createHmac("sha256", secretBytes)
+				.update(bodyText)
+				.digest("base64");
+
+			try {
+				if (
+					crypto.timingSafeEqual(
+						Buffer.from(hookdeckSignature.trim()),
+						Buffer.from(hashBase64),
+					)
+				) {
+					return true;
+				}
+			} catch (err) {
+				// Ignore
+			}
+		}
+
+		// 2. Check Hookdeck Outpost format (Hex, prefixed with v0=)
+		if (outpostSignature) {
+			const outpostEventId = c.req.header("x-outpost-event-id") || "";
+			const extractedSigs = outpostSignature
+				.split(",")
+				.map((s) => s.trim())
+				.filter((s) => s.startsWith("v0="))
+				.map((s) => s.slice(3));
+
+			const payloadsToTest = [
+				bodyText,
+				outpostTimestamp ? `${outpostTimestamp}.${bodyText}` : null,
+				(outpostEventId && outpostTimestamp)
+					? `${outpostEventId}.${outpostTimestamp}.${bodyText}`
+					: null,
+			].filter(Boolean) as string[];
+
+			for (const payload of payloadsToTest) {
+				const hashHex = crypto
+					.createHmac("sha256", secretBytes)
+					.update(payload)
+					.digest("hex");
+
+				const hashBase64 = crypto
+					.createHmac("sha256", secretBytes)
+					.update(payload)
+					.digest("base64");
+
+				for (const sig of extractedSigs) {
+					try {
+						if (
+							Buffer.from(sig).length ===
+								Buffer.from(hashHex).length &&
+							crypto.timingSafeEqual(
+								Buffer.from(sig),
+								Buffer.from(hashHex),
+							)
+						) {
+							return true;
+						}
+						if (
+							Buffer.from(sig).length ===
+								Buffer.from(hashBase64).length &&
+							crypto.timingSafeEqual(
+								Buffer.from(sig),
+								Buffer.from(hashBase64),
+							)
+						) {
+							return true;
+						}
+					} catch (err) {
+						// Ignore
+					}
+				}
+			}
+		}
+	}
+
+	logger.error(
+		handlerName,
+		"Signature mismatch. None of the extracted signatures matched the computed hashes.",
 	);
-	return signatureBase64 === signatureHeader;
+	return false;
 }
 
 export const handleBayeuWebhook = async (c: Context) => {
 	const handlerName = "bayeu-webhook";
 
 	try {
-		const signatureHeader = c.req.header("Hookdeck-Signature") || null;
 		const bodyText = await c.req.text();
 
 		const skipVerification =
 			Deno.env.get("SKIP_WEBHOOK_VERIFICATION") === "true" ||
 			Deno.env.get("DENO_ENV") === "test";
 
-		const isValid = await verifyHookdeckSignature(
+		const isValid = verifyHookdeckSignature(
 			bodyText,
-			signatureHeader,
+			c,
 		);
 		if (!isValid && !skipVerification) {
 			logger.error(handlerName, "Invalid Hookdeck-Signature");
