@@ -17,8 +17,10 @@ subscriptionRoutes.post("/v2", handleCreateEventDrivenSubscription);
 
 // "/subscriptions/event-driven" redirect to"/subscriptions/v2"
 subscriptionRoutes.post("/event-driven", (c) => {
+	const url = new URL(c.req.url);
+	url.pathname = url.pathname.replace("/event-driven", "/v2");
 	// 308 preserves the HTTP method (POST) and payload
-	return c.redirect("/v2", 308);
+	return c.redirect(url.toString(), 308);
 });
 
 subscriptionRoutes.get("/", handleGetSubscription);
