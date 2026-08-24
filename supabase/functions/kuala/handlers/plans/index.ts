@@ -175,16 +175,6 @@ export async function handlePlans(c: Context) {
 		const interval = c.req.query("interval");
 
 		try {
-			// filter by interval if provided
-			if (interval) {
-				if (interval !== "month" && interval !== "year") {
-					const errorResponse: ErrorResponse = {
-						code: "INVALID_INTERVAL",
-						message: "Interval must be 'month' or 'year'",
-					};
-					return c.json(errorResponse, 400);
-				}
-			}
 			// Try to fetch from Kill Bill first
 			const plans = await fetchKillBillPlans();
 

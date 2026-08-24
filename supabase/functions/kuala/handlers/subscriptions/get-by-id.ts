@@ -25,15 +25,6 @@ export const handleGetSubscriptionById = async (c: Context) => {
 			subscriptionId: subscriptionId?.substring(0, 8) + "...",
 		});
 
-		if (!subscriptionId) {
-			authLogger.error(handlerName, "Missing subscription ID parameter");
-			const errorResponse: ErrorResponse = {
-				code: "MISSING_SUBSCRIPTION_ID",
-				message: "Subscription ID is required",
-			};
-			return c.json(errorResponse, 400);
-		}
-
 		// Get authenticated user from context (set by authMiddleware)
 		const user = getUser(c);
 		const userId = user.id;

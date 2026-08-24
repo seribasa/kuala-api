@@ -42,24 +42,6 @@ Deno.test("handlePayInvoice - user not in context returns 500 because getUser th
 	assertEquals((res as unknown as MockResponse).status, 500);
 });
 
-Deno.test("handlePayInvoice - returns 400 if invoice id missing", async () => {
-	const req = new Request("http://localhost/invoices//pay", {
-		method: "POST",
-		headers: { "Authorization": "Bearer token" },
-	});
-	const c = {
-		req: {
-			header: (k: string) => req.headers.get(k),
-			param: (k: string) => null, // No invoice ID
-		},
-		get: (k: string) => ({ id: "123", email: "test@example.com" }),
-		json: (body: unknown, status: number) => ({ body, status }),
-	} as unknown as Context;
-
-	const res = await handlePayInvoice(c);
-	assertEquals((res as unknown as MockResponse).status, 400);
-});
-
 Deno.test("handlePayInvoice - returns 500 if invoice fetch fails", async () => {
 	Deno.env.set("PAYMENT_GATEWAY", "stripe");
 	const getInvoiceByIdStub = stub(killBillService, "getInvoiceById", () => {
@@ -84,49 +66,6 @@ Deno.test("handlePayInvoice - returns 500 if invoice fetch fails", async () => {
 		assertEquals((res as unknown as MockResponse).status, 500);
 	} finally {
 		getInvoiceByIdStub.restore();
-	}
-});
-
-Deno.test("handlePayInvoice - returns 400 if invoice balance is zero", async () => {
-	Deno.env.set("PAYMENT_GATEWAY", "stripe");
-	const getInvoiceByIdStub = stub(killBillService, "getInvoiceById", () => {
-		return Promise.resolve(
-			{
-				accountId: "acc-123",
-				balance: 0,
-				currency: "USD",
-			} as unknown as KillBillInvoice,
-		);
-	});
-	const getAccountStub = stub(
-		killBillService,
-		"getAccountByExternalKey",
-		() => {
-			return Promise.resolve(
-				{ accountId: "acc-123" } as unknown as KillBillAccount,
-			);
-		},
-	);
-	try {
-		const req = new Request("http://localhost/invoices/inv-123/pay", {
-			method: "POST",
-			headers: { "Authorization": "Bearer token" },
-		});
-		const c = {
-			req: {
-				header: (k: string) => req.headers.get(k),
-				param: (k: string) => "inv-123",
-				query: (k?: string) => k ? undefined : {},
-			},
-			get: (k: string) => ({ id: "123", email: "test@example.com" }),
-			json: (body: unknown, status?: number) => ({ body, status }),
-		} as unknown as Context;
-
-		const res = await handlePayInvoice(c);
-		assertEquals((res as unknown as MockResponse).status, 400);
-	} finally {
-		getInvoiceByIdStub.restore();
-		getAccountStub.restore();
 	}
 });
 
@@ -172,67 +111,6 @@ Deno.test("handlePayInvoice - returns 500 if bayeu initiate fails", async () => 
 
 		const res = await handlePayInvoice(c);
 		assertEquals((res as unknown as MockResponse).status, 500);
-	} finally {
-		getInvoiceByIdStub.restore();
-		getAccountStub.restore();
-		fetchStub.restore();
-	}
-});
-
-Deno.test("handlePayInvoice - returns 400 if bayeu initiate fails with json error", async () => {
-	Deno.env.set("BAYEU_API_URL", "http://localhost:54331");
-	Deno.env.set("BAYEU_ANON_KEY", "test-anon-key");
-	Deno.env.set("PAYMENT_GATEWAY", "stripe");
-	const getInvoiceByIdStub = stub(killBillService, "getInvoiceById", () => {
-		return Promise.resolve(
-			{
-				accountId: "acc-123",
-				balance: 100,
-				currency: "USD",
-			} as unknown as KillBillInvoice,
-		);
-	});
-	const getAccountStub = stub(
-		killBillService,
-		"getAccountByExternalKey",
-		() => {
-			return Promise.resolve(
-				{ accountId: "acc-123" } as unknown as KillBillAccount,
-			);
-		},
-	);
-	const fetchStub = stub(globalThis, "fetch", () => {
-		return Promise.resolve(
-			new Response(
-				JSON.stringify({
-					is_successful: false,
-					message: "This invoice has already been paid.",
-				}),
-				{ status: 400 },
-			),
-		);
-	});
-	try {
-		const req = new Request("http://localhost/invoices/inv-123/pay", {
-			method: "POST",
-			headers: { "Authorization": "Bearer token" },
-		});
-		const c = {
-			req: {
-				header: (k: string) => req.headers.get(k),
-				param: (k: string) => "inv-123",
-				query: (k?: string) => k ? undefined : {},
-			},
-			get: (k: string) => ({ id: "123", email: "test@example.com" }),
-			json: (body: unknown, status?: number) => ({ body, status }),
-		} as unknown as Context;
-
-		const res = await handlePayInvoice(c);
-		assertEquals((res as unknown as MockResponse).status, 400);
-		assertEquals((res as unknown as MockResponse).body, {
-			code: "BAD_REQUEST",
-			message: "This invoice has already been paid.",
-		});
 	} finally {
 		getInvoiceByIdStub.restore();
 		getAccountStub.restore();

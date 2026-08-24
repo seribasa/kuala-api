@@ -25,15 +25,6 @@ export const handleDownloadInvoicePdf = async (c: Context) => {
 			invoiceId: invoiceId?.substring(0, 8) + "...",
 		});
 
-		if (!invoiceId) {
-			authLogger.error(handlerName, "Missing invoice ID parameter");
-			const errorResponse: ErrorResponse = {
-				code: "MISSING_INVOICE_ID",
-				message: "Invoice ID is required",
-			};
-			return c.json(errorResponse, 400);
-		}
-
 		// Get authenticated user from context (set by authMiddleware)
 		const user = getUser(c);
 		const userId = user.id;

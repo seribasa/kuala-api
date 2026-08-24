@@ -11,24 +11,13 @@ export const handleRefreshToken = async (c: Context) => {
 	authLogger.start(handlerName);
 
 	try {
-		// Parse request body
-		const body = await c.req.json();
-		const { refresh_token } = body;
+		// Extract required body parameters
+		const { refresh_token } = await c.req.json();
 
 		authLogger.validation(handlerName, "request body", {
 			hasRefreshToken: !!refresh_token,
 			refreshTokenLength: refresh_token?.length || 0,
 		});
-
-		// Validate required parameters
-		if (!refresh_token) {
-			authLogger.error(handlerName, "Missing refresh_token");
-			const errorResponse: ErrorResponse = {
-				code: "MISSING_REFRESH_TOKEN",
-				message: "refresh_token is required",
-			};
-			return c.json(errorResponse, 400);
-		}
 
 		// Build the Supabase token refresh URL
 		const supabaseBaseUrl = Deno.env.get("AUTH_BASE_URL") || c.req.url;

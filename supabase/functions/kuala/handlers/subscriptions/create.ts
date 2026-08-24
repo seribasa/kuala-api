@@ -18,22 +18,12 @@ export async function handleCreateSubscription(c: Context) {
 		const user = getUser(c);
 
 		// 2. Parse and validate request body
-		const body = await c.req.json() as CreateSubscriptionRequest;
-		const { planId } = body;
+		const { planId } = await c.req.json();
 
 		logger.info(handlerName, "Request validated", {
 			userId: user.id,
 			planId,
 		});
-
-		if (!planId) {
-			logger.error(handlerName, "Missing planId");
-			const errorResponse: ErrorResponse = {
-				code: "MISSING_PLAN_ID",
-				message: "planId is required",
-			};
-			return c.json(errorResponse, 400);
-		}
 
 		// 3. Get or create Kill Bill account
 		const accountResponse = await killBillService.getOrCreateAccount(

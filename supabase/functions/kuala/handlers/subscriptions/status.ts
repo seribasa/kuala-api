@@ -223,15 +223,6 @@ export async function handleGetSubscriptionStatus(c: Context) {
 		// Get correlation ID from URL params
 		const correlationId = c.req.param("correlationId");
 
-		if (!correlationId) {
-			logger.error(handlerName, "Missing correlation ID in request");
-			const errorResponse: ErrorResponse = {
-				code: "MISSING_CORRELATION_ID",
-				message: "Correlation ID is required",
-			};
-			return c.json(errorResponse, 400);
-		}
-
 		logger.info(handlerName, "Getting subscription status", {
 			correlationId,
 			userId: user.id,
