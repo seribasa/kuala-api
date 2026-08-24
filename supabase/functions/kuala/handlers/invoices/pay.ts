@@ -95,7 +95,6 @@ export const handlePayInvoice = async (c: Context) => {
 		}
 
 		const bayeuUrl = Deno.env.get("BAYEU_API_URL");
-		const webhookUrl = Deno.env.get("KUALA_WEBHOOK_URL");
 
 		if (!bayeuUrl) {
 			logger.error(handlerName, "BAYEU_API_URL is not configured");
@@ -116,10 +115,15 @@ export const handlePayInvoice = async (c: Context) => {
 			return c.json(err, 500);
 		}
 		let backUrlBody: string | undefined;
+		let successUrlBody: string | undefined;
+		let failedUrlBody: string | undefined;
 		try {
 			const body = await c.req.json();
-			if (body && typeof body === "object" && "back_url" in body) {
-				backUrlBody = body.back_url as string;
+			if (body && typeof body === "object") {
+				const payload = body as Record<string, unknown>;
+				backUrlBody = payload.back_url as string | undefined;
+				successUrlBody = payload.success_url as string | undefined;
+				failedUrlBody = payload.failed_url as string | undefined;
 			}
 		} catch (e) {
 			// Ignore if body is empty or not valid JSON
@@ -128,10 +132,26 @@ export const handlePayInvoice = async (c: Context) => {
 		let backUrl = typeof c.req.query === "function"
 			? c.req.query("back_url")
 			: undefined;
+		let successUrl = typeof c.req.query === "function"
+			? c.req.query("success_url")
+			: undefined;
+		let failedUrl = typeof c.req.query === "function"
+			? c.req.query("failed_url")
+			: undefined;
 		if (
 			!backUrl && backUrlBody && typeof backUrlBody === "string"
 		) {
 			backUrl = backUrlBody;
+		}
+		if (
+			!successUrl && successUrlBody && typeof successUrlBody === "string"
+		) {
+			successUrl = successUrlBody;
+		}
+		if (
+			!failedUrl && failedUrlBody && typeof failedUrlBody === "string"
+		) {
+			failedUrl = failedUrlBody;
 		}
 
 		logger.info(
@@ -152,6 +172,8 @@ export const handlePayInvoice = async (c: Context) => {
 				user_id: user?.id,
 				tenant_id: "kuala-api",
 				back_url: backUrl || undefined,
+				success_url: successUrl || undefined,
+				failed_url: failedUrl || undefined,
 				metadata: {
 					invoice_id: invoiceId,
 				},
