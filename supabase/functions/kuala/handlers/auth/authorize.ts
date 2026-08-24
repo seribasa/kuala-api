@@ -22,51 +22,17 @@ export const handleAuthorize = async (c: Context) => {
 			codeChallengeLength: codeChallenge?.length || 0,
 		});
 
-		// Validate required parameters
-		if (!redirectTo) {
-			authLogger.error(handlerName, "Missing redirect_to parameter");
-			const errorResponse: ErrorResponse = {
-				code: "MISSING_REDIRECT_TO",
-				message: "redirect_to parameter is required",
-			};
-			return c.json(errorResponse, 400);
-		}
-
-		if (!codeChallenge) {
-			authLogger.error(handlerName, "Missing code_challenge parameter");
-			const errorResponse: ErrorResponse = {
-				code: "MISSING_CODE_CHALLENGE",
-				message: "code_challenge parameter is required",
-			};
-			return c.json(errorResponse, 400);
-		}
-
-		// Validate redirect_to is a valid URL
-		try {
-			new URL(redirectTo);
-			authLogger.validation(handlerName, "redirect_to URL validation", {
-				redirectTo,
-				isValid: true,
-			});
-		} catch {
-			authLogger.error(handlerName, "Invalid redirect_to URL", {
-				redirectTo,
-			});
-			const errorResponse: ErrorResponse = {
-				code: "INVALID_REDIRECT_TO",
-				message: "redirect_to must be a valid URL",
-			};
-			return c.json(errorResponse, 400);
-		}
-
 		// Build the Supabase OAuth authorization URL
 		const supabaseBaseUrl = Deno.env.get("AUTH_BASE_URL") || c.req.url;
 		const supabaseAuthUrl = new URL("/auth/v1/authorize", supabaseBaseUrl);
 		supabaseAuthUrl.searchParams.set("provider", "keycloak");
 		supabaseAuthUrl.searchParams.set("scopes", "openid");
-		supabaseAuthUrl.searchParams.set("redirect_to", redirectTo);
+		supabaseAuthUrl.searchParams.set("redirect_to", redirectTo as string);
 		supabaseAuthUrl.searchParams.set("flow_type", "pkce");
-		supabaseAuthUrl.searchParams.set("code_challenge", codeChallenge);
+		supabaseAuthUrl.searchParams.set(
+			"code_challenge",
+			codeChallenge as string,
+		);
 		supabaseAuthUrl.searchParams.set("code_challenge_method", "s256");
 
 		authLogger.apiCall(handlerName, "URL construction", {

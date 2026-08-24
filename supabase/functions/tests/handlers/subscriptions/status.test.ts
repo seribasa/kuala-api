@@ -38,19 +38,6 @@ function createMockContext(
 
 // ─────────────────────────── Validation Tests ───────────────────────────
 
-Deno.test("handleGetSubscriptionStatus - should return 400 when correlationId is missing", async () => {
-	const mockUser = { id: "user123", email: "test@example.com" };
-	const mockContext = createMockContext("", mockUser);
-
-	const response = await handleGetSubscriptionStatus(
-		mockContext,
-	) as unknown as JsonResponse;
-
-	assertEquals(response.status, 400);
-	assertEquals(response.data.code, "MISSING_CORRELATION_ID");
-	assertEquals(response.data.message, "Correlation ID is required");
-});
-
 Deno.test("handleGetSubscriptionStatus - should return 500 when user is not authenticated", async () => {
 	const mockContext = createMockContext("corr-123");
 

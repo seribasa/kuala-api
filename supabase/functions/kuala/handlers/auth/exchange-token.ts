@@ -11,28 +11,8 @@ export const handleExchangeToken = async (c: Context) => {
 	authLogger.start(handlerName);
 
 	try {
-		// Parse request body
-		const body = await c.req.json();
-		const { auth_code, code_verifier } = body;
-
-		// Validate required parameters
-		if (!auth_code) {
-			authLogger.error(handlerName, "Missing authorization code");
-			const errorResponse: ErrorResponse = {
-				code: "MISSING_AUTH_CODE",
-				message: "auth_code is required",
-			};
-			return c.json(errorResponse, 400);
-		}
-
-		if (!code_verifier) {
-			authLogger.error(handlerName, "Missing code verifier");
-			const errorResponse: ErrorResponse = {
-				code: "MISSING_CODE_VERIFIER",
-				message: "code_verifier is required",
-			};
-			return c.json(errorResponse, 400);
-		}
+		// Extract required body parameters
+		const { auth_code, code_verifier } = await c.req.json();
 
 		// Build the Supabase token exchange URL
 		const supabaseBaseUrl = Deno.env.get("AUTH_BASE_URL") || c.req.url;

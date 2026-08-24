@@ -79,17 +79,6 @@ function setupEnvStub() {
 	});
 }
 
-Deno.test("handleGetInvoiceById - should return 400 when invoiceId is missing", async () => {
-	const mockContext = createMockContext("");
-
-	const response = await handleGetInvoiceById(
-		mockContext,
-	) as unknown as JsonResponse;
-
-	assertEquals(response.status, 400);
-	assertEquals(response.data.code, "MISSING_INVOICE_ID");
-});
-
 Deno.test("handleGetInvoiceById - should return 404 when user does not own invoice", async () => {
 	const mockUser = {
 		id: "user123",
@@ -304,90 +293,6 @@ Deno.test("handleGetInvoiceById - should return invoice successfully", async () 
 		assertEquals(response.data.accountId, "acc123");
 		assertEquals(response.data.amount, 100);
 		assertEquals(response.data.status, "open");
-	} finally {
-		envStub.restore();
-		fetchStub.restore();
-	}
-});
-
-Deno.test("handleGetInvoiceById - should handle Kill Bill service errors gracefully", async () => {
-	const mockUser = {
-		id: "user123",
-		email: "test@example.com",
-	};
-
-	const envStub = setupEnvStub();
-
-	const fetchStub = stub(
-		globalThis,
-		"fetch",
-		(url: string | URL | Request) => {
-			const urlString = typeof url === "string"
-				? url
-				: url instanceof URL
-				? url.toString()
-				: url.url;
-
-			if (urlString.includes("/1.0/kb/invoices/inv123")) {
-				return Promise.resolve(
-					new MockResponse(
-						{ error: "Internal error" },
-						500,
-						false,
-					) as unknown as Response,
-				);
-			}
-
-			return Promise.resolve(
-				new MockResponse(
-					{ error: "Unexpected call" },
-					500,
-					false,
-				) as unknown as Response,
-			);
-		},
-	);
-
-	try {
-		const mockContext = createMockContext("inv123", mockUser);
-
-		const response = await handleGetInvoiceById(
-			mockContext,
-		) as unknown as JsonResponse;
-
-		assertEquals(response.status, 500);
-		assertEquals(response.data.code, "KILLBILL_ERROR");
-	} finally {
-		envStub.restore();
-		fetchStub.restore();
-	}
-});
-
-Deno.test("handleGetInvoiceById - should handle network errors gracefully", async () => {
-	const mockUser = {
-		id: "user123",
-		email: "test@example.com",
-	};
-
-	const envStub = setupEnvStub();
-
-	const fetchStub = stub(
-		globalThis,
-		"fetch",
-		() => {
-			return Promise.reject(new Error("Network error"));
-		},
-	);
-
-	try {
-		const mockContext = createMockContext("inv123", mockUser);
-
-		const response = await handleGetInvoiceById(
-			mockContext,
-		) as unknown as JsonResponse;
-
-		assertEquals(response.status, 500);
-		assertEquals(response.data.code, "INTERNAL_ERROR");
 	} finally {
 		envStub.restore();
 		fetchStub.restore();

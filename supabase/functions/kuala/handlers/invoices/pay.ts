@@ -29,14 +29,7 @@ export const handlePayInvoice = async (c: Context) => {
 			return c.json(err, 401);
 		}
 
-		const invoiceId = c.req.param("id");
-		if (!invoiceId) {
-			const err: ErrorResponse = {
-				code: "BAD_REQUEST",
-				message: "Invoice ID is required",
-			};
-			return c.json(err, 400);
-		}
+		const invoiceId = c.req.param("id") as string;
 
 		const gateway = Deno.env.get("PAYMENT_GATEWAY");
 		if (!gateway) {
@@ -129,15 +122,9 @@ export const handlePayInvoice = async (c: Context) => {
 			// Ignore if body is empty or not valid JSON
 		}
 
-		let backUrl = typeof c.req.query === "function"
-			? c.req.query("back_url")
-			: undefined;
-		let successUrl = typeof c.req.query === "function"
-			? c.req.query("success_url")
-			: undefined;
-		let failedUrl = typeof c.req.query === "function"
-			? c.req.query("failed_url")
-			: undefined;
+		let backUrl = c.req.query("back_url");
+		let successUrl = c.req.query("success_url");
+		let failedUrl = c.req.query("failed_url");
 		if (
 			!backUrl && backUrlBody && typeof backUrlBody === "string"
 		) {

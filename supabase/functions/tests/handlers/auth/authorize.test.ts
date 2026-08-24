@@ -38,49 +38,6 @@ function createMockContext(
 	} as unknown as Context;
 }
 
-Deno.test("handleAuthorize - should return 400 when redirect_to is missing", async () => {
-	const mockContext = createMockContext({
-		code_challenge: "test_challenge",
-	});
-
-	const response = await handleAuthorize(
-		mockContext,
-	) as unknown as JsonResponse;
-
-	assertEquals(response.status, 400);
-	assertEquals(response.data.code, "MISSING_REDIRECT_TO");
-	assertEquals(response.data.message, "redirect_to parameter is required");
-});
-
-Deno.test("handleAuthorize - should return 400 when code_challenge is missing", async () => {
-	const mockContext = createMockContext({
-		redirect_to: "https://example.com/callback",
-	});
-
-	const response = await handleAuthorize(
-		mockContext,
-	) as unknown as JsonResponse;
-
-	assertEquals(response.status, 400);
-	assertEquals(response.data.code, "MISSING_CODE_CHALLENGE");
-	assertEquals(response.data.message, "code_challenge parameter is required");
-});
-
-Deno.test("handleAuthorize - should return 400 when redirect_to is invalid URL", async () => {
-	const mockContext = createMockContext({
-		redirect_to: "invalid-url",
-		code_challenge: "test_challenge",
-	});
-
-	const response = await handleAuthorize(
-		mockContext,
-	) as unknown as JsonResponse;
-
-	assertEquals(response.status, 400);
-	assertEquals(response.data.code, "INVALID_REDIRECT_TO");
-	assertEquals(response.data.message, "redirect_to must be a valid URL");
-});
-
 Deno.test("handleAuthorize - should redirect with correct parameters when all inputs are valid", async () => {
 	// Mock environment variable
 	const envStub = stub(Deno.env, "get", (key: string) => {
@@ -121,41 +78,6 @@ Deno.test("handleAuthorize - should redirect with correct parameters when all in
 	} finally {
 		envStub.restore();
 		fetchStub.restore();
-	}
-});
-
-Deno.test("handleAuthorize - should handle URL constructor error gracefully", async () => {
-	// Create a stub that makes URL constructor throw
-	const originalURL = globalThis.URL;
-	let constructorCallCount = 0;
-
-	globalThis.URL = class extends URL {
-		constructor(url: string | URL, base?: string | URL) {
-			constructorCallCount++;
-			if (constructorCallCount === 1) {
-				// First call is for validation - throw error
-				throw new Error("Invalid URL");
-			}
-			// Second call is for building supabase URL - allow it
-			super(url, base);
-		}
-	} as typeof URL;
-
-	try {
-		const mockContext = createMockContext({
-			redirect_to: "https://example.com/callback",
-			code_challenge: "test_challenge",
-		});
-
-		const response = await handleAuthorize(
-			mockContext,
-		) as unknown as JsonResponse;
-
-		assertEquals(response.status, 400);
-		assertEquals(response.data.code, "INVALID_REDIRECT_TO");
-		assertEquals(response.data.message, "redirect_to must be a valid URL");
-	} finally {
-		globalThis.URL = originalURL;
 	}
 });
 

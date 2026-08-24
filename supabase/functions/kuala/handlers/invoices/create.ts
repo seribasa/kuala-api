@@ -25,26 +25,8 @@ export const handleCreateInvoice = async (c: Context) => {
 			hasAuthorization: !!authorization,
 		});
 
-		// Parse body
-		let body: CreateInvoiceRequest;
-		try {
-			body = await c.req.json<CreateInvoiceRequest>();
-		} catch (_) {
-			const errorResponse: ErrorResponse = {
-				code: "INVALID_REQUEST",
-				message: "Invalid JSON body",
-			};
-			return c.json(errorResponse, 400);
-		}
-
-		if (!body.accountId) {
-			authLogger.error(handlerName, "Missing accountId parameter");
-			const errorResponse: ErrorResponse = {
-				code: "MISSING_ACCOUNT_ID",
-				message: "accountId is required",
-			};
-			return c.json(errorResponse, 400);
-		}
+		// Parse body from validated request
+		const body = await c.req.json();
 
 		// Get authenticated user from context (set by authMiddleware)
 		const user = getUser(c);

@@ -17,12 +17,9 @@ export const handleListInvoices = async (c: Context) => {
 		// Get Authorization header
 		const authorization = c.req.header("Authorization");
 
-		const offsetParam = c.req.query("offset");
-		const limitParam = c.req.query("limit");
+		const offset = parseInt(c.req.query("offset") || "0", 10);
+		const limit = parseInt(c.req.query("limit") || "100", 10);
 		const searchKey = c.req.query("searchKey");
-
-		const offset = offsetParam ? parseInt(offsetParam, 10) : 0;
-		const limit = limitParam ? parseInt(limitParam, 10) : 100;
 
 		authLogger.validation(handlerName, "Request validation", {
 			hasAuthorization: !!authorization,
