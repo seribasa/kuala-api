@@ -1,3 +1,4 @@
+import { config } from "../../../_shared/config/env.ts";
 import { Context } from "@hono/hono";
 import { ErrorResponse } from "../../../_shared/types/response.ts";
 import { authLogger } from "../../middleware/logger.ts";
@@ -15,7 +16,7 @@ export const handleExchangeToken = async (c: Context) => {
 		const { auth_code, code_verifier } = await c.req.json();
 
 		// Build the Supabase token exchange URL
-		const supabaseBaseUrl = Deno.env.get("AUTH_BASE_URL") || c.req.url;
+		const supabaseBaseUrl = config.AUTH_BASE_URL || c.req.url;
 		const supabaseTokenUrl = new URL("/auth/v1/token", supabaseBaseUrl);
 		supabaseTokenUrl.searchParams.set("grant_type", "pkce");
 
@@ -38,7 +39,7 @@ export const handleExchangeToken = async (c: Context) => {
 		});
 
 		// Get apikey from environment or request
-		const apikey = Deno.env.get("AUTH_SUPABASE_ANON_KEY");
+		const apikey = config.AUTH_SUPABASE_ANON_KEY;
 		if (!apikey) {
 			authLogger.error(handlerName, "Missing AUTH_SUPABASE_ANON_KEY");
 			const errorResponse: ErrorResponse = {

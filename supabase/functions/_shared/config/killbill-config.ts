@@ -1,3 +1,4 @@
+import { config } from "../../_shared/config/env.ts";
 type KillBillConfig = {
 	baseUrl: string;
 	apiKey: string;
@@ -9,12 +10,12 @@ type KillBillConfig = {
 
 function killBillConfig(): KillBillConfig {
 	return {
-		baseUrl: Deno.env.get("KILLBILL_BASE_URL") || "",
-		apiKey: Deno.env.get("KILLBILL_API_KEY") || "",
-		apiSecret: Deno.env.get("KILLBILL_API_SECRET") || "",
-		username: Deno.env.get("KILLBILL_USERNAME") || "",
-		password: Deno.env.get("KILLBILL_PASSWORD") || "",
-		defaultCurrency: Deno.env.get("KILLBILL_DEFAULT_CURRENCY") || "",
+		baseUrl: config.KILLBILL_BASE_URL,
+		apiKey: config.KILLBILL_API_KEY,
+		apiSecret: config.KILLBILL_API_SECRET,
+		username: config.KILLBILL_USERNAME,
+		password: config.KILLBILL_PASSWORD,
+		defaultCurrency: config.KILLBILL_DEFAULT_CURRENCY,
 	};
 }
 

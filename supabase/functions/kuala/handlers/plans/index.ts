@@ -1,3 +1,4 @@
+import { config } from "../../../_shared/config/env.ts";
 import { Context } from "@hono/hono";
 import { ErrorResponse } from "../../../_shared/types/response.ts";
 import {
@@ -24,19 +25,19 @@ type EnterpriseContactConfig = {
 
 function getKillBillConfig(): KillBillConfig {
 	return {
-		baseUrl: Deno.env.get("KILLBILL_BASE_URL") || "",
-		apiKey: Deno.env.get("KILLBILL_API_KEY") || "",
-		apiSecret: Deno.env.get("KILLBILL_API_SECRET") || "",
-		username: Deno.env.get("KILLBILL_USERNAME") || "",
-		password: Deno.env.get("KILLBILL_PASSWORD") || "",
+		baseUrl: config.KILLBILL_BASE_URL,
+		apiKey: config.KILLBILL_API_KEY,
+		apiSecret: config.KILLBILL_API_SECRET,
+		username: config.KILLBILL_USERNAME,
+		password: config.KILLBILL_PASSWORD,
 	};
 }
 
 function getEnterpriseContactConfig(): EnterpriseContactConfig {
 	return {
-		email: Deno.env.get("ENTERPRISE_CONTACT_EMAIL") || "",
-		phone: Deno.env.get("ENTERPRISE_CONTACT_PHONE") || "",
-		body: Deno.env.get("ENTERPRISE_CONTACT_MESSAGE") || "",
+		email: config.ENTERPRISE_CONTACT_EMAIL,
+		phone: config.ENTERPRISE_CONTACT_PHONE,
+		body: config.ENTERPRISE_CONTACT_MESSAGE,
 	};
 }
 

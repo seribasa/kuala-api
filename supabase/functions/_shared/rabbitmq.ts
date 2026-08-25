@@ -1,3 +1,4 @@
+import { config as envConfig } from "./config/env.ts";
 // RabbitMQ Connection and Event Handling for Supabase Edge Functions
 import { Connection } from "rabbitmq-client";
 import { DomainEvent } from "./types/events.ts";
@@ -53,7 +54,7 @@ interface RabbitMQConfig {
 
 // For development, you might use CloudAMQP or a local RabbitMQ instance
 // For production, consider using RabbitMQ on Railway, Render, or AWS
-const rabbitmqUrl = Deno.env.get("RABBITMQ_URL");
+const rabbitmqUrl = envConfig.RABBITMQ_URL;
 if (!rabbitmqUrl) {
 	throw new Error("RABBITMQ_URL not set");
 }

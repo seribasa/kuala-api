@@ -1,7 +1,8 @@
+import { config } from "../../_shared/config/env.ts";
 import { createClient, SupabaseClient } from "@supabase/supabase-js";
 
-const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
-const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+const supabaseUrl = config.SUPABASE_URL!;
+const supabaseServiceKey = config.SUPABASE_SERVICE_ROLE_KEY!;
 
 export interface StateTransition {
 	id: string;

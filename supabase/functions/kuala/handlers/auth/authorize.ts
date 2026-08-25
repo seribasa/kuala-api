@@ -1,3 +1,4 @@
+import { config } from "../../../_shared/config/env.ts";
 import { Context } from "@hono/hono";
 import { ErrorResponse } from "../../../_shared/types/response.ts";
 import { authLogger } from "../../middleware/logger.ts";
@@ -23,7 +24,7 @@ export const handleAuthorize = async (c: Context) => {
 		});
 
 		// Build the Supabase OAuth authorization URL
-		const supabaseBaseUrl = Deno.env.get("AUTH_BASE_URL") || c.req.url;
+		const supabaseBaseUrl = config.AUTH_BASE_URL || c.req.url;
 		const supabaseAuthUrl = new URL("/auth/v1/authorize", supabaseBaseUrl);
 		supabaseAuthUrl.searchParams.set("provider", "keycloak");
 		supabaseAuthUrl.searchParams.set("scopes", "openid");

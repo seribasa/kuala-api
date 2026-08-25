@@ -1,3 +1,4 @@
+import { config } from "../../_shared/config/env.ts";
 import {
 	CurrentEntityState,
 	stateManager,
@@ -6,8 +7,8 @@ import {
 } from "./state-management.ts";
 import { createClient, SupabaseClient } from "@supabase/supabase-js";
 
-const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
-const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+const supabaseUrl = config.SUPABASE_URL!;
+const supabaseServiceKey = config.SUPABASE_SERVICE_ROLE_KEY!;
 
 // Create Supabase client for lock operations
 const supabase: SupabaseClient = createClient(supabaseUrl, supabaseServiceKey);
