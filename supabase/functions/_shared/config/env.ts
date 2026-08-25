@@ -31,29 +31,40 @@ const envSchema = z.object({
 
 type EnvConfig = z.infer<typeof envSchema>;
 
-function loadConfig(): EnvConfig {
-	const env = typeof Deno !== "undefined" ? Deno.env.toObject() : {};
-	const result = envSchema.safeParse(env);
-	if (!result.success) {
-		console.error(
-			"❌ Invalid environment configuration:",
-			z.treeifyError(result.error),
-		);
-		throw new Error("Invalid config");
-	}
-	return result.data;
+const baseConfig = typeof Deno !== "undefined" ? Deno.env.toObject() : {};
+const parsed = envSchema.safeParse(baseConfig);
+if (!parsed.success) {
+	console.error(
+		"❌ Invalid environment configuration:",
+		parsed.error.format(),
+	);
 }
+const fallbackConfig = parsed.success ? parsed.data : {} as EnvConfig;
 
-export const initialConfig = loadConfig();
-export const config = { ...initialConfig };
+export const config = new Proxy(fallbackConfig, {
+	get(target, prop) {
+		if (typeof prop === "string" && prop in envSchema.shape) {
+			const shapeProp = prop as keyof typeof envSchema.shape;
+			if (typeof Deno !== "undefined") {
+				try {
+					const dynamicVal = Deno.env.get(prop);
+					return envSchema.shape[shapeProp].parse(dynamicVal);
+				} catch (e) {
+					// Fallback if parsing fails (e.g. invalid URL)
+					return target[shapeProp as keyof typeof target];
+				}
+			}
+		}
+		return target[prop as keyof typeof target];
+	},
+}) as EnvConfig;
 
 export function overrideConfig(overrides: Partial<EnvConfig>) {
-	Object.assign(config, overrides);
+	Object.assign(fallbackConfig, overrides);
 }
 
 export function resetConfig() {
-	for (const key of Object.keys(config) as (keyof EnvConfig)[]) {
-		// @ts-ignore dynamic
-		config[key] = initialConfig[key];
+	if (parsed.success) {
+		Object.assign(fallbackConfig, parsed.data);
 	}
 }
