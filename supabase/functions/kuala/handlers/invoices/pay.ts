@@ -111,16 +111,14 @@ export const handlePayInvoice = async (c: Context) => {
 		let backUrlBody: string | undefined;
 		let successUrlBody: string | undefined;
 		let failedUrlBody: string | undefined;
-		try {
-			const body = await c.req.json();
-			if (body && typeof body === "object") {
-				const payload = body as Record<string, unknown>;
-				backUrlBody = payload.back_url as string | undefined;
-				successUrlBody = payload.success_url as string | undefined;
-				failedUrlBody = payload.failed_url as string | undefined;
-			}
-		} catch (e) {
-			// Ignore if body is empty or not valid JSON
+		// Read the safely validated JSON body from our middleware
+		const payload = c.req.valid("json" as never) as
+			| Record<string, unknown>
+			| undefined;
+		if (payload && typeof payload === "object") {
+			backUrlBody = payload.back_url as string | undefined;
+			successUrlBody = payload.success_url as string | undefined;
+			failedUrlBody = payload.failed_url as string | undefined;
 		}
 
 		let backUrl = c.req.query("back_url");
