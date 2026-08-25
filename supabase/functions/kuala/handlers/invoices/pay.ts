@@ -1,3 +1,4 @@
+import { config } from "../../../_shared/config/env.ts";
 import { Context } from "@hono/hono";
 import { ErrorResponse } from "../../../_shared/types/response.ts";
 import { logger } from "../../middleware/logger.ts";
@@ -31,7 +32,7 @@ export const handlePayInvoice = async (c: Context) => {
 
 		const invoiceId = c.req.param("id") as string;
 
-		const gateway = Deno.env.get("PAYMENT_GATEWAY");
+		const gateway = config.PAYMENT_GATEWAY;
 		if (!gateway) {
 			logger.error(handlerName, "PAYMENT_GATEWAY is not configured");
 			const err: ErrorResponse = {
@@ -87,7 +88,7 @@ export const handlePayInvoice = async (c: Context) => {
 			return c.json(err, 400);
 		}
 
-		const bayeuUrl = Deno.env.get("BAYEU_API_URL");
+		const bayeuUrl = config.BAYEU_API_URL;
 
 		if (!bayeuUrl) {
 			logger.error(handlerName, "BAYEU_API_URL is not configured");
@@ -98,7 +99,7 @@ export const handlePayInvoice = async (c: Context) => {
 			return c.json(err, 500);
 		}
 
-		const bayeuAnonKey = Deno.env.get("BAYEU_ANON_KEY");
+		const bayeuAnonKey = config.BAYEU_ANON_KEY;
 		if (!bayeuAnonKey) {
 			logger.error(handlerName, "BAYEU_ANON_KEY is not configured");
 			const err: ErrorResponse = {
