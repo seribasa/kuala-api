@@ -1085,6 +1085,20 @@ paths:
                       type: string
                       format: uri
                   description: Optional URL to redirect back for back button in payment gateway 
+                - in: query
+                  name: success_url
+                  required: false
+                  schema:
+                      type: string
+                      format: uri
+                  description: Optional URL to redirect after successful payment
+                - in: query
+                  name: failed_url
+                  required: false
+                  schema:
+                      type: string
+                      format: uri
+                  description: Optional URL to redirect after failed payment
             responses:
                 "200":
                     description: Payment initiated successfully (fallback if no redirect URL)
