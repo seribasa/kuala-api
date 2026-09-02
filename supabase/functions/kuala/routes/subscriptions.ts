@@ -32,10 +32,10 @@ subscriptionRoutes.post(
 
 // "/subscriptions/event-driven" redirect to"/subscriptions/v2"
 subscriptionRoutes.post(
-	"/event-driven", 
+	"/event-driven",
 	validateJson(createSubscriptionSchema),
 	handleCreateEventDrivenSubscription,
-)
+);
 
 subscriptionRoutes.get("/", handleGetSubscription);
 
