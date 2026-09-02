@@ -1526,41 +1526,95 @@ components:
         Invoice:
             type: object
             properties:
-                id: { type: string }
-                number: { type: string }
-                userId: { type: string }
-                subscriptionId: { type: string }
+                invoiceId: { type: string, description: "UUID for the invoice" }
+                accountId: { type: string, description: "UUID for the account" }
+                amount: { type: number, description: "Sum of all item amounts" }
+                currency: { type: string, description: "Currency associated with the account" }
                 status:
                     type: string
-                    enum: [draft, open, paid, void, uncollectible]
-                currency: { type: string }
-                amount: { type: number }
-                balance: { type: number }
+                    description: "Status of the invoice"
+                creditAdj: { type: number, description: "Invoice credit (amount that we owe to the customer)" }
+                refundAdj: { type: number, description: "Refund amount associated with an invoice" }
+                invoiceDate: { type: string, format: date, description: "Date when this invoice was generated" }
+                targetDate: { type: string, format: date, description: "Date up to which the account has been invoiced" }
+                invoiceNumber: { type: string, description: "Invoice number" }
+                balance: { type: number, description: "Invoice balance (amount that a customer owes as part of an invoice)" }
+                bundleKeys:
+                    type: array
+                    items: { type: string }
+                    nullable: true
+                credits:
+                    type: array
+                    items: { type: object }
+                    nullable: true
                 items:
                     type: array
                     items: { $ref: "#/components/schemas/InvoiceItem" }
-                createdAt: { type: string, format: date-time }
-                dueDate: { type: string, format: date-time }
+                trackingIds:
+                    type: array
+                    items: { type: string }
+                isParentInvoice: { type: boolean }
+                parentInvoiceId: { type: string, nullable: true }
+                parentAccountId: { type: string, nullable: true }
+                auditLogs:
+                    type: array
+                    items: { type: object }
             required:
                 [
-                    id,
-                    userId,
-                    status,
-                    currency,
+                    invoiceId,
+                    accountId,
                     amount,
+                    currency,
+                    status,
+                    invoiceDate,
                     balance,
-                    items,
-                    createdAt,
+                    items
                 ]
 
         InvoiceItem:
             type: object
             properties:
-                description: { type: string }
-                quantity: { type: number, default: 1 }
-                unitAmount: { type: number }
-                amount: { type: number }
-            required: [description, amount]
+                invoiceItemId: { type: string }
+                invoiceId: { type: string }
+                linkedInvoiceItemId: { type: string, nullable: true }
+                accountId: { type: string }
+                childAccountId: { type: string, nullable: true }
+                bundleId: { type: string, nullable: true }
+                subscriptionId: { type: string, nullable: true }
+                productName: { type: string, nullable: true }
+                planName: { type: string, nullable: true }
+                phaseName: { type: string, nullable: true }
+                usageName: { type: string, nullable: true }
+                prettyProductName: { type: string, nullable: true }
+                prettyPlanName: { type: string, nullable: true }
+                prettyPhaseName: { type: string, nullable: true }
+                prettyUsageName: { type: string, nullable: true }
+                itemType:
+                    type: string
+                    enum: [EXTERNAL_CHARGE, FIXED, RECURRING, REPAIR_ADJ, CBA_ADJ, ITEM_ADJ, USAGE, TAX, PARENT_SUMMARY]
+                description: { type: string, nullable: true }
+                startDate: { type: string, format: date, nullable: true }
+                endDate: { type: string, format: date, nullable: true }
+                amount: { type: number, nullable: true }
+                rate: { type: number, nullable: true }
+                currency: { type: string, nullable: true }
+                quantity: { type: number, nullable: true }
+                itemDetails: { type: string, nullable: true }
+                catalogEffectiveDate: { type: string, format: date-time, nullable: true }
+                childItems:
+                    type: array
+                    items: { type: object }
+                    nullable: true
+                auditLogs:
+                    type: array
+                    items: { type: object }
+            required:
+                [
+                    invoiceItemId,
+                    invoiceId,
+                    accountId,
+                    itemType
+                ]
 
         InitiatePaymentResponse:
             type: object
@@ -1754,10 +1808,19 @@ components:
                 bundleId: { type: string }
                 accountId: { type: string }
                 userId: { type: string }
+                plan:
+                    allOf: [{ $ref: "#/components/schemas/Plan" }]
+                    nullable: true
                 planName: { type: string }
                 productName: { type: string }
+                productCategory: { type: string }
                 billingPeriod: { type: string }
+                phaseType: { type: string }
+                priceList: { type: string }
                 state: { type: string }
+                sourceType: { type: string }
+                startDate: { type: string, format: date-time }
+                cancelledDate: { type: string, format: date-time, nullable: true }
                 billingStartDate: { type: string, format: date-time }
                 billingEndDate: {
                     type: string,
@@ -1765,6 +1828,11 @@ components:
                     nullable: true,
                 }
                 chargedThroughDate: { type: string, format: date-time }
+                billCycleDayLocal: { type: integer, nullable: true }
+                quantity: { type: integer }
+                events:
+                    type: array
+                    items: { $ref: "#/components/schemas/SubscriptionEventItem" }
                 account:
                     $ref: "#/components/schemas/SubscriptionAccountInfo"
             required: [
@@ -1780,6 +1848,38 @@ components:
                 chargedThroughDate,
                 account,
             ]
+
+        SubscriptionEventItem:
+            type: object
+            properties:
+                eventId: { type: string }
+                billingPeriod: { type: string }
+                effectiveDate: { type: string, format: date-time }
+                catalogEffectiveDate: { type: string, format: date-time, nullable: true }
+                plan: { type: string }
+                product: { type: string }
+                priceList: { type: string }
+                phase: { type: string }
+                eventType: { type: string }
+                isBlockedBilling: { type: boolean }
+                isBlockedEntitlement: { type: boolean }
+                serviceName: { type: string }
+                serviceStateName: { type: string }
+            required:
+                [
+                    eventId,
+                    billingPeriod,
+                    effectiveDate,
+                    plan,
+                    product,
+                    priceList,
+                    phase,
+                    eventType,
+                    isBlockedBilling,
+                    isBlockedEntitlement,
+                    serviceName,
+                    serviceStateName,
+                ]
 
         SubscriptionAccountInfo:
             type: object
