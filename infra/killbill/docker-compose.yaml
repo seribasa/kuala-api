@@ -66,7 +66,7 @@ services:
             retries: 10
     init-tenant:
         container_name: init_tenant
-        image: curlimages/curl:8.20.0
+        image: curlimages/curl:8.22.0
         volumes:
             - ./init-tenant.sh:/scripts/init-tenant.sh:ro
         environment:
@@ -88,7 +88,7 @@ services:
         restart: "no"
     init-catalog:
         container_name: init_catalog
-        image: curlimages/curl:8.20.0
+        image: curlimages/curl:8.22.0
         volumes:
             - ./init-plans-catalog.sh:/scripts/init-plans-catalog.sh:ro
             - ./plans.xml:/scripts/plans.xml:ro
@@ -115,7 +115,7 @@ services:
         restart: "no"
     init-translations:
         container_name: init_translations
-        image: curlimages/curl:8.20.0
+        image: curlimages/curl:8.22.0
         volumes:
             - ./init-invoice-translations.sh:/scripts/init-invoice-translations.sh:ro
             - ./invoice-translation-en_US.properties:/scripts/invoice-translation-en_US.properties:ro
@@ -141,7 +141,7 @@ services:
         restart: "no"
     init-template:
         container_name: init_template
-        image: curlimages/curl:8.20.0
+        image: curlimages/curl:8.22.0
         volumes:
             - ./init-invoice-templates.sh:/scripts/init-invoice-templates.sh:ro
             - ./HtmlInvoiceTemplate.mustache:/scripts/HtmlInvoiceTemplate.mustache:ro
