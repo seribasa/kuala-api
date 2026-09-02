@@ -145,10 +145,47 @@ interface Subscription {
 // Kill Bill Account response
 interface KillBillAccount {
 	accountId: string;
-	name: string;
-	email: string;
 	externalKey: string;
+	referenceTime?: string;
+	parentAccountId?: string | null;
+	isPaymentDelegatedToParent?: boolean;
 	currency: string;
+	billCycleDayLocal?: number | null;
+	paymentMethodId?: string | null;
+	name: string;
+	firstNameLength?: number;
+	company?: string | null;
+	address1?: string | null;
+	address2?: string | null;
+	city?: string | null;
+	state?: string | null;
+	postalCode?: string | null;
+	country?: string | null;
+	locale?: string | null;
+	timeZone?: string;
+	phone?: string | null;
+	email: string;
+	notes?: string | null;
+	isMigrated?: boolean;
+	accountCBA?: number;
+	accountBalance?: number;
+	auditLogs?: unknown[];
+}
+
+interface KillBillSubscriptionEvent {
+	eventId: string;
+	billingPeriod: string;
+	effectiveDate: string;
+	catalogEffectiveDate?: string | null;
+	plan: string;
+	product: string;
+	priceList: string;
+	phase: string;
+	eventType: string;
+	isBlockedBilling: boolean;
+	isBlockedEntitlement: boolean;
+	serviceName: string;
+	serviceStateName: string;
 }
 
 // Kill Bill Subscription response
@@ -163,26 +200,16 @@ interface KillBillSubscription {
 	billingPeriod: string;
 	priceList: string;
 	planName: string;
+	phaseType?: string;
 	state: string;
 	sourceType: string;
 	cancelledDate: string | null;
 	chargedThroughDate: string;
 	billingStartDate: string;
 	billingEndDate: string;
-	events: Array<{
-		eventId: string;
-		billingPeriod: string;
-		effectiveDate: string;
-		plan: string;
-		product: string;
-		priceList: string;
-		eventType: string;
-		isBlockedBilling: boolean;
-		isBlockedEntitlement: boolean;
-		serviceName: string;
-		serviceStateName: string;
-		phase: string;
-	}>;
+	billCycleDayLocal?: number | null;
+	quantity?: number;
+	events: KillBillSubscriptionEvent[];
 	priceOverrides: unknown[];
 }
 
@@ -282,6 +309,7 @@ export type {
 	KillBillInvoiceItem,
 	KillBillPrice,
 	KillBillSubscription,
+	KillBillSubscriptionEvent,
 	Plan,
 	Price,
 	Subscription,
