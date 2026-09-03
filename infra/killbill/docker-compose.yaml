@@ -3,7 +3,7 @@ volumes:
 services:
     killbill:
         container_name: killbill-kuala
-        image: killbill/killbill:0.24.18
+        image: killbill/killbill:0.24.21
         ports:
             - "${KILLBILL_PORT}:8080"
         volumes:
