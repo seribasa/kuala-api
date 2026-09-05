@@ -1,6 +1,6 @@
 services:
     rabbitmq:
-        image: dhi.io/rabbitmq:4.2
+        image: dhi.io/rabbitmq:4.3
         hostname: rabbitmq
         ports:
             - "5672:5672" # AMQP

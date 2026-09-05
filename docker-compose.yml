@@ -15,7 +15,7 @@ services:
     # Management UI: http://localhost:15672 (guest/guest)
     # ============================================================================
     rabbitmq:
-        image: dhi.io/rabbitmq:4.2
+        image: dhi.io/rabbitmq:4.3
         container_name: rabbitmq
         hostname: rabbitmq
         ports:
