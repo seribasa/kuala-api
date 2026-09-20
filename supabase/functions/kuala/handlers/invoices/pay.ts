@@ -202,9 +202,17 @@ export const handlePayInvoice = async (c: Context) => {
 		if (bayeuData.is_successful && bayeuData.data?.redirect_url) {
 			logger.info(
 				handlerName,
-				`Successfully initiated payment for invoice ${invoiceId}, redirecting to ${bayeuData.data.redirect_url}`,
+				`Successfully initiated payment for invoice ${invoiceId}`,
 			);
-			return c.redirect(bayeuData.data.redirect_url, 302);
+			return c.json({
+				is_successful: true,
+				data: {
+					order_id: bayeuData.data.order_id,
+					gateway: bayeuData.data.gateway,
+					token: bayeuData.data.token,
+					redirect_url: bayeuData.data.redirect_url,
+				},
+			}, 200);
 		}
 
 		logger.info(

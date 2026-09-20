@@ -1101,19 +1101,11 @@ paths:
                   description: Optional URL to redirect after failed payment
             responses:
                 "200":
-                    description: Payment initiated successfully (fallback if no redirect URL)
+                    description: Payment initiated successfully
                     content:
                         application/json:
                             schema:
                                 $ref: "#/components/schemas/InitiatePaymentResponse"
-                "301":
-                    description: Redirect to the payment gateway frontend
-                    headers:
-                        Location:
-                            description: URL to redirect the user to complete payment
-                            schema:
-                                type: string
-                                format: uri
                 "402":
                     description: Payment required / failed
                     content:
@@ -1634,7 +1626,11 @@ components:
                         token:
                             type: string
                             description: Payment token or client secret
-                    required: [order_id, gateway, token]
+                        redirect_url:
+                            type: string
+                            format: uri
+                            description: URL to redirect the user to complete payment
+                    required: [order_id, gateway, token, redirect_url]
             required: [is_successful, data]
             
         Payment:
