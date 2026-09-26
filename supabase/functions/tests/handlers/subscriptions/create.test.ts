@@ -95,54 +95,6 @@ Deno.test("handleCreateSubscription - should return 401 when user authentication
 	assertEquals(response.data.code, "INTERNAL_ERROR");
 });
 
-Deno.test("handleCreateSubscription - should return 400 when planId is missing", async () => {
-	// Mock user response
-	const mockUser = {
-		id: "user123",
-		email: "test@example.com",
-	};
-
-	const mockContext = createMockContext(
-		"Bearer valid_token",
-		{ interval: "month" }, // Missing planId
-		undefined,
-		mockUser,
-	);
-
-	const response = await handleCreateSubscription(
-		mockContext,
-	) as unknown as JsonResponse;
-
-	assertEquals(response.status, 400);
-	assertEquals(response.data.code, "MISSING_PLAN_ID");
-});
-
-Deno.test("handleCreateSubscription - should return 400 when interval is invalid", async () => {
-	// Mock user response
-	const mockUser = {
-		id: "user123",
-		email: "test@example.com",
-	};
-
-	const mockContext = createMockContext(
-		"Bearer valid_token",
-		{ planId: "basic", interval: "weekly" }, // Invalid interval (not used anymore, but test remains for validation)
-		undefined,
-		mockUser,
-	);
-
-	const response = await handleCreateSubscription(
-		mockContext,
-	) as unknown as JsonResponse;
-
-	// This test should pass since we don't validate interval anymore - plan name includes interval
-	// The test will create subscription if all other conditions are met
-	assertEquals(
-		response.status !== 400 || response.data.code !== "INVALID_INTERVAL",
-		true,
-	);
-});
-
 Deno.test("handleCreateSubscription - should create subscription successfully", async () => {
 	// Mock user response
 	const mockUser = {

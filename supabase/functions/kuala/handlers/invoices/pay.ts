@@ -1,3 +1,4 @@
+import { config } from "../../../_shared/config/env.ts";
 import { Context } from "@hono/hono";
 import { ErrorResponse } from "../../../_shared/types/response.ts";
 import { logger } from "../../middleware/logger.ts";
@@ -29,16 +30,9 @@ export const handlePayInvoice = async (c: Context) => {
 			return c.json(err, 401);
 		}
 
-		const invoiceId = c.req.param("id");
-		if (!invoiceId) {
-			const err: ErrorResponse = {
-				code: "BAD_REQUEST",
-				message: "Invoice ID is required",
-			};
-			return c.json(err, 400);
-		}
+		const invoiceId = c.req.param("id") as string;
 
-		const gateway = Deno.env.get("PAYMENT_GATEWAY");
+		const gateway = config.PAYMENT_GATEWAY;
 		if (!gateway) {
 			logger.error(handlerName, "PAYMENT_GATEWAY is not configured");
 			const err: ErrorResponse = {
@@ -94,8 +88,7 @@ export const handlePayInvoice = async (c: Context) => {
 			return c.json(err, 400);
 		}
 
-		const bayeuUrl = Deno.env.get("BAYEU_API_URL");
-		const webhookUrl = Deno.env.get("KUALA_WEBHOOK_URL");
+		const bayeuUrl = config.BAYEU_API_URL;
 
 		if (!bayeuUrl) {
 			logger.error(handlerName, "BAYEU_API_URL is not configured");
@@ -106,7 +99,7 @@ export const handlePayInvoice = async (c: Context) => {
 			return c.json(err, 500);
 		}
 
-		const bayeuAnonKey = Deno.env.get("BAYEU_ANON_KEY");
+		const bayeuAnonKey = config.BAYEU_ANON_KEY;
 		if (!bayeuAnonKey) {
 			logger.error(handlerName, "BAYEU_ANON_KEY is not configured");
 			const err: ErrorResponse = {
@@ -116,22 +109,35 @@ export const handlePayInvoice = async (c: Context) => {
 			return c.json(err, 500);
 		}
 		let backUrlBody: string | undefined;
-		try {
-			const body = await c.req.json();
-			if (body && typeof body === "object" && "back_url" in body) {
-				backUrlBody = body.back_url as string;
-			}
-		} catch (e) {
-			// Ignore if body is empty or not valid JSON
+		let successUrlBody: string | undefined;
+		let failedUrlBody: string | undefined;
+		// Read the safely validated JSON body from our middleware
+		const payload = c.req.valid("json" as never) as
+			| Record<string, unknown>
+			| undefined;
+		if (payload && typeof payload === "object") {
+			backUrlBody = payload.back_url as string | undefined;
+			successUrlBody = payload.success_url as string | undefined;
+			failedUrlBody = payload.failed_url as string | undefined;
 		}
 
-		let backUrl = typeof c.req.query === "function"
-			? c.req.query("back_url")
-			: undefined;
+		let backUrl = c.req.query("back_url");
+		let successUrl = c.req.query("success_url");
+		let failedUrl = c.req.query("failed_url");
 		if (
 			!backUrl && backUrlBody && typeof backUrlBody === "string"
 		) {
 			backUrl = backUrlBody;
+		}
+		if (
+			!successUrl && successUrlBody && typeof successUrlBody === "string"
+		) {
+			successUrl = successUrlBody;
+		}
+		if (
+			!failedUrl && failedUrlBody && typeof failedUrlBody === "string"
+		) {
+			failedUrl = failedUrlBody;
 		}
 
 		logger.info(
@@ -152,6 +158,8 @@ export const handlePayInvoice = async (c: Context) => {
 				user_id: user?.id,
 				tenant_id: "kuala-api",
 				back_url: backUrl || undefined,
+				success_url: successUrl || undefined,
+				failed_url: failedUrl || undefined,
 				metadata: {
 					invoice_id: invoiceId,
 				},
@@ -194,9 +202,17 @@ export const handlePayInvoice = async (c: Context) => {
 		if (bayeuData.is_successful && bayeuData.data?.redirect_url) {
 			logger.info(
 				handlerName,
-				`Successfully initiated payment for invoice ${invoiceId}, redirecting to ${bayeuData.data.redirect_url}`,
+				`Successfully initiated payment for invoice ${invoiceId}`,
 			);
-			return c.redirect(bayeuData.data.redirect_url, 302);
+			return c.json({
+				is_successful: true,
+				data: {
+					order_id: bayeuData.data.order_id,
+					gateway: bayeuData.data.gateway,
+					token: bayeuData.data.token,
+					redirect_url: bayeuData.data.redirect_url,
+				},
+			}, 200);
 		}
 
 		logger.info(

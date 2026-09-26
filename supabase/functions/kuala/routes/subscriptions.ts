@@ -7,25 +7,46 @@ import {
 import { handleCreateEventDrivenSubscription } from "../handlers/subscriptions/create-event-driven.ts";
 import { handleGetSubscriptionStatus } from "../handlers/subscriptions/status.ts";
 import { authMiddleware } from "../middleware/auth.ts";
+import { validateJson, validateParam } from "../validators/core.ts";
+import {
+	createSubscriptionSchema,
+	getSubscriptionByIdParamSchema,
+	getSubscriptionStatusParamSchema,
+} from "../validators/schemas.ts";
 
 export const subscriptionRoutes = new Hono().basePath("/subscriptions");
 subscriptionRoutes.use(authMiddleware);
 
 // Deprecated endpoints for subscriptions, but still supported for backward compatibility
-subscriptionRoutes.post("/", handleCreateSubscription);
-subscriptionRoutes.post("/v2", handleCreateEventDrivenSubscription);
+subscriptionRoutes.post(
+	"/",
+	validateJson(createSubscriptionSchema),
+	handleCreateSubscription,
+);
+
+subscriptionRoutes.post(
+	"/v2",
+	validateJson(createSubscriptionSchema),
+	handleCreateEventDrivenSubscription,
+);
 
 // "/subscriptions/event-driven" redirect to"/subscriptions/v2"
-subscriptionRoutes.post("/event-driven", (c) => {
-	const url = new URL(c.req.url);
-	url.pathname = url.pathname.replace("/event-driven", "/v2");
-	// 308 preserves the HTTP method (POST) and payload
-	return c.redirect(url.toString(), 308);
-});
+subscriptionRoutes.post(
+	"/event-driven",
+	validateJson(createSubscriptionSchema),
+	handleCreateEventDrivenSubscription,
+);
 
 subscriptionRoutes.get("/", handleGetSubscription);
-subscriptionRoutes.get("/:subscriptionId", handleGetSubscriptionById);
+
+subscriptionRoutes.get(
+	"/:subscriptionId",
+	validateParam(getSubscriptionByIdParamSchema),
+	handleGetSubscriptionById,
+);
+
 subscriptionRoutes.get(
 	"/status/:correlationId",
+	validateParam(getSubscriptionStatusParamSchema),
 	handleGetSubscriptionStatus,
 );

@@ -1,3 +1,4 @@
+import { config } from "../../../_shared/config/env.ts";
 import { Context } from "@hono/hono";
 import { logger } from "../../middleware/logger.ts";
 import { killBillService } from "../../../_shared/services/killbill.ts";
@@ -14,7 +15,7 @@ function verifyHookdeckSignature(
 	bodyText: string,
 	c: Context,
 ): boolean {
-	const OUTPOST_WEBHOOK_SECRET = Deno.env.get("OUTPOST_WEBHOOK_SECRET");
+	const OUTPOST_WEBHOOK_SECRET = config.OUTPOST_WEBHOOK_SECRET;
 	const handlerName = "bayeu-webhook";
 
 	if (!OUTPOST_WEBHOOK_SECRET) {
@@ -144,9 +145,8 @@ export const handleBayeuWebhook = async (c: Context) => {
 	try {
 		const bodyText = await c.req.text();
 
-		const skipVerification =
-			Deno.env.get("SKIP_WEBHOOK_VERIFICATION") === "true" ||
-			Deno.env.get("DENO_ENV") === "test";
+		const skipVerification = config.SKIP_WEBHOOK_VERIFICATION ||
+			config.DENO_ENV === "test";
 
 		const isValid = verifyHookdeckSignature(
 			bodyText,

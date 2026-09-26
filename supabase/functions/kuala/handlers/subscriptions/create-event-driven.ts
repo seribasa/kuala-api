@@ -46,39 +46,8 @@ export async function handleCreateEventDrivenSubscription(c: Context) {
 			},
 		);
 
-		// Parse request body with validation
-		let body: CreateEventDrivenSubscriptionRequest;
-		try {
-			body = await c.req.json();
-		} catch (_parseError) {
-			logger.error(handlerName, "Invalid JSON in request body");
-			const errorResponse: CreateEventDrivenSubscriptionErrorResponse = {
-				code: ErrorCodes.INVALID_EVENT_STRUCTURE,
-				message: "Invalid JSON in request body",
-			};
-			return c.json(errorResponse, 400);
-		}
-
-		if (!body.planId) {
-			logger.error(handlerName, "Missing planId in request");
-			const errorResponse: CreateEventDrivenSubscriptionErrorResponse = {
-				code: ErrorCodes.MISSING_PLAN_ID,
-				message: "planId is required",
-			};
-			return c.json(errorResponse, 400);
-		}
-
-		// Validate planId format (basic validation)
-		if (
-			typeof body.planId !== "string" || body.planId.trim().length === 0
-		) {
-			logger.error(handlerName, "Invalid planId format");
-			const errorResponse: CreateEventDrivenSubscriptionErrorResponse = {
-				code: ErrorCodes.MISSING_PLAN_ID,
-				message: "planId must be a non-empty string",
-			};
-			return c.json(errorResponse, 400);
-		}
+		// Parse request body from validated context
+		const body = await c.req.json();
 
 		// Check for existing pending subscription request using database lock table
 		// This is more reliable than querying state as it uses atomic operations
