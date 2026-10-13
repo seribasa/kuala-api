@@ -4,6 +4,8 @@ import { authLogger } from "../../middleware/logger.ts";
 import { getUser } from "../../middleware/auth.ts";
 import { killBillService } from "@shared/services/killbill.ts";
 
+import { mapInvoiceStatus } from "./mapper.ts";
+
 /**
  * Get invoice by ID
  * GET /invoices/{invoiceId}
@@ -22,15 +24,6 @@ export const handleGetInvoiceById = async (c: Context) => {
 			hasInvoiceId: !!invoiceId,
 			invoiceId: invoiceId?.substring(0, 8) + "...",
 		});
-
-		if (!invoiceId) {
-			authLogger.error(handlerName, "Missing invoice ID parameter");
-			const errorResponse: ErrorResponse = {
-				code: "MISSING_INVOICE_ID",
-				message: "Invoice ID is required",
-			};
-			return c.json(errorResponse, 400);
-		}
 
 		// Get authenticated user from context (set by authMiddleware)
 		const user = getUser(c);
@@ -61,14 +54,16 @@ export const handleGetInvoiceById = async (c: Context) => {
 			return c.json(errorResponse, 404);
 		}
 
+		const mappedInvoice = mapInvoiceStatus(invoice);
+
 		authLogger.success(handlerName, "Invoice retrieved successfully", {
-			invoiceId: invoice.invoiceId.substring(0, 8) + "...",
-			status: invoice.status,
-			amount: invoice.amount,
+			invoiceId: mappedInvoice.invoiceId.substring(0, 8) + "...",
+			status: mappedInvoice.status,
+			amount: mappedInvoice.amount,
 		});
 
 		// Forward the Kill Bill invoice response as per spec
-		return c.json(invoice, 200);
+		return c.json(mappedInvoice, 200);
 	} catch (error) {
 		authLogger.exception(handlerName, error as Error);
 

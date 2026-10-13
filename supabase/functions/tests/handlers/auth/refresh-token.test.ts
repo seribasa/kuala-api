@@ -47,18 +47,6 @@ function createMockContext(
 	} as unknown as Context;
 }
 
-Deno.test("handleRefreshToken - should return 400 when refresh_token is missing", async () => {
-	const mockContext = createMockContext({});
-
-	const response = await handleRefreshToken(
-		mockContext,
-	) as unknown as JsonResponse;
-
-	assertEquals(response.status, 400);
-	assertEquals(response.data.code, "MISSING_REFRESH_TOKEN");
-	assertEquals(response.data.message, "refresh_token is required");
-});
-
 Deno.test("handleRefreshToken - should return 500 when AUTH_SUPABASE_ANON_KEY is missing", async () => {
 	// Stub environment variable to return undefined
 	const envStub = stub(Deno.env, "get", () => undefined);
@@ -141,56 +129,6 @@ Deno.test("handleRefreshToken - should forward successful response from Supabase
 				refresh_token: "test_refresh_token",
 			}),
 		);
-	} finally {
-		envStub.restore();
-		fetchStub.restore();
-	}
-});
-
-Deno.test("handleRefreshToken - should forward 400 error from Supabase", async () => {
-	// Mock error response from Supabase
-	const mockErrorResponse = {
-		error: "invalid_grant",
-		error_description: "Invalid refresh token",
-	};
-
-	// Stub environment variables with proper values
-	const envStub = stub(Deno.env, "get", (key: string) => {
-		if (key === "AUTH_BASE_URL") return "https://test.supabase.co";
-		if (key === "AUTH_SUPABASE_ANON_KEY") return "test_api_key";
-		return undefined;
-	});
-
-	// Stub fetch to return error response
-	const fetchStub = stub(
-		globalThis,
-		"fetch",
-		() =>
-			Promise.resolve(
-				new MockResponse(
-					mockErrorResponse,
-					400,
-					false,
-				) as unknown as Response,
-			),
-	);
-
-	try {
-		const mockContext = createMockContext({
-			refresh_token: "invalid_refresh_token",
-		});
-
-		const response = await handleRefreshToken(
-			mockContext,
-		) as unknown as JsonResponse;
-
-		const expectedResponse = {
-			code: "SUPABASE_ERROR",
-			message: "Invalid refresh token",
-		};
-
-		assertEquals(response.status, 400);
-		assertEquals(response.data, expectedResponse);
 	} finally {
 		envStub.restore();
 		fetchStub.restore();

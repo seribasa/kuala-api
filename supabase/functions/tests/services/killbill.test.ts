@@ -83,6 +83,19 @@ describe("KillBillService", () => {
 	});
 
 	describe("getAccountByExternalKey", () => {
+		it("returns null on 404", async () => {
+			fetchStub.restore();
+			fetchStub = stub(
+				globalThis,
+				"fetch",
+				returnsNext([
+					Promise.resolve(new Response(null, { status: 404 })),
+				]),
+			);
+			const res = await killBillService.getAccountByExternalKey("u1");
+			assertEquals(res, null);
+		});
+
 		it("handles fetch failure", async () => {
 			fetchStub.restore();
 			fetchStub = stub(
@@ -90,6 +103,20 @@ describe("KillBillService", () => {
 				"fetch",
 				returnsNext([
 					Promise.reject(new Error("Network err")),
+				]),
+			);
+
+			const res = await killBillService.getAccountByExternalKey("u2");
+			assertEquals(res, null);
+		});
+
+		it("handles string error and returns null", async () => {
+			fetchStub.restore();
+			fetchStub = stub(
+				globalThis,
+				"fetch",
+				returnsNext([
+					Promise.reject("String error"),
 				]),
 			);
 
@@ -242,6 +269,21 @@ describe("KillBillService", () => {
 				"Failed to get account subscriptions: 500",
 			);
 		});
+
+		it("returns null on 404", async () => {
+			fetchStub.restore();
+			fetchStub = stub(
+				globalThis,
+				"fetch",
+				returnsNext([
+					Promise.resolve(new Response(null, { status: 404 })),
+				]),
+			);
+			const res = await killBillService.getSubscriptionByExternalId(
+				"sub-1",
+			);
+			assertEquals(res, null);
+		});
 	});
 
 	describe("hasActiveSubscription", () => {
@@ -252,6 +294,32 @@ describe("KillBillService", () => {
 				"fetch",
 				returnsNext([
 					Promise.reject(new Error("Net err")),
+				]),
+			);
+			const req = await killBillService.hasActiveSubscription("sub-1");
+			assertEquals(req.hasActive, false);
+		});
+
+		it("false on fetch string error", async () => {
+			fetchStub.restore();
+			fetchStub = stub(
+				globalThis,
+				"fetch",
+				returnsNext([
+					Promise.reject("Net err string"),
+				]),
+			);
+			const req = await killBillService.hasActiveSubscription("sub-1");
+			assertEquals(req.hasActive, false);
+		});
+
+		it("returns hasActive false when no subscription found", async () => {
+			fetchStub.restore();
+			fetchStub = stub(
+				globalThis,
+				"fetch",
+				returnsNext([
+					Promise.resolve(new Response(null, { status: 404 })),
 				]),
 			);
 			const req = await killBillService.hasActiveSubscription("sub-1");
@@ -698,6 +766,54 @@ describe("KillBillService", () => {
 			);
 		});
 	});
+	describe("getInvoiceHtml", () => {
+		it("success", async () => {
+			fetchStub.restore();
+			fetchStub = stub(
+				globalThis,
+				"fetch",
+				returnsNext([
+					Promise.resolve(
+						new Response("<html>test</html>", {
+							status: 200,
+						}),
+					),
+				]),
+			);
+			const res = await killBillService.getInvoiceHtml("inv1");
+			assertEquals(res, "<html>test</html>");
+		});
+		it("404", async () => {
+			fetchStub.restore();
+			fetchStub = stub(
+				globalThis,
+				"fetch",
+				returnsNext([
+					Promise.resolve(new Response(null, { status: 404 })),
+				]),
+			);
+			await assertRejects(
+				() => killBillService.getInvoiceHtml("inv1"),
+				Error,
+				"INVOICE_NOT_FOUND",
+			);
+		});
+		it("error", async () => {
+			fetchStub.restore();
+			fetchStub = stub(
+				globalThis,
+				"fetch",
+				returnsNext([
+					Promise.resolve(new Response(null, { status: 500 })),
+				]),
+			);
+			await assertRejects(
+				() => killBillService.getInvoiceHtml("inv1"),
+				Error,
+				"Failed to get invoice HTML: 500",
+			);
+		});
+	});
 	describe("listInvoices", () => {
 		it("success", async () => {
 			fetchStub.restore();
@@ -762,6 +878,147 @@ describe("KillBillService", () => {
 				() => killBillService.searchInvoices("key", 0, 100),
 				Error,
 				"Failed to search invoices: 500",
+			);
+		});
+	});
+
+	describe("payInvoiceExternal", () => {
+		it("throws if invoice missing accountId", async () => {
+			fetchStub.restore();
+			fetchStub = stub(
+				globalThis,
+				"fetch",
+				returnsNext([
+					Promise.resolve(
+						new Response(JSON.stringify({ invoiceId: "1" }), {
+							status: 200,
+						}),
+					),
+				]),
+			);
+			await assertRejects(
+				() => killBillService.payInvoiceExternal("inv-1"),
+				Error,
+				"Invoice inv-1 not found or missing accountId",
+			);
+		});
+
+		it("returns without paying if balance <= 0", async () => {
+			fetchStub.restore();
+			fetchStub = stub(
+				globalThis,
+				"fetch",
+				returnsNext([
+					Promise.resolve(
+						new Response(
+							JSON.stringify({
+								invoiceId: "1",
+								accountId: "acc-1",
+								balance: 0,
+							}),
+							{
+								status: 200,
+							},
+						),
+					),
+				]),
+			);
+			await killBillService.payInvoiceExternal("inv-1");
+		});
+
+		it("throws on error from external payment", async () => {
+			fetchStub.restore();
+			fetchStub = stub(
+				globalThis,
+				"fetch",
+				returnsNext([
+					Promise.resolve(
+						new Response(
+							JSON.stringify({
+								invoiceId: "1",
+								accountId: "acc-1",
+								balance: 100,
+							}),
+							{
+								status: 200,
+							},
+						),
+					),
+					Promise.resolve(new Response("err", { status: 400 })),
+				]),
+			);
+			await assertRejects(
+				() => killBillService.payInvoiceExternal("inv-1", 100),
+				Error,
+				"Failed to pay invoice externally: 400 - err",
+			);
+		});
+
+		it("success", async () => {
+			fetchStub.restore();
+			fetchStub = stub(
+				globalThis,
+				"fetch",
+				returnsNext([
+					Promise.resolve(
+						new Response(
+							JSON.stringify({
+								invoiceId: "1",
+								accountId: "acc-1",
+								balance: 100,
+							}),
+							{
+								status: 200,
+							},
+						),
+					),
+					Promise.resolve(new Response(null, { status: 200 })),
+				]),
+			);
+			await killBillService.payInvoiceExternal("inv-1", 100);
+		});
+	});
+
+	describe("uploadInvoiceTranslation", () => {
+		it("success", async () => {
+			fetchStub.restore();
+			fetchStub = stub(
+				globalThis,
+				"fetch",
+				returnsNext([
+					Promise.resolve(new Response(null, { status: 200 })),
+				]),
+			);
+			await killBillService.uploadInvoiceTranslation(
+				"en_US",
+				"key=value",
+			);
+
+			// Verify fetch was called with correct parameters
+			assertSpyCalls(fetchStub, 1);
+			const fetchArgs = fetchStub.calls[0].args;
+			assertEquals(fetchArgs[1].method, "POST");
+			assertEquals(fetchArgs[1].body, "key=value");
+			assertEquals(fetchArgs[1].headers["Content-Type"], "text/plain");
+		});
+
+		it("error", async () => {
+			fetchStub.restore();
+			fetchStub = stub(
+				globalThis,
+				"fetch",
+				returnsNext([
+					Promise.resolve(new Response("err", { status: 400 })),
+				]),
+			);
+			await assertRejects(
+				() =>
+					killBillService.uploadInvoiceTranslation(
+						"en_US",
+						"key=value",
+					),
+				Error,
+				"Failed to upload invoice translation: 400 - err",
 			);
 		});
 	});

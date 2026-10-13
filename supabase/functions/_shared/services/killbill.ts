@@ -120,6 +120,7 @@ export class KillBillService {
 			email: email,
 			externalKey: userId,
 			currency: this.config.defaultCurrency,
+			billCycleDayLocal: 1,
 		};
 
 		logger.info(handlerName, "Creating new Kill Bill account", {
@@ -545,7 +546,7 @@ export class KillBillService {
 		withMigrationInvoices?: boolean,
 		unpaidInvoicesOnly?: boolean,
 		includeVoidedInvoices?: boolean,
-		includeInvoiceComponents?: boolean,
+		includeInvoiceComponents = true,
 		invoicesFilter?: string[],
 		audit?: "NONE" | "MINIMAL" | "FULL",
 	): Promise<KillBillInvoice[]> {
@@ -715,6 +716,40 @@ export class KillBillService {
 	}
 
 	/**
+	 * Get invoice HTML by ID
+	 */
+	async getInvoiceHtml(invoiceId: string): Promise<string> {
+		const handlerName = "killbill-service";
+		const url = `${this.baseUrl}/1.0/kb/invoices/${invoiceId}/html`;
+
+		logger.info(handlerName, "Getting invoice HTML by ID", {
+			url,
+			invoiceId: invoiceId.substring(0, 8) + "...",
+		});
+
+		const response = await fetch(url, {
+			method: "GET",
+			headers: {
+				...this.getHeaders(),
+				"Accept": "text/html",
+			},
+		});
+
+		if (!response.ok) {
+			if (response.status === 404) {
+				throw new Error("INVOICE_NOT_FOUND");
+			}
+			logger.error(handlerName, "Failed to get invoice HTML", {
+				status: response.status,
+				statusText: response.statusText,
+			});
+			throw new Error(`Failed to get invoice HTML: ${response.status}`);
+		}
+
+		return await response.text();
+	}
+
+	/**
 	 * Trigger invoice run for account
 	 */
 	async triggerInvoiceRun(
@@ -760,7 +795,47 @@ export class KillBillService {
 
 		// Get invoice ID from Location header
 		const location = response.headers.get("Location");
-		const invoiceId = location?.split("/").pop() || "unknown";
+		if (location) {
+			const cleanLocation = location.endsWith("/")
+				? location.slice(0, -1)
+				: location;
+			const invoiceId = cleanLocation.split("/").pop() || "unknown";
+			logger.info(handlerName, "Invoice run completed successfully", {
+				invoiceId: invoiceId.substring(0, 8) + "...",
+			});
+			return invoiceId;
+		}
+
+		// Fallback to response body if no Location header
+		const responseData = await response.json().catch(() => null);
+
+		// If responseData is an empty array, it means Kill Bill did not generate a new invoice
+		if (Array.isArray(responseData) && responseData.length === 0) {
+			logger.info(
+				handlerName,
+				"No invoice to generate - account up to date",
+			);
+			return null;
+		}
+
+		let invoiceId = "unknown";
+
+		if (responseData && responseData.invoiceId) {
+			invoiceId = responseData.invoiceId;
+		} else if (
+			responseData && Array.isArray(responseData) &&
+			responseData.length > 0 && responseData[0].invoiceId
+		) {
+			invoiceId = responseData[0].invoiceId;
+		}
+
+		if (invoiceId === "unknown") {
+			logger.info(
+				handlerName,
+				"No invoice to generate or unable to parse invoice ID - account up to date",
+			);
+			return null;
+		}
 
 		logger.info(handlerName, "Invoice run completed successfully", {
 			invoiceId: invoiceId.substring(0, 8) + "...",
@@ -801,6 +876,122 @@ export class KillBillService {
 
 		logger.info(handlerName, "Voided invoice successfully", {
 			invoiceId: invoiceId.substring(0, 8) + "...",
+		});
+	}
+
+	/**
+	 * Pay an invoice externally
+	 * @param invoiceId string
+	 * @param amount number
+	 * @return void
+	 */
+	async payInvoiceExternal(
+		invoiceId: string,
+		amount?: number,
+	): Promise<void> {
+		const handlerName = "killbill-service";
+
+		// Fetch the invoice first to get the accountId, which is required by Kill Bill
+		const invoice = await this.getInvoiceById(invoiceId);
+		if (!invoice || !invoice.accountId) {
+			throw new Error(
+				`Invoice ${invoiceId} not found or missing accountId`,
+			);
+		}
+
+		const paymentAmount = amount ?? invoice.balance;
+
+		if (paymentAmount <= 0) {
+			logger.info(
+				handlerName,
+				`Invoice ${invoiceId} has no balance to pay.`,
+			);
+			return;
+		}
+
+		const url =
+			`${this.baseUrl}/1.0/kb/invoices/${invoiceId}/payments?externalPayment=true`;
+
+		logger.info(handlerName, "Paying invoice externally", {
+			url,
+			invoiceId: invoiceId.substring(0, 8) + "...",
+			amount: paymentAmount,
+			accountId: invoice.accountId,
+		});
+
+		const response = await fetch(url, {
+			method: "POST",
+			headers: {
+				...this.getHeaders(),
+				"X-Killbill-CreatedBy": "kuala-api-webhook",
+				"X-Killbill-Reason": "External Payment Success from Gateway",
+			},
+			body: JSON.stringify({
+				accountId: invoice.accountId,
+				purchasedAmount: paymentAmount,
+				targetInvoiceId: invoiceId,
+			}),
+		});
+
+		if (!response.ok) {
+			const errorText = await response.text();
+			logger.error(handlerName, "Failed to pay invoice externally", {
+				status: response.status,
+				error: errorText,
+			});
+			throw new Error(
+				`Failed to pay invoice externally: ${response.status} - ${errorText}`,
+			);
+		}
+
+		logger.info(handlerName, "Paid invoice externally successfully", {
+			invoiceId: invoiceId.substring(0, 8) + "...",
+		});
+	}
+
+	/**
+	 * Upload invoice translation for a specific locale
+	 * @param locale string (e.g. "en_US")
+	 * @param translation string (format: key=value\n...)
+	 * @param deleteIfExists boolean
+	 * @return void
+	 */
+	async uploadInvoiceTranslation(
+		locale: string,
+		translation: string,
+		deleteIfExists = false,
+	): Promise<void> {
+		const handlerName = "killbill-service";
+		const url =
+			`${this.baseUrl}/1.0/kb/invoices/translation/${locale}?deleteIfExists=${deleteIfExists}`;
+
+		logger.info(handlerName, "Uploading invoice translation", {
+			url,
+			locale,
+		});
+
+		const response = await fetch(url, {
+			method: "POST",
+			headers: {
+				...this.getHeaders(),
+				"Content-Type": "text/plain",
+			},
+			body: translation,
+		});
+
+		if (!response.ok) {
+			const errorText = await response.text();
+			logger.error(handlerName, "Failed to upload invoice translation", {
+				status: response.status,
+				error: errorText,
+			});
+			throw new Error(
+				`Failed to upload invoice translation: ${response.status} - ${errorText}`,
+			);
+		}
+
+		logger.info(handlerName, "Uploaded invoice translation successfully", {
+			locale,
 		});
 	}
 }

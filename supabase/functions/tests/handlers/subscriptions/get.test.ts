@@ -271,6 +271,33 @@ Deno.test("handleGetSubscription - should return subscription successfully", asy
 				);
 			}
 
+			if (callCount === 3) {
+				// Get catalog for plans
+				const mockCatalog = [{
+					products: [{
+						name: "Basic",
+						prettyName: "Basic",
+						plans: [{
+							name: "basic-monthly",
+							phases: [{
+								type: "EVERGREEN",
+								prices: [{ currency: "USD", value: 10 }],
+							}],
+						}],
+					}],
+					priceLists: [{
+						name: "DEFAULT",
+						plans: ["basic-monthly"],
+					}],
+				}];
+				return Promise.resolve(
+					new MockResponse(
+						mockCatalog,
+						200,
+					) as unknown as Response,
+				);
+			}
+
 			return Promise.resolve(
 				new MockResponse(
 					{ error: "Unexpected call" },
@@ -376,6 +403,33 @@ Deno.test("handleGetSubscription - should return subscription with ANNUAL billin
 				return Promise.resolve(
 					new MockResponse(
 						mockSubscription,
+						200,
+					) as unknown as Response,
+				);
+			}
+
+			if (callCount === 3) {
+				// Get catalog for plans
+				const mockCatalog = [{
+					products: [{
+						name: "Premium",
+						prettyName: "Premium",
+						plans: [{
+							name: "premium-annual",
+							phases: [{
+								type: "EVERGREEN",
+								prices: [{ currency: "USD", value: 100 }],
+							}],
+						}],
+					}],
+					priceLists: [{
+						name: "DEFAULT",
+						plans: ["premium-annual"],
+					}],
+				}];
+				return Promise.resolve(
+					new MockResponse(
+						mockCatalog,
 						200,
 					) as unknown as Response,
 				);
