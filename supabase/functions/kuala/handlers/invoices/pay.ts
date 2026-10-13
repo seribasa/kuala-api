@@ -1,0 +1,238 @@
+import { config } from "../../../_shared/config/env.ts";
+import { Context } from "@hono/hono";
+import { ErrorResponse } from "../../../_shared/types/response.ts";
+import { logger } from "../../middleware/logger.ts";
+import { getUser } from "../../middleware/auth.ts";
+import { killBillService } from "../../../_shared/services/killbill.ts";
+
+export const handlePayInvoice = async (c: Context) => {
+	const handlerName = "pay-invoice";
+
+	try {
+		const authorization = c.req.header("Authorization");
+		if (!authorization) {
+			logger.error(handlerName, "Missing Authorization header");
+			const err: ErrorResponse = {
+				code: "UNAUTHORIZED",
+				message: "Unauthorized: Missing Authorization header",
+			};
+			return c.json(err, 401);
+		}
+
+		// `getUser` reads from context because `authMiddleware` is used
+		let user;
+		try {
+			user = getUser(c);
+		} catch (_e) {
+			user = null;
+		}
+		if (!user) {
+			logger.error(handlerName, "User not found in context");
+			const err: ErrorResponse = {
+				code: "UNAUTHORIZED",
+				message: "Unauthorized",
+			};
+			return c.json(err, 401);
+		}
+
+		const invoiceId = c.req.param("id") as string;
+
+		const gateway = config.PAYMENT_GATEWAY;
+		if (!gateway) {
+			logger.error(handlerName, "PAYMENT_GATEWAY is not configured");
+			const err: ErrorResponse = {
+				code: "INTERNAL_ERROR",
+				message: "Payment service configuration error",
+			};
+			return c.json(err, 500);
+		}
+		// Fetch invoice from Kill Bill
+		logger.info(
+			handlerName,
+			`Fetching invoice ${invoiceId} from Kill Bill`,
+		);
+		let invoice;
+		try {
+			invoice = await killBillService.getInvoiceById(invoiceId);
+		} catch (e: unknown) {
+			logger.error(
+				handlerName,
+				`Failed to fetch invoice: ${
+					e instanceof Error ? e.message : String(e)
+				}`,
+			);
+			const err: ErrorResponse = {
+				code: "INTERNAL_ERROR",
+				message: "Failed to fetch invoice",
+			};
+			return c.json(err, 500);
+		}
+
+		// Verify invoice ownership
+		const account = await killBillService.getAccountByExternalKey(user.id);
+		if (!account || invoice.accountId !== account.accountId) {
+			logger.error(
+				handlerName,
+				`Invoice ${invoiceId} does not belong to user ${user.id}`,
+			);
+			const err: ErrorResponse = {
+				code: "FORBIDDEN",
+				message: "You do not have permission to pay this invoice",
+			};
+			return c.json(err, 403);
+		}
+
+		const amount = invoice.balance;
+		const currency = invoice.currency;
+
+		if (!amount || amount <= 0) {
+			const err: ErrorResponse = {
+				code: "BAD_REQUEST",
+				message: "Invoice balance is zero. Nothing to pay.",
+			};
+			return c.json(err, 400);
+		}
+
+		const bayeuUrl = config.BAYEU_API_URL;
+
+		if (!bayeuUrl) {
+			logger.error(handlerName, "BAYEU_API_URL is not configured");
+			const err: ErrorResponse = {
+				code: "INTERNAL_ERROR",
+				message: "Payment service configuration error",
+			};
+			return c.json(err, 500);
+		}
+
+		const bayeuAnonKey = config.BAYEU_ANON_KEY;
+		if (!bayeuAnonKey) {
+			logger.error(handlerName, "BAYEU_ANON_KEY is not configured");
+			const err: ErrorResponse = {
+				code: "INTERNAL_ERROR",
+				message: "Payment service configuration error",
+			};
+			return c.json(err, 500);
+		}
+		let backUrlBody: string | undefined;
+		let successUrlBody: string | undefined;
+		let failedUrlBody: string | undefined;
+		// Read the safely validated JSON body from our middleware
+		const payload = c.req.valid("json" as never) as
+			| Record<string, unknown>
+			| undefined;
+		if (payload && typeof payload === "object") {
+			backUrlBody = payload.back_url as string | undefined;
+			successUrlBody = payload.success_url as string | undefined;
+			failedUrlBody = payload.failed_url as string | undefined;
+		}
+
+		let backUrl = c.req.query("back_url");
+		let successUrl = c.req.query("success_url");
+		let failedUrl = c.req.query("failed_url");
+		if (
+			!backUrl && backUrlBody && typeof backUrlBody === "string"
+		) {
+			backUrl = backUrlBody;
+		}
+		if (
+			!successUrl && successUrlBody && typeof successUrlBody === "string"
+		) {
+			successUrl = successUrlBody;
+		}
+		if (
+			!failedUrl && failedUrlBody && typeof failedUrlBody === "string"
+		) {
+			failedUrl = failedUrlBody;
+		}
+
+		logger.info(
+			handlerName,
+			`Initiating payment via Bayeu for invoice ${invoiceId}`,
+		);
+		const bayeuResponse = await fetch(`${bayeuUrl}/initiate-payment`, {
+			method: "POST",
+			headers: {
+				"Content-Type": "application/json",
+				"Authorization": authorization,
+				"apikey": bayeuAnonKey,
+			},
+			body: JSON.stringify({
+				amount,
+				currency,
+				gateway,
+				user_id: user?.id,
+				tenant_id: "kuala-api",
+				back_url: backUrl || undefined,
+				success_url: successUrl || undefined,
+				failed_url: failedUrl || undefined,
+				metadata: {
+					invoice_id: invoiceId,
+				},
+			}),
+		});
+
+		if (!bayeuResponse.ok) {
+			const bayeuErr = await bayeuResponse.text();
+			logger.error(handlerName, `Bayeu initiation failed: ${bayeuErr}`);
+
+			let parsedErr;
+			try {
+				parsedErr = JSON.parse(bayeuErr);
+			} catch (e) {
+				// Ignore parsing error
+			}
+
+			if (parsedErr && !parsedErr.is_successful && parsedErr.message) {
+				const err: ErrorResponse = {
+					code: "BAD_REQUEST",
+					message: parsedErr.message,
+				};
+				const status =
+					bayeuResponse.status >= 400 && bayeuResponse.status < 500
+						? bayeuResponse.status
+						: 400;
+				// deno-lint-ignore no-explicit-any
+				return c.json(err, status as any);
+			}
+
+			const err: ErrorResponse = {
+				code: "INTERNAL_ERROR",
+				message: "Failed to initiate payment gateway",
+			};
+			return c.json(err, 500);
+		}
+
+		const bayeuData = await bayeuResponse.json();
+
+		if (bayeuData.is_successful && bayeuData.data?.redirect_url) {
+			logger.info(
+				handlerName,
+				`Successfully initiated payment for invoice ${invoiceId}`,
+			);
+			return c.json({
+				is_successful: true,
+				data: {
+					order_id: bayeuData.data.order_id,
+					gateway: bayeuData.data.gateway,
+					token: bayeuData.data.token,
+					redirect_url: bayeuData.data.redirect_url,
+				},
+			}, 200);
+		}
+
+		logger.info(
+			handlerName,
+			`Successfully initiated payment for invoice ${invoiceId} but no redirect URL provided`,
+		);
+		return c.json(bayeuData);
+	} catch (error) {
+		logger.error(handlerName, "Internal server error", {
+			error: String(error),
+		});
+		const err: ErrorResponse = {
+			code: "INTERNAL_ERROR",
+			message: "Internal server error",
+		};
+		return c.json(err, 500);
+	}
+};

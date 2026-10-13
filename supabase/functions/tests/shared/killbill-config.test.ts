@@ -3,7 +3,6 @@ import { stub } from "@std/testing/mock";
 import { killBillConfig } from "../../_shared/config/killbill-config.ts";
 
 Deno.test("killBillConfig - should return config with environment variables", () => {
-	// Stub environment variables
 	const envStub = stub(Deno.env, "get", (key: string) => {
 		const envMap: Record<string, string> = {
 			"KILLBILL_BASE_URL": "https://killbill.example.com",
@@ -18,7 +17,6 @@ Deno.test("killBillConfig - should return config with environment variables", ()
 
 	try {
 		const config = killBillConfig();
-
 		assertEquals(config.baseUrl, "https://killbill.example.com");
 		assertEquals(config.apiKey, "test-api-key");
 		assertEquals(config.apiSecret, "test-api-secret");
@@ -31,14 +29,12 @@ Deno.test("killBillConfig - should return config with environment variables", ()
 });
 
 Deno.test("killBillConfig - should return empty strings for missing environment variables", () => {
-	// Stub environment variables returning undefined
 	const envStub = stub(Deno.env, "get", (_key: string) => {
 		return undefined;
 	});
 
 	try {
 		const config = killBillConfig();
-
 		assertEquals(config.baseUrl, "");
 		assertEquals(config.apiKey, "");
 		assertEquals(config.apiSecret, "");
@@ -61,7 +57,6 @@ Deno.test("killBillConfig - should return partial config with some env vars set"
 
 	try {
 		const config = killBillConfig();
-
 		assertEquals(config.baseUrl, "https://kb.test.com");
 		assertEquals(config.apiKey, "");
 		assertEquals(config.apiSecret, "");

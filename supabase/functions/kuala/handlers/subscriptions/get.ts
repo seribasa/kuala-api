@@ -4,6 +4,8 @@ import { authLogger, logger } from "../../middleware/logger.ts";
 import { getUser } from "../../middleware/auth.ts";
 import { killBillService } from "@shared/services/killbill.ts";
 import { subscriptionStateManager } from "../../../_shared/services/subscription-state-management.ts";
+import { fetchKillBillPlans } from "../plans/index.ts";
+import { KillBillSubscriptionEvent, Plan } from "@shared/types/index.ts";
 
 interface SubscriptionAccountInfo {
 	name: string;
@@ -16,13 +18,23 @@ interface SubscriptionItem {
 	bundleId: string;
 	accountId: string;
 	userId: string;
+	plan: Plan | null;
 	planName: string;
 	productName: string;
+	productCategory?: string;
 	billingPeriod: string;
+	phaseType?: string;
+	priceList?: string;
 	state: string;
+	sourceType?: string;
+	startDate?: string;
+	cancelledDate?: string | null;
 	billingStartDate: string;
 	billingEndDate: string | null;
 	chargedThroughDate: string;
+	billCycleDayLocal?: number | null;
+	quantity?: number;
+	events?: KillBillSubscriptionEvent[];
 	account: SubscriptionAccountInfo;
 }
 
@@ -83,16 +95,10 @@ export const handleGetSubscription = async (c: Context) => {
 		try {
 			account = await killBillService.getAccountByExternalKey(userId);
 		} catch (error) {
-			logger.error(
-				handlerName,
-				"Failed to fetch Kill Bill account",
-				{
-					userId,
-					error: error instanceof Error
-						? error.message
-						: String(error),
-				},
-			);
+			logger.error(handlerName, "Failed to fetch Kill Bill account", {
+				userId,
+				error: error instanceof Error ? error.message : String(error),
+			});
 			const errorResponse: ErrorResponse = {
 				code: "UPSTREAM_ERROR",
 				message:
@@ -134,18 +140,35 @@ export const handleGetSubscription = async (c: Context) => {
 					},
 				);
 
+				const plans = await fetchKillBillPlans();
+				// Find the plan that matches the subscription's planName (case-insensitive)
+				const plan = plans.find((p) =>
+					p.name.toLowerCase() ===
+						kbSubscription.planName.toLowerCase()
+				);
+
 				subscriptions.push({
 					id: kbSubscription.subscriptionId,
 					bundleId: kbSubscription.bundleId,
 					accountId: account.accountId,
 					userId: userId,
+					plan: plan || null,
 					planName: kbSubscription.planName,
 					productName: kbSubscription.productName,
+					productCategory: kbSubscription.productCategory,
 					billingPeriod: kbSubscription.billingPeriod,
+					phaseType: kbSubscription.phaseType,
+					priceList: kbSubscription.priceList,
 					state: kbSubscription.state,
+					sourceType: kbSubscription.sourceType,
+					startDate: kbSubscription.startDate,
+					cancelledDate: kbSubscription.cancelledDate || null,
 					billingStartDate: kbSubscription.billingStartDate,
 					billingEndDate: kbSubscription.billingEndDate || null,
 					chargedThroughDate: kbSubscription.chargedThroughDate,
+					billCycleDayLocal: kbSubscription.billCycleDayLocal,
+					quantity: kbSubscription.quantity,
+					events: kbSubscription.events,
 					account: {
 						name: account.name,
 						email: account.email,
@@ -154,16 +177,10 @@ export const handleGetSubscription = async (c: Context) => {
 				});
 			}
 		} catch (error) {
-			logger.error(
-				handlerName,
-				"Failed to fetch subscription details",
-				{
-					accountId: account.accountId,
-					error: error instanceof Error
-						? error.message
-						: String(error),
-				},
-			);
+			logger.error(handlerName, "Failed to fetch subscription details", {
+				accountId: account.accountId,
+				error: error instanceof Error ? error.message : String(error),
+			});
 			const errorResponse: ErrorResponse = {
 				code: "UPSTREAM_ERROR",
 				message:

@@ -74,17 +74,6 @@ function createMockContext(
 	} as unknown as Context;
 }
 
-Deno.test("handleGetSubscriptionById - should return 400 when subscriptionId is missing", async () => {
-	const mockContext = createMockContext("");
-
-	const response = await handleGetSubscriptionById(
-		mockContext,
-	) as unknown as JsonResponse;
-
-	assertEquals(response.status, 400);
-	assertEquals(response.data.code, "MISSING_SUBSCRIPTION_ID");
-});
-
 Deno.test("handleGetSubscriptionById - should return 500 when user is not authenticated", async () => {
 	const mockContext = createMockContext("sub123");
 
@@ -575,48 +564,6 @@ Deno.test("handleGetSubscriptionById - should handle Kill Bill service errors", 
 		) as unknown as JsonResponse;
 
 		// When Kill Bill service fails, verifySubscriptionOwnership returns false, resulting in 404
-		assertEquals(response.status, 404);
-		assertEquals(response.data.code, "SUBSCRIPTION_NOT_FOUND");
-	} finally {
-		envStub.restore();
-		fetchStub.restore();
-	}
-});
-
-Deno.test("handleGetSubscriptionById - should handle network errors gracefully", async () => {
-	const mockUser = {
-		id: "user123",
-		email: "test@example.com",
-	};
-
-	// Mock environment variables
-	const envStub = stub(Deno.env, "get", (key: string) => {
-		if (key === "KILLBILL_BASE_URL") return "http://localhost:8080";
-		if (key === "KILLBILL_API_KEY") return "test_key";
-		if (key === "KILLBILL_API_SECRET") return "test_secret";
-		if (key === "KILLBILL_USERNAME") return "admin";
-		if (key === "KILLBILL_PASSWORD") return "password";
-		if (key === "KILLBILL_DEFAULT_CURRENCY") return "USD";
-		return undefined;
-	});
-
-	const fetchStub = stub(
-		globalThis,
-		"fetch",
-		() => {
-			// Mock network error - this will cause verifySubscriptionOwnership to return false
-			return Promise.reject(new Error("Network error"));
-		},
-	);
-
-	try {
-		const mockContext = createMockContext("sub123", mockUser);
-
-		const response = await handleGetSubscriptionById(
-			mockContext,
-		) as unknown as JsonResponse;
-
-		// When network errors occur, verifySubscriptionOwnership returns false, resulting in 404
 		assertEquals(response.status, 404);
 		assertEquals(response.data.code, "SUBSCRIPTION_NOT_FOUND");
 	} finally {

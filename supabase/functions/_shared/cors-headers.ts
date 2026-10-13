@@ -1,3 +1,4 @@
+import { config } from "../_shared/config/env.ts";
 const corsHeaders = {
 	"Access-Control-Allow-Origin": "*",
 	"Access-Control-Allow-Headers":
@@ -17,8 +18,8 @@ const corsHeaders = {
  *   - "http://localhost:4200,https://kuala-staging.seribasa.digital,https://kuala.seribasa.digital"
  */
 function getCorsConfig() {
-	const corsEnabled = Deno.env.get("CORS_ENABLED")?.toLowerCase() !== "false";
-	const corsOrigin = Deno.env.get("CORS_ORIGIN") || "*";
+	const corsEnabled = config.CORS_ENABLED;
+	const corsOrigin = config.CORS_ORIGIN;
 
 	return {
 		enabled: corsEnabled,

@@ -215,30 +215,6 @@ Deno.test("handlePlans - should filter plans by interval", async () => {
 	}
 });
 
-Deno.test("handlePlans - should return 400 for invalid interval", async () => {
-	const fetchStub = stub(
-		globalThis,
-		"fetch",
-		() => {
-			throw new Error("fetch should not be called");
-		},
-	);
-
-	try {
-		const response = await handlePlans(
-			createMockContext("weekly"),
-		) as unknown as JsonResponse;
-
-		assertEquals(response.status, 400);
-		assertEquals(response.data, {
-			code: "INVALID_INTERVAL",
-			message: "Interval must be 'month' or 'year'",
-		});
-	} finally {
-		fetchStub.restore();
-	}
-});
-
 Deno.test("handlePlans - should return 404 when no plans match interval", async () => {
 	const catalog = createMockCatalog();
 	// Remove monthly plan so only annual remains

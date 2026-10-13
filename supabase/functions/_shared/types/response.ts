@@ -7,5 +7,5 @@ export type BaseResponse<T> = {
 export type ErrorResponse = {
 	code: string;
 	message: string;
-	details?: string;
+	details?: string | Record<string, unknown>;
 };
