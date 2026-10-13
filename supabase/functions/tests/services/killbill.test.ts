@@ -124,6 +124,20 @@ describe("KillBillService", () => {
 			assertEquals(res, null);
 		});
 
+		it("handles string error and returns null", async () => {
+			fetchStub.restore();
+			fetchStub = stub(
+				globalThis,
+				"fetch",
+				returnsNext([
+					Promise.reject("String error"),
+				]),
+			);
+
+			const res = await killBillService.getAccountByExternalKey("u2");
+			assertEquals(res, null);
+		});
+
 		it("throws if create failure", async () => {
 			fetchStub.restore();
 			fetchStub = stub(
