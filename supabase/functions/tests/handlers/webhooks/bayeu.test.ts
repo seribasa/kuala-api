@@ -32,6 +32,13 @@ function generateMockOutpostSignatureHex(payload: string, secret: string) {
 		);
 }
 
+function generateMockOutpostSignatureBase64(payload: string, secret: string) {
+	return "v0=" +
+		crypto.createHmac("sha256", Buffer.from(secret)).update(payload).digest(
+			"base64",
+		);
+}
+
 function generateMockOutpostSignatureHexWhsec(payload: string, secret: string) {
 	const rawKey = secret.slice(6);
 	return "v0=" +
@@ -40,10 +47,17 @@ function generateMockOutpostSignatureHexWhsec(payload: string, secret: string) {
 }
 
 function createMockContext(headers: Record<string, string>, body: string) {
+	const headerEntries = Object.entries(headers);
 	return {
 		req: {
-			header: (k: string) => headers[k] || null,
+			header: (k: string) =>
+				headers[k] || headers[k.toLowerCase()] || null,
 			text: () => Promise.resolve(body),
+			raw: {
+				headers: {
+					entries: () => headerEntries[Symbol.iterator](),
+				},
+			},
 		},
 		json: (body: any, status?: number) => ({ body, status: status || 200 }),
 	} as unknown as Context;
@@ -52,12 +66,11 @@ function createMockContext(headers: Record<string, string>, body: string) {
 Deno.test("handleBayeuWebhook - missing signature header returns 401", async () => {
 	const originalDenoEnv = Deno.env.get("DENO_ENV");
 	const originalSkipVerification = Deno.env.get("SKIP_WEBHOOK_VERIFICATION");
+	const originalKey = Deno.env.get("OUTPOST_WEBHOOK_SECRET");
 	Deno.env.delete("DENO_ENV");
 	Deno.env.delete("SKIP_WEBHOOK_VERIFICATION");
+	Deno.env.set("OUTPOST_WEBHOOK_SECRET", "test_secret");
 	try {
-		const req = new Request("http://localhost/webhooks/bayeu", {
-			method: "POST",
-		});
 		const c = createMockContext({}, "{}");
 
 		const res = await handleBayeuWebhook(c);
@@ -69,11 +82,20 @@ Deno.test("handleBayeuWebhook - missing signature header returns 401", async () 
 		if (originalSkipVerification !== undefined) {
 			Deno.env.set("SKIP_WEBHOOK_VERIFICATION", originalSkipVerification);
 		}
+		if (originalKey !== undefined) {
+			Deno.env.set("OUTPOST_WEBHOOK_SECRET", originalKey);
+		} else {
+			Deno.env.delete("OUTPOST_WEBHOOK_SECRET");
+		}
 	}
 });
 
 Deno.test("handleBayeuWebhook - missing OUTPOST_WEBHOOK_SECRET returns 401", async () => {
+	const originalDenoEnv = Deno.env.get("DENO_ENV");
+	const originalSkipVerification = Deno.env.get("SKIP_WEBHOOK_VERIFICATION");
 	const originalKey = Deno.env.get("OUTPOST_WEBHOOK_SECRET");
+	Deno.env.delete("DENO_ENV");
+	Deno.env.delete("SKIP_WEBHOOK_VERIFICATION");
 	Deno.env.delete("OUTPOST_WEBHOOK_SECRET");
 	try {
 		const payload = JSON.stringify({ status: "success", amount: 100 });
@@ -84,8 +106,46 @@ Deno.test("handleBayeuWebhook - missing OUTPOST_WEBHOOK_SECRET returns 401", asy
 		const res = await handleBayeuWebhook(c);
 		assertEquals((res as any).status, 401);
 	} finally {
+		if (originalDenoEnv !== undefined) {
+			Deno.env.set("DENO_ENV", originalDenoEnv);
+		}
+		if (originalSkipVerification !== undefined) {
+			Deno.env.set("SKIP_WEBHOOK_VERIFICATION", originalSkipVerification);
+		}
 		if (originalKey !== undefined) {
 			Deno.env.set("OUTPOST_WEBHOOK_SECRET", originalKey);
+		}
+	}
+});
+
+Deno.test("handleBayeuWebhook - signature mismatch returns 401", async () => {
+	const originalDenoEnv = Deno.env.get("DENO_ENV");
+	const originalSkipVerification = Deno.env.get("SKIP_WEBHOOK_VERIFICATION");
+	const originalKey = Deno.env.get("OUTPOST_WEBHOOK_SECRET");
+	Deno.env.delete("DENO_ENV");
+	Deno.env.delete("SKIP_WEBHOOK_VERIFICATION");
+	Deno.env.set("OUTPOST_WEBHOOK_SECRET", "test_secret");
+	try {
+		const payload = JSON.stringify({ status: "success", amount: 100 });
+		const c = createMockContext({
+			"x-hookdeck-signature": "completely_wrong_signature",
+			"x-outpost-signature":
+				"v0=0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+		}, payload);
+
+		const res = await handleBayeuWebhook(c);
+		assertEquals((res as any).status, 401);
+	} finally {
+		if (originalDenoEnv !== undefined) {
+			Deno.env.set("DENO_ENV", originalDenoEnv);
+		}
+		if (originalSkipVerification !== undefined) {
+			Deno.env.set("SKIP_WEBHOOK_VERIFICATION", originalSkipVerification);
+		}
+		if (originalKey !== undefined) {
+			Deno.env.set("OUTPOST_WEBHOOK_SECRET", originalKey);
+		} else {
+			Deno.env.delete("OUTPOST_WEBHOOK_SECRET");
 		}
 	}
 });
@@ -169,7 +229,7 @@ Deno.test("handleBayeuWebhook - returns 500 if killBillService throws", async ()
 	}
 });
 
-Deno.test("handleBayeuWebhook - returns 200 on success", async () => {
+Deno.test("handleBayeuWebhook - returns 200 on success with hookdeck-signature header", async () => {
 	const originalKey = Deno.env.get("OUTPOST_WEBHOOK_SECRET");
 	Deno.env.set("OUTPOST_WEBHOOK_SECRET", "test_secret");
 
@@ -181,7 +241,7 @@ Deno.test("handleBayeuWebhook - returns 200 on success", async () => {
 	const signatureBase64 = await generateMockSignature(payload, "test_secret");
 
 	const c = createMockContext({
-		"x-hookdeck-signature": signatureBase64,
+		"hookdeck-signature": signatureBase64,
 	}, payload);
 
 	const payStub = stub(killBillService, "payInvoiceExternal", () => {
@@ -228,6 +288,49 @@ Deno.test("handleBayeuWebhook - outpost format valid signature with timestamp re
 	const c = createMockContext({
 		"x-outpost-signature": signatureHex,
 		"x-outpost-timestamp": timestamp,
+	}, payload);
+
+	const payStub = stub(killBillService, "payInvoiceExternal", () => {
+		return Promise.resolve();
+	});
+
+	const storageFromStub = stub(supabase.storage, "from", () => {
+		return {
+			remove: () => Promise.resolve({ data: null, error: null }),
+		} as any;
+	});
+
+	try {
+		const res = await handleBayeuWebhook(c);
+		assertEquals((res as any).status, 200);
+		assertEquals((res as any).body.message, "Payment processed");
+	} finally {
+		payStub.restore();
+		storageFromStub.restore();
+		if (originalKey === undefined) {
+			Deno.env.delete("OUTPOST_WEBHOOK_SECRET");
+		} else {
+			Deno.env.set("OUTPOST_WEBHOOK_SECRET", originalKey);
+		}
+	}
+});
+
+Deno.test("handleBayeuWebhook - outpost format base64 signature returns 200", async () => {
+	const originalKey = Deno.env.get("OUTPOST_WEBHOOK_SECRET");
+	Deno.env.set("OUTPOST_WEBHOOK_SECRET", "test_secret");
+
+	const payload = JSON.stringify({
+		status: "success",
+		amount: 100,
+		metadata: { invoice_id: "inv-123" },
+	});
+	const signatureBase64 = generateMockOutpostSignatureBase64(
+		payload,
+		"test_secret",
+	);
+
+	const c = createMockContext({
+		"x-outpost-signature": signatureBase64,
 	}, payload);
 
 	const payStub = stub(killBillService, "payInvoiceExternal", () => {
@@ -342,6 +445,104 @@ Deno.test("handleBayeuWebhook - outpost format with whsec_ secret returns 200", 
 			Deno.env.delete("OUTPOST_WEBHOOK_SECRET");
 		} else {
 			Deno.env.set("OUTPOST_WEBHOOK_SECRET", originalKey);
+		}
+	}
+});
+
+Deno.test("handleBayeuWebhook - handles storage remove error gracefully", async () => {
+	const originalKey = Deno.env.get("OUTPOST_WEBHOOK_SECRET");
+	Deno.env.set("OUTPOST_WEBHOOK_SECRET", "test_secret");
+
+	const payload = JSON.stringify({
+		status: "success",
+		amount: 100,
+		metadata: { invoice_id: "inv-123" },
+	});
+	const signatureBase64 = await generateMockSignature(payload, "test_secret");
+
+	const c = createMockContext({
+		"x-hookdeck-signature": signatureBase64,
+	}, payload);
+
+	const payStub = stub(killBillService, "payInvoiceExternal", () => {
+		return Promise.resolve();
+	});
+
+	const storageFromStub = stub(supabase.storage, "from", () => {
+		return {
+			remove: () =>
+				Promise.resolve({
+					data: null,
+					error: { message: "Failed deletion" },
+				}),
+		} as any;
+	});
+
+	try {
+		const res = await handleBayeuWebhook(c);
+		assertEquals((res as any).status, 200);
+	} finally {
+		payStub.restore();
+		storageFromStub.restore();
+		if (originalKey === undefined) {
+			Deno.env.delete("OUTPOST_WEBHOOK_SECRET");
+		} else {
+			Deno.env.set("OUTPOST_WEBHOOK_SECRET", originalKey);
+		}
+	}
+});
+
+Deno.test("handleBayeuWebhook - handles storage remove exception gracefully", async () => {
+	const originalKey = Deno.env.get("OUTPOST_WEBHOOK_SECRET");
+	Deno.env.set("OUTPOST_WEBHOOK_SECRET", "test_secret");
+
+	const payload = JSON.stringify({
+		status: "success",
+		amount: 100,
+		metadata: { invoice_id: "inv-123" },
+	});
+	const signatureBase64 = await generateMockSignature(payload, "test_secret");
+
+	const c = createMockContext({
+		"x-hookdeck-signature": signatureBase64,
+	}, payload);
+
+	const payStub = stub(killBillService, "payInvoiceExternal", () => {
+		return Promise.resolve();
+	});
+
+	const storageFromStub = stub(supabase.storage, "from", () => {
+		return {
+			remove: () => Promise.reject(new Error("Storage service failure")),
+		} as any;
+	});
+
+	try {
+		const res = await handleBayeuWebhook(c);
+		assertEquals((res as any).status, 200);
+	} finally {
+		payStub.restore();
+		storageFromStub.restore();
+		if (originalKey === undefined) {
+			Deno.env.delete("OUTPOST_WEBHOOK_SECRET");
+		} else {
+			Deno.env.set("OUTPOST_WEBHOOK_SECRET", originalKey);
+		}
+	}
+});
+
+Deno.test("handleBayeuWebhook - returns 500 when request body is malformed JSON", async () => {
+	const origSkip = Deno.env.get("SKIP_WEBHOOK_VERIFICATION");
+	Deno.env.set("SKIP_WEBHOOK_VERIFICATION", "true");
+	try {
+		const c = createMockContext({}, "invalid-json-body");
+		const res = await handleBayeuWebhook(c);
+		assertEquals((res as any).status, 500);
+	} finally {
+		if (origSkip !== undefined) {
+			Deno.env.set("SKIP_WEBHOOK_VERIFICATION", origSkip);
+		} else {
+			Deno.env.delete("SKIP_WEBHOOK_VERIFICATION");
 		}
 	}
 });

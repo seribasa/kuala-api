@@ -20,7 +20,12 @@ export const handlePayInvoice = async (c: Context) => {
 		}
 
 		// `getUser` reads from context because `authMiddleware` is used
-		const user = getUser(c);
+		let user;
+		try {
+			user = getUser(c);
+		} catch (_e) {
+			user = null;
+		}
 		if (!user) {
 			logger.error(handlerName, "User not found in context");
 			const err: ErrorResponse = {

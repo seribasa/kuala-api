@@ -298,3 +298,47 @@ Deno.test("handleGetInvoiceById - should return invoice successfully", async () 
 		fetchStub.restore();
 	}
 });
+
+Deno.test("handleGetInvoiceById - should return 500 when Kill Bill throws Failed to get error", async () => {
+	const mockUser = { id: "user123", email: "test@example.com" };
+	const envStub = setupEnvStub();
+	const fetchStub = stub(globalThis, "fetch", () => {
+		return Promise.resolve(
+			new MockResponse(
+				{ error: "error" },
+				500,
+				false,
+			) as unknown as Response,
+		);
+	});
+	try {
+		const mockContext = createMockContext("inv123", mockUser);
+		const response = await handleGetInvoiceById(
+			mockContext,
+		) as unknown as JsonResponse;
+		assertEquals(response.status, 500);
+		assertEquals(response.data.code, "KILLBILL_ERROR");
+	} finally {
+		envStub.restore();
+		fetchStub.restore();
+	}
+});
+
+Deno.test("handleGetInvoiceById - should return 500 on unexpected error", async () => {
+	const mockUser = { id: "user123", email: "test@example.com" };
+	const envStub = setupEnvStub();
+	const fetchStub = stub(globalThis, "fetch", () => {
+		return Promise.reject("unexpected non-error exception");
+	});
+	try {
+		const mockContext = createMockContext("inv123", mockUser);
+		const response = await handleGetInvoiceById(
+			mockContext,
+		) as unknown as JsonResponse;
+		assertEquals(response.status, 500);
+		assertEquals(response.data.code, "INTERNAL_ERROR");
+	} finally {
+		envStub.restore();
+		fetchStub.restore();
+	}
+});

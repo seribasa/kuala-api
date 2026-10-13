@@ -631,7 +631,29 @@ describe("KillBillService", () => {
 	});
 
 	describe("triggerInvoiceRun", () => {
-		it("success", async () => {
+		it("success with location header", async () => {
+			fetchStub.restore();
+			fetchStub = stub(
+				globalThis,
+				"fetch",
+				returnsNext([
+					Promise.resolve(
+						new Response(null, {
+							status: 201,
+							headers: new Headers({
+								"Location": "http://loc/inv-1/",
+							}),
+						}),
+					),
+				]),
+			);
+			const res = await killBillService.triggerInvoiceRun(
+				"acc-1",
+				"target_date",
+			);
+			assertEquals(res, "inv-1");
+		});
+		it("success without targetDate", async () => {
 			fetchStub.restore();
 			fetchStub = stub(
 				globalThis,
@@ -647,11 +669,78 @@ describe("KillBillService", () => {
 					),
 				]),
 			);
-			const res = await killBillService.triggerInvoiceRun(
-				"acc-1",
-				"target_date",
-			);
+			const res = await killBillService.triggerInvoiceRun("acc-1");
 			assertEquals(res, "inv-1");
+		});
+		it("fallback to body object with invoiceId", async () => {
+			fetchStub.restore();
+			fetchStub = stub(
+				globalThis,
+				"fetch",
+				returnsNext([
+					Promise.resolve(
+						new Response(
+							JSON.stringify({ invoiceId: "inv-from-body" }),
+							{
+								status: 200,
+							},
+						),
+					),
+				]),
+			);
+			const res = await killBillService.triggerInvoiceRun("acc-1");
+			assertEquals(res, "inv-from-body");
+		});
+		it("fallback to body array with invoiceId", async () => {
+			fetchStub.restore();
+			fetchStub = stub(
+				globalThis,
+				"fetch",
+				returnsNext([
+					Promise.resolve(
+						new Response(
+							JSON.stringify([{ invoiceId: "inv-from-array" }]),
+							{
+								status: 200,
+							},
+						),
+					),
+				]),
+			);
+			const res = await killBillService.triggerInvoiceRun("acc-1");
+			assertEquals(res, "inv-from-array");
+		});
+		it("fallback to empty array returns null", async () => {
+			fetchStub.restore();
+			fetchStub = stub(
+				globalThis,
+				"fetch",
+				returnsNext([
+					Promise.resolve(
+						new Response(JSON.stringify([]), {
+							status: 200,
+						}),
+					),
+				]),
+			);
+			const res = await killBillService.triggerInvoiceRun("acc-1");
+			assertEquals(res, null);
+		});
+		it("fallback to body without invoiceId returns null", async () => {
+			fetchStub.restore();
+			fetchStub = stub(
+				globalThis,
+				"fetch",
+				returnsNext([
+					Promise.resolve(
+						new Response(JSON.stringify({ something: "else" }), {
+							status: 200,
+						}),
+					),
+				]),
+			);
+			const res = await killBillService.triggerInvoiceRun("acc-1");
+			assertEquals(res, null);
 		});
 		it("404", async () => {
 			fetchStub.restore();
