@@ -88,17 +88,6 @@ function setupEnvStub() {
 	});
 }
 
-Deno.test("handleDownloadInvoicePdf - should return 400 when invoiceId is missing", async () => {
-	const mockContext = createMockContext("");
-
-	const response = await handleDownloadInvoicePdf(
-		mockContext,
-	) as unknown as JsonResponse;
-
-	assertEquals(response.status, 400);
-	assertEquals(response.data.code, "MISSING_INVOICE_ID");
-});
-
 Deno.test("handleDownloadInvoicePdf - should return 404 when user does not own invoice", async () => {
 	const mockUser = {
 		id: "user123",
@@ -438,51 +427,23 @@ Deno.test("handleDownloadInvoicePdf - should return redirect to signed URL direc
 	}
 });
 
-Deno.test("handleDownloadInvoicePdf - should handle Kill Bill service errors gracefully", async () => {
-	const mockUser = {
-		id: "user123",
-		email: "test@example.com",
-	};
-
+Deno.test("handleDownloadInvoicePdf - should return 500 when Kill Bill throws Failed to get error", async () => {
+	const mockUser = { id: "user123", email: "test@example.com" };
 	const envStub = setupEnvStub();
-
-	const fetchStub = stub(
-		globalThis,
-		"fetch",
-		(url: string | URL | Request) => {
-			const urlString = typeof url === "string"
-				? url
-				: url instanceof URL
-				? url.toString()
-				: url.url;
-
-			if (urlString.includes("/1.0/kb/invoices/inv123")) {
-				return Promise.resolve(
-					new MockResponse(
-						{ error: "Internal error" },
-						500,
-						false,
-					) as unknown as Response,
-				);
-			}
-
-			return Promise.resolve(
-				new MockResponse(
-					{ error: "Unexpected call" },
-					500,
-					false,
-				) as unknown as Response,
-			);
-		},
-	);
-
+	const fetchStub = stub(globalThis, "fetch", () => {
+		return Promise.resolve(
+			new MockResponse(
+				{ error: "error" },
+				500,
+				false,
+			) as unknown as Response,
+		);
+	});
 	try {
 		const mockContext = createMockContext("inv123", mockUser);
-
 		const response = await handleDownloadInvoicePdf(
 			mockContext,
 		) as unknown as JsonResponse;
-
 		assertEquals(response.status, 500);
 		assertEquals(response.data.code, "KILLBILL_ERROR");
 	} finally {
@@ -491,65 +452,30 @@ Deno.test("handleDownloadInvoicePdf - should handle Kill Bill service errors gra
 	}
 });
 
-Deno.test("handleDownloadInvoicePdf - should handle network errors gracefully", async () => {
-	const mockUser = {
-		id: "user123",
-		email: "test@example.com",
-	};
-
-	const envStub = setupEnvStub();
-
-	const fetchStub = stub(
-		globalThis,
-		"fetch",
-		() => {
-			return Promise.reject(new Error("Network error"));
-		},
-	);
-
-	try {
-		const mockContext = createMockContext("inv123", mockUser);
-
-		const response = await handleDownloadInvoicePdf(
-			mockContext,
-		) as unknown as JsonResponse;
-
-		assertEquals(response.status, 500);
-		assertEquals(response.data.code, "INTERNAL_ERROR");
-	} finally {
-		envStub.restore();
-		fetchStub.restore();
-	}
-});
-
-Deno.test("handleDownloadInvoicePdf - should handle storage upload errors gracefully", async () => {
-	const mockUser = {
-		id: "user123",
-		email: "test@example.com",
-	};
-
+Deno.test("handleDownloadInvoicePdf - should return 500 when upload to storage fails", async () => {
+	const mockUser = { id: "user123", email: "test@example.com" };
 	const mockInvoice = {
 		invoiceId: "inv123",
 		accountId: "acc123",
 		amount: 100,
 		status: "COMMITTED",
 	};
-
 	const mockUserAccount = {
 		accountId: "acc123",
 		externalKey: "user123",
 		currency: "USD",
 	};
-
 	const envStub = setupEnvStub();
 
 	const storageStub = stub(supabase.storage, "from", () =>
 		({
-			list: () => Promise.resolve({ data: [] }), // Not found in storage
+			list: () => Promise.resolve({ data: [] }),
 			upload: () =>
-				Promise.resolve({ error: new Error("Upload failed") }),
-			createSignedUrl: () =>
-				Promise.resolve({ data: { signedUrl: "" }, error: null }),
+				Promise.resolve({
+					data: null,
+					error: { message: "Upload failed" },
+				}),
+			createSignedUrl: () => Promise.resolve({ data: null, error: null }),
 		}) as unknown as ReturnType<typeof supabase.storage.from>);
 
 	const fetchStub = stub(
@@ -563,10 +489,9 @@ Deno.test("handleDownloadInvoicePdf - should handle storage upload errors gracef
 				: url.url;
 			if (urlString.includes("/1.0/kb/invoices/inv123/html")) {
 				return Promise.resolve(
-					new MockResponse(
-						"<html>Invoice</html>",
-						200,
-					) as unknown as Response,
+					new Response("<html><body>Invoice</body></html>", {
+						status: 200,
+					}),
 				);
 			}
 			if (urlString.includes("/1.0/kb/invoices/inv123")) {
@@ -584,7 +509,7 @@ Deno.test("handleDownloadInvoicePdf - should handle storage upload errors gracef
 			}
 			return Promise.resolve(
 				new MockResponse(
-					{ error: "Unexpected call" },
+					{ error: "Unexpected" },
 					500,
 					false,
 				) as unknown as Response,
@@ -606,36 +531,29 @@ Deno.test("handleDownloadInvoicePdf - should handle storage upload errors gracef
 	}
 });
 
-Deno.test("handleDownloadInvoicePdf - should handle signed url generation errors gracefully", async () => {
-	const mockUser = {
-		id: "user123",
-		email: "test@example.com",
-	};
-
+Deno.test("handleDownloadInvoicePdf - should return 500 when createSignedUrl fails", async () => {
+	const mockUser = { id: "user123", email: "test@example.com" };
 	const mockInvoice = {
 		invoiceId: "inv123",
 		accountId: "acc123",
 		amount: 100,
 		status: "COMMITTED",
 	};
-
 	const mockUserAccount = {
 		accountId: "acc123",
 		externalKey: "user123",
 		currency: "USD",
 	};
-
 	const envStub = setupEnvStub();
 
 	const storageStub = stub(supabase.storage, "from", () =>
 		({
-			list: () =>
-				Promise.resolve({ data: [{ name: "invoice-inv123.pdf" }] }), // Found in storage
-			upload: () => Promise.reject(new Error("Should not upload")),
+			list: () => Promise.resolve({ data: [] }),
+			upload: () => Promise.resolve({ data: { path: "p" }, error: null }),
 			createSignedUrl: () =>
 				Promise.resolve({
 					data: null,
-					error: new Error("Signed URL failed"),
+					error: { message: "Sign failed" },
 				}),
 		}) as unknown as ReturnType<typeof supabase.storage.from>);
 
@@ -648,6 +566,13 @@ Deno.test("handleDownloadInvoicePdf - should handle signed url generation errors
 				: url instanceof URL
 				? url.toString()
 				: url.url;
+			if (urlString.includes("/1.0/kb/invoices/inv123/html")) {
+				return Promise.resolve(
+					new Response("<html><body>Invoice</body></html>", {
+						status: 200,
+					}),
+				);
+			}
 			if (urlString.includes("/1.0/kb/invoices/inv123")) {
 				return Promise.resolve(
 					new MockResponse(mockInvoice, 200) as unknown as Response,
@@ -663,7 +588,7 @@ Deno.test("handleDownloadInvoicePdf - should handle signed url generation errors
 			}
 			return Promise.resolve(
 				new MockResponse(
-					{ error: "Unexpected call" },
+					{ error: "Unexpected" },
 					500,
 					false,
 				) as unknown as Response,

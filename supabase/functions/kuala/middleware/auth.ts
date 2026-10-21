@@ -1,3 +1,4 @@
+import { config } from "../../_shared/config/env.ts";
 import { Context, Next } from "@hono/hono";
 import { ErrorResponse } from "../../_shared/types/response.ts";
 import type { AuthenticatedUser } from "../../_shared/types/index.ts";
@@ -10,13 +11,13 @@ export async function getAuthenticatedUser(
 	authorization: string,
 ): Promise<AuthenticatedUser | null> {
 	const handlerName = "authMiddleware";
-	const supabaseBaseUrl = Deno.env.get("AUTH_BASE_URL");
+	const supabaseBaseUrl = config.AUTH_BASE_URL;
 	if (!supabaseBaseUrl) {
 		logger.error(handlerName, "Missing SUPABASE_URL environment variable");
 		return null;
 	}
 	const supabaseUserUrl = new URL("/auth/v1/user", supabaseBaseUrl);
-	const apikey = Deno.env.get("AUTH_SUPABASE_ANON_KEY");
+	const apikey = config.AUTH_SUPABASE_ANON_KEY;
 
 	if (!apikey) {
 		logger.error(handlerName, "Missing API key");

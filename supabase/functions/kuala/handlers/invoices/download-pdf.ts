@@ -25,15 +25,6 @@ export const handleDownloadInvoicePdf = async (c: Context) => {
 			invoiceId: invoiceId?.substring(0, 8) + "...",
 		});
 
-		if (!invoiceId) {
-			authLogger.error(handlerName, "Missing invoice ID parameter");
-			const errorResponse: ErrorResponse = {
-				code: "MISSING_INVOICE_ID",
-				message: "Invoice ID is required",
-			};
-			return c.json(errorResponse, 400);
-		}
-
 		// Get authenticated user from context (set by authMiddleware)
 		const user = getUser(c);
 		const userId = user.id;
@@ -98,14 +89,23 @@ export const handleDownloadInvoicePdf = async (c: Context) => {
 			page.drawText("Invoice: " + invoiceId, {
 				x: padding,
 				y: height - padding,
-				size: 16,
+				size: 10,
 				font,
 			});
 
 			// Clean up HTML a bit for text rendering
 			const cleanText = htmlContent
-				.replace(/<[^>]+>/g, " ") // Strip HTML tags
-				.replace(/\s+/g, " ") // Collapse whitespace
+				.replace(/\s+/g, " ") // Collapse all whitespace and newlines first
+				.replace(/<style[^>]*>[\s\S]*?<\/style>/gi, "") // Remove style blocks
+				.replace(/<script[^>]*>[\s\S]*?<\/script>/gi, "") // Remove script blocks
+				.replace(/<\/(p|div|tr|h[1-6]|table)>/gi, "\n") // Add newline after blocks
+				.replace(/<br\s*\/?>/gi, "\n") // Replace <br> with newline
+				.replace(/<\/th>/gi, "    ") // Add spacing between table columns
+				.replace(/<\/td>/gi, "    ") // Add spacing between table columns
+				.replace(/<[^>]+>/g, "") // Strip remaining HTML tags
+				.replace(/^[ \t]+/gm, "") // Remove leading whitespace on each line
+				.replace(/[ \t]+$/gm, "") // Remove trailing whitespace
+				.replace(/\n[ \t]*\n[ \t]*\n+/g, "\n\n") // Collapse 3+ newlines to 2
 				.trim()
 				.substring(0, 4000); // Limit length to avoid page overflow for basic dump
 

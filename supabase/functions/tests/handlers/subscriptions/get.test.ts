@@ -3,6 +3,8 @@ import { stub } from "@std/testing/mock";
 import { Context } from "@hono/hono";
 import { handleGetSubscription } from "../../../kuala/handlers/subscriptions/get.ts";
 import { subscriptionStateManager } from "../../../_shared/services/subscription-state-management.ts";
+import { killBillService } from "@shared/services/killbill.ts";
+import { KillBillAccount } from "../../../_shared/types/index.ts";
 
 // Stub state manager globally to prevent Supabase queries from hitting mocked fetch
 const globalPendingStub = stub(
@@ -271,6 +273,33 @@ Deno.test("handleGetSubscription - should return subscription successfully", asy
 				);
 			}
 
+			if (callCount === 3) {
+				// Get catalog for plans
+				const mockCatalog = [{
+					products: [{
+						name: "Basic",
+						prettyName: "Basic",
+						plans: [{
+							name: "basic-monthly",
+							phases: [{
+								type: "EVERGREEN",
+								prices: [{ currency: "USD", value: 10 }],
+							}],
+						}],
+					}],
+					priceLists: [{
+						name: "DEFAULT",
+						plans: ["basic-monthly"],
+					}],
+				}];
+				return Promise.resolve(
+					new MockResponse(
+						mockCatalog,
+						200,
+					) as unknown as Response,
+				);
+			}
+
 			return Promise.resolve(
 				new MockResponse(
 					{ error: "Unexpected call" },
@@ -376,6 +405,33 @@ Deno.test("handleGetSubscription - should return subscription with ANNUAL billin
 				return Promise.resolve(
 					new MockResponse(
 						mockSubscription,
+						200,
+					) as unknown as Response,
+				);
+			}
+
+			if (callCount === 3) {
+				// Get catalog for plans
+				const mockCatalog = [{
+					products: [{
+						name: "Premium",
+						prettyName: "Premium",
+						plans: [{
+							name: "premium-annual",
+							phases: [{
+								type: "EVERGREEN",
+								prices: [{ currency: "USD", value: 100 }],
+							}],
+						}],
+					}],
+					priceLists: [{
+						name: "DEFAULT",
+						plans: ["premium-annual"],
+					}],
+				}];
+				return Promise.resolve(
+					new MockResponse(
+						mockCatalog,
 						200,
 					) as unknown as Response,
 				);
@@ -627,5 +683,82 @@ Deno.test("handleGetSubscription - should return 409 when user has pending subsc
 	} finally {
 		pendingStub.restore();
 		latestRequestStub.restore();
+	}
+});
+
+Deno.test("handleGetSubscription - handles non-Error thrown when fetching account", async () => {
+	const mockUser = {
+		id: "user123",
+		email: "test@example.com",
+	};
+
+	const pendingStub = stub(
+		subscriptionStateManager,
+		"hasPendingSubscriptionRequest",
+		() => Promise.resolve(false),
+	);
+
+	const accountStub = stub(
+		killBillService,
+		"getAccountByExternalKey",
+		() => Promise.reject("non-error account string"),
+	);
+
+	try {
+		const mockContext = createMockContext(mockUser);
+		const response = await handleGetSubscription(
+			mockContext,
+		) as unknown as JsonResponse;
+
+		assertEquals(response.status, 502);
+		assertEquals(response.data.code, "UPSTREAM_ERROR");
+	} finally {
+		accountStub.restore();
+		pendingStub.restore();
+	}
+});
+
+Deno.test("handleGetSubscription - handles non-Error thrown when fetching subscription", async () => {
+	const mockUser = {
+		id: "user123",
+		email: "test@example.com",
+	};
+
+	const pendingStub = stub(
+		subscriptionStateManager,
+		"hasPendingSubscriptionRequest",
+		() => Promise.resolve(false),
+	);
+
+	const accountStub = stub(
+		killBillService,
+		"getAccountByExternalKey",
+		() =>
+			Promise.resolve({
+				accountId: "account123",
+				name: "test@example.com",
+				email: "test@example.com",
+				currency: "USD",
+			} as unknown as KillBillAccount),
+	);
+
+	const subStub = stub(
+		killBillService,
+		"getSubscriptionByExternalId",
+		() => Promise.reject("non-error subscription string"),
+	);
+
+	try {
+		const mockContext = createMockContext(mockUser);
+		const response = await handleGetSubscription(
+			mockContext,
+		) as unknown as JsonResponse;
+
+		assertEquals(response.status, 502);
+		assertEquals(response.data.code, "UPSTREAM_ERROR");
+	} finally {
+		accountStub.restore();
+		subStub.restore();
+		pendingStub.restore();
 	}
 });

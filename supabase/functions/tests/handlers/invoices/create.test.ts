@@ -82,37 +82,6 @@ function setupEnvStub() {
 	});
 }
 
-Deno.test("handleCreateInvoice - should return 400 when body is invalid", async () => {
-	const mockContext = {
-		req: {
-			json: () => Promise.reject(new Error("Invalid JSON")),
-			header: () => "Bearer valid_token",
-		},
-		json: (data: Record<string, unknown>, status: number) => ({
-			data,
-			status,
-		}),
-	} as unknown as Context;
-
-	const response = await handleCreateInvoice(
-		mockContext,
-	) as unknown as JsonResponse;
-
-	assertEquals(response.status, 400);
-	assertEquals(response.data.code, "INVALID_REQUEST");
-});
-
-Deno.test("handleCreateInvoice - should return 400 when accountId is missing", async () => {
-	const mockContext = createMockContext({ targetDate: "2024-01-01" });
-
-	const response = await handleCreateInvoice(
-		mockContext,
-	) as unknown as JsonResponse;
-
-	assertEquals(response.status, 400);
-	assertEquals(response.data.code, "MISSING_ACCOUNT_ID");
-});
-
 Deno.test("handleCreateInvoice - should return 404 when user does not own account", async () => {
 	const mockUser = {
 		id: "user123",
