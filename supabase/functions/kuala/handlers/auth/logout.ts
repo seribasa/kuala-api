@@ -97,11 +97,13 @@ export const handleLogout = async (c: Context) => {
 
 				if (userResponse.ok) {
 					const userData = await userResponse.json();
-					const identities = userData?.identities as Array<{
-						provider?: string;
-						id?: string;
-						identity_data?: { sub?: string };
-					}> | undefined;
+					const identities = userData?.identities as
+						| Array<{
+							provider?: string;
+							id?: string;
+							identity_data?: { sub?: string };
+						}>
+						| undefined;
 					const keycloakIdentity = identities?.find(
 						(i) => i.provider === "keycloak",
 					);

@@ -100,7 +100,8 @@ export class KeycloakService {
 			return null;
 		}
 
-		const tokenUrl = `${this.getBaseUrl()}/realms/${this.realm}/protocol/openid-connect/token`;
+		const tokenUrl =
+			`${this.getBaseUrl()}/realms/${this.realm}/protocol/openid-connect/token`;
 		const params = new URLSearchParams();
 		params.set("grant_type", "client_credentials");
 		params.set("client_id", this.clientId);
@@ -150,7 +151,8 @@ export class KeycloakService {
 			return false;
 		}
 
-		const logoutUrl = `${this.getBaseUrl()}/admin/realms/${this.realm}/users/${keycloakUserId}/logout`;
+		const logoutUrl =
+			`${this.getBaseUrl()}/admin/realms/${this.realm}/users/${keycloakUserId}/logout`;
 		try {
 			const res = await fetch(logoutUrl, {
 				method: "POST",
@@ -185,7 +187,8 @@ export class KeycloakService {
 			return false;
 		}
 
-		const logoutUrl = `${this.getBaseUrl()}/realms/${this.realm}/protocol/openid-connect/logout`;
+		const logoutUrl =
+			`${this.getBaseUrl()}/realms/${this.realm}/protocol/openid-connect/logout`;
 		const params = new URLSearchParams();
 		params.set("client_id", this.clientId);
 		params.set("client_secret", this.clientSecret);

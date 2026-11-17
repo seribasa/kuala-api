@@ -448,7 +448,9 @@ Deno.test("handleLogout - should trigger Keycloak admin logout when user has key
 	const envStub = stub(Deno.env, "get", (key: string) => {
 		if (key === "AUTH_BASE_URL") return "https://test.supabase.co";
 		if (key === "AUTH_SUPABASE_ANON_KEY") return "test_api_key";
-		if (key === "KEYCLOAK_URL") return "https://identity.example.com/realms/kuala";
+		if (key === "KEYCLOAK_URL") {
+			return "https://identity.example.com/realms/kuala";
+		}
 		if (key === "KEYCLOAK_CLIENT_ID") return "kuala";
 		if (key === "KEYCLOAK_CLIENT_SECRET") return "kuala_secret";
 		return undefined;
@@ -493,7 +495,9 @@ Deno.test("handleLogout - should trigger Keycloak admin logout when user has key
 			}
 
 			// Keycloak admin logout endpoint
-			if (urlStr.includes("/admin/realms/kuala/users/kc_user_123/logout")) {
+			if (
+				urlStr.includes("/admin/realms/kuala/users/kc_user_123/logout")
+			) {
 				return Promise.resolve(
 					new MockResponse(null, 204, true) as unknown as Response,
 				);
@@ -514,15 +518,23 @@ Deno.test("handleLogout - should trigger Keycloak admin logout when user has key
 
 	try {
 		const mockContext = createMockContext("Bearer test_token");
-		const response = await handleLogout(mockContext) as unknown as BodyResponse;
+		const response = await handleLogout(
+			mockContext,
+		) as unknown as BodyResponse;
 
 		assertEquals(response.status, 204);
 		assertEquals(response.body, null);
 
 		const hasUserCall = calledUrls.some((u) => u.includes("/auth/v1/user"));
-		const hasTokenCall = calledUrls.some((u) => u.includes("/protocol/openid-connect/token"));
-		const hasAdminLogoutCall = calledUrls.some((u) => u.includes("/admin/realms/kuala/users/kc_user_123/logout"));
-		const hasSupabaseLogoutCall = calledUrls.some((u) => u.includes("/auth/v1/logout"));
+		const hasTokenCall = calledUrls.some((u) =>
+			u.includes("/protocol/openid-connect/token")
+		);
+		const hasAdminLogoutCall = calledUrls.some((u) =>
+			u.includes("/admin/realms/kuala/users/kc_user_123/logout")
+		);
+		const hasSupabaseLogoutCall = calledUrls.some((u) =>
+			u.includes("/auth/v1/logout")
+		);
 
 		assertEquals(hasUserCall, true);
 		assertEquals(hasTokenCall, true);
@@ -538,7 +550,9 @@ Deno.test("handleLogout - should trigger Keycloak OIDC logout when refresh_token
 	const envStub = stub(Deno.env, "get", (key: string) => {
 		if (key === "AUTH_BASE_URL") return "https://test.supabase.co";
 		if (key === "AUTH_SUPABASE_ANON_KEY") return "test_api_key";
-		if (key === "KEYCLOAK_URL") return "https://identity.example.com/realms/kuala";
+		if (key === "KEYCLOAK_URL") {
+			return "https://identity.example.com/realms/kuala";
+		}
 		if (key === "KEYCLOAK_CLIENT_ID") return "kuala";
 		if (key === "KEYCLOAK_CLIENT_SECRET") return "kuala_secret";
 		return undefined;
@@ -560,7 +574,11 @@ Deno.test("handleLogout - should trigger Keycloak OIDC logout when refresh_token
 
 			if (urlStr.includes("/auth/v1/user")) {
 				return Promise.resolve(
-					new MockResponse({ id: "sb_user_1", identities: [] }, 200, true) as unknown as Response,
+					new MockResponse(
+						{ id: "sb_user_1", identities: [] },
+						200,
+						true,
+					) as unknown as Response,
 				);
 			}
 
@@ -582,10 +600,14 @@ Deno.test("handleLogout - should trigger Keycloak OIDC logout when refresh_token
 			"https://kuala-api.example.com/auth/logout",
 			{ refresh_token: "my_keycloak_refresh_token" },
 		);
-		const response = await handleLogout(mockContext) as unknown as BodyResponse;
+		const response = await handleLogout(
+			mockContext,
+		) as unknown as BodyResponse;
 
 		assertEquals(response.status, 204);
-		const hasOidcLogoutCall = calledUrls.some((u) => u.includes("/protocol/openid-connect/logout"));
+		const hasOidcLogoutCall = calledUrls.some((u) =>
+			u.includes("/protocol/openid-connect/logout")
+		);
 		assertEquals(hasOidcLogoutCall, true);
 	} finally {
 		envStub.restore();
@@ -597,7 +619,9 @@ Deno.test("handleLogout - should complete successfully even if Keycloak logout f
 	const envStub = stub(Deno.env, "get", (key: string) => {
 		if (key === "AUTH_BASE_URL") return "https://test.supabase.co";
 		if (key === "AUTH_SUPABASE_ANON_KEY") return "test_api_key";
-		if (key === "KEYCLOAK_URL") return "https://identity.example.com/realms/kuala";
+		if (key === "KEYCLOAK_URL") {
+			return "https://identity.example.com/realms/kuala";
+		}
 		if (key === "KEYCLOAK_CLIENT_ID") return "kuala";
 		if (key === "KEYCLOAK_CLIENT_SECRET") return "kuala_secret";
 		return undefined;
@@ -610,7 +634,9 @@ Deno.test("handleLogout - should complete successfully even if Keycloak logout f
 			const urlStr = input.toString();
 
 			if (urlStr.includes("/auth/v1/user")) {
-				return Promise.reject(new Error("Network failure reaching user endpoint"));
+				return Promise.reject(
+					new Error("Network failure reaching user endpoint"),
+				);
 			}
 
 			if (urlStr.includes("/auth/v1/logout")) {
@@ -627,7 +653,9 @@ Deno.test("handleLogout - should complete successfully even if Keycloak logout f
 
 	try {
 		const mockContext = createMockContext("Bearer test_token");
-		const response = await handleLogout(mockContext) as unknown as BodyResponse;
+		const response = await handleLogout(
+			mockContext,
+		) as unknown as BodyResponse;
 
 		assertEquals(response.status, 204);
 		assertEquals(response.body, null);
