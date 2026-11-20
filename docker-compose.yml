@@ -98,7 +98,7 @@ services:
     # Connect local Supabase CLI to this instance if not using hosted Supabase
     # ============================================================================
     postgres:
-        image: postgres:18
+        image: postgres:19
         container_name: postgres-kuala
         ports:
             - "5432:5432"
