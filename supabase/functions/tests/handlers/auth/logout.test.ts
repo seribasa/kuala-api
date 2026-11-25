@@ -88,6 +88,30 @@ Deno.test("handleLogout - should return 500 when AUTH_SUPABASE_ANON_KEY is missi
 	}
 });
 
+Deno.test("handleLogout - should return 500 when AUTH_BASE_URL is missing", async () => {
+	const envStub = stub(Deno.env, "get", (key: string) => {
+		if (key === "AUTH_SUPABASE_ANON_KEY") return "test_api_key";
+		return undefined;
+	});
+
+	try {
+		const mockContext = createMockContext("Bearer test_token");
+
+		const response = await handleLogout(
+			mockContext,
+		) as unknown as JsonResponse;
+
+		assertEquals(response.status, 500);
+		assertEquals(response.data.code, "MISSING_AUTH_BASE_URL");
+		assertEquals(
+			response.data.message,
+			"Supabase Auth base URL not configured",
+		);
+	} finally {
+		envStub.restore();
+	}
+});
+
 Deno.test("handleLogout - should return 204 for successful logout", async () => {
 	// Stub environment variables with proper values
 	const envStub = stub(Deno.env, "get", (key: string) => {
@@ -228,8 +252,12 @@ Deno.test("handleLogout - should return 500 for other error status from Supabase
 });
 
 Deno.test("handleLogout - should handle fetch error", async () => {
-	// Stub environment variable
-	const envStub = stub(Deno.env, "get", () => "test_api_key");
+	// Stub environment variables with proper values (no Keycloak configured)
+	const envStub = stub(Deno.env, "get", (key: string) => {
+		if (key === "AUTH_BASE_URL") return "https://test.supabase.co";
+		if (key === "AUTH_SUPABASE_ANON_KEY") return "test_api_key";
+		return undefined;
+	});
 
 	// Stub fetch to throw error
 	const fetchStub = stub(
@@ -307,46 +335,6 @@ Deno.test("handleLogout - should handle empty Authorization header", async () =>
 	assertEquals(response.status, 401);
 	assertEquals(response.data.code, "MISSING_AUTHORIZATION");
 	assertEquals(response.data.message, "Authorization header is required");
-});
-
-Deno.test("handleLogout - should use fallback URL when AUTH_BASE_URL is not set", async () => {
-	// Stub environment variables to return undefined for AUTH_BASE_URL but valid API key
-	const envStub = stub(Deno.env, "get", (key: string) => {
-		if (key === "AUTH_SUPABASE_ANON_KEY") return "test_api_key";
-		return undefined; // AUTH_BASE_URL not set
-	});
-
-	// Stub fetch to return successful logout response
-	const fetchStub = stub(
-		globalThis,
-		"fetch",
-		() =>
-			Promise.resolve(
-				new MockResponse(null, 204, true) as unknown as Response,
-			),
-	);
-
-	try {
-		const mockContext = createMockContext(
-			"Bearer test_token",
-			"https://kuala-api.example.com/auth/logout",
-		);
-
-		const response = await handleLogout(
-			mockContext,
-		) as unknown as BodyResponse;
-
-		assertEquals(response.status, 204);
-
-		// Verify fetch was called with fallback URL
-		assertEquals(fetchStub.calls.length, 1);
-		const [url] = fetchStub.calls[0].args;
-		const requestUrl = new URL(url as string);
-		assertEquals(requestUrl.origin, "https://kuala-api.example.com");
-	} finally {
-		envStub.restore();
-		fetchStub.restore();
-	}
 });
 
 Deno.test("handleLogout - should handle Supabase error without error_description", async () => {

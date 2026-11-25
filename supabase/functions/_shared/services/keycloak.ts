@@ -67,16 +67,27 @@ export class KeycloakService {
 			try {
 				const parsed = new URL(this.keycloakUrl);
 				const match = parsed.pathname.match(/\/realms\/([^/]+)/);
-				return match ? match[1] : "kuala";
+				return match ? match[1] : "";
 			} catch {
-				return "kuala";
+				return "";
 			}
 		}
-		return "kuala";
+		return "";
 	}
 
 	public isConfigured(): boolean {
-		return !!(this.keycloakUrl && this.clientId && this.clientSecret);
+		const hasCreds = !!(
+			this.keycloakUrl &&
+			this.clientId &&
+			this.clientSecret
+		);
+		if (hasCreds && !this.realm) {
+			console.warn(
+				"[KeycloakService] Keycloak credentials are set, but realm could not be resolved from KEYCLOAK_REALM or KEYCLOAK_URL.",
+			);
+			return false;
+		}
+		return hasCreds;
 	}
 
 	public getBaseUrl(): string {

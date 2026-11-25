@@ -31,16 +31,6 @@ export const handleLogout = async (c: Context) => {
 			return c.json(errorResponse, 401);
 		}
 
-		// Build the Supabase logout URL
-		const supabaseBaseUrl = config.AUTH_BASE_URL || c.req.url;
-		const supabaseLogoutUrl = new URL("/auth/v1/logout", supabaseBaseUrl);
-
-		authLogger.apiCall(handlerName, "URL construction", {
-			supabaseBaseUrl,
-			requestUrl: c.req.url,
-			finalLogoutUrl: supabaseLogoutUrl.toString(),
-		});
-
 		// Get apikey from environment
 		const apikey = config.AUTH_SUPABASE_ANON_KEY;
 
@@ -57,6 +47,25 @@ export const handleLogout = async (c: Context) => {
 			};
 			return c.json(errorResponse, 500);
 		}
+
+		// Build the Supabase logout URL
+		const supabaseBaseUrl = config.AUTH_BASE_URL;
+		if (!supabaseBaseUrl) {
+			authLogger.error(handlerName, "Missing AUTH_BASE_URL");
+			const errorResponse: ErrorResponse = {
+				code: "MISSING_AUTH_BASE_URL",
+				message: "Supabase Auth base URL not configured",
+			};
+			return c.json(errorResponse, 500);
+		}
+
+		const supabaseLogoutUrl = new URL("/auth/v1/logout", supabaseBaseUrl);
+
+		authLogger.apiCall(handlerName, "URL construction", {
+			supabaseBaseUrl,
+			requestUrl: c.req.url,
+			finalLogoutUrl: supabaseLogoutUrl.toString(),
+		});
 
 		// Optional: parse body for refresh token (if client passed one)
 		let keycloakRefreshToken: string | undefined;
@@ -100,19 +109,13 @@ export const handleLogout = async (c: Context) => {
 					const identities = userData?.identities as
 						| Array<{
 							provider?: string;
-							id?: string;
 							identity_data?: { sub?: string };
 						}>
 						| undefined;
 					const keycloakIdentity = identities?.find(
 						(i) => i.provider === "keycloak",
 					);
-					const keycloakUserId =
-						keycloakIdentity?.identity_data?.sub ||
-						keycloakIdentity?.id ||
-						(userData?.app_metadata?.provider === "keycloak"
-							? userData?.user_metadata?.sub
-							: null);
+					const keycloakUserId = keycloakIdentity?.identity_data?.sub;
 
 					if (keycloakUserId) {
 						authLogger.apiCall(
