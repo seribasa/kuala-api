@@ -27,6 +27,13 @@ const envSchema = z.object({
 	SKIP_WEBHOOK_VERIFICATION: z.string().transform((v) => v === "true")
 		.default(false),
 	RABBITMQ_URL: z.string().optional(),
+	KEYCLOAK_URL: z.string().optional().default(""),
+	KEYCLOAK_CLIENT_ID: z.string().optional().default(""),
+	KEYCLOAK_CLIENT_SECRET: z.string().optional().default(""),
+	KEYCLOAK_REALM: z.string().optional().default(""),
+	EXTERNAL_KEYCLOAK_URL: z.string().optional().default(""),
+	EXTERNAL_KEYCLOAK_CLIENT_ID: z.string().optional().default(""),
+	EXTERNAL_KEYCLOAK_SECRET: z.string().optional().default(""),
 });
 
 type EnvConfig = z.infer<typeof envSchema>;
